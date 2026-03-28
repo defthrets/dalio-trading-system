@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DALIOS — Automated Trading Framework</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <!-- Scanline overlay -->
+  <div class="scanlines" aria-hidden="true"></div>
+  <!-- Noise overlay -->
+  <div class="noise" aria-hidden="true"></div>
+
+  <!-- ═══════════════════════════════════════════════
+       HEADER
+  ═══════════════════════════════════════════════ -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-block">
+        <span class="logo-icon" title="Dalios">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Notepad body -->
+            <rect x="3" y="4" width="18" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <!-- Spiral binding -->
+            <line x1="3" y1="8" x2="21" y2="8" stroke="currentColor" stroke-width="0.8" opacity="0.4"/>
+            <circle cx="7"  cy="4" r="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <circle cx="12" cy="4" r="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <circle cx="17" cy="4" r="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <!-- Lines on notepad -->
+            <line x1="7" y1="13" x2="17" y2="13" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+            <line x1="7" y1="17" x2="17" y2="17" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+            <line x1="7" y1="21" x2="13" y2="21" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+            <!-- Quill -->
+            <path d="M20 2 C26 1 27 8 22 12 L16 20 L15 16 L19 11 C24 7 23 3 20 2Z" fill="currentColor" opacity="0.85"/>
+            <!-- Quill tip / nib -->
+            <path d="M15 16 L13 22 L17 18 Z" fill="currentColor" opacity="0.6"/>
+            <!-- Ink drop -->
+            <circle cx="13" cy="23" r="1" fill="currentColor" opacity="0.45"/>
+          </svg>
+        </span>
+        <div class="logo-text">
+          <span class="logo-main">DALIOS</span>
+          <span class="logo-sub">AUTOMATED TRADING FRAMEWORK</span>
+        </div>
+      </div>
+      <div class="header-divider"></div>
+      <div class="system-badges">
+        <span class="badge badge--green" id="statusBadge">● OPERATIONAL</span>
+        <span class="badge badge--amber" id="modeBadge">MODE: PAPER</span>
+        <span class="badge badge--cyan" id="uptimeBadge">UPTIME: --</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="live-clock" id="liveClock"></div>
+      <button class="mode-toggle-btn" id="modeToggleBtn" onclick="toggleTradingMode()" title="Switch paper / live trading">
+        <span class="mode-toggle-dot" id="modeToggleDot"></span>
+        <span id="modeToggleLabel">PAPER</span>
+      </button>
+      <button class="sound-toggle-btn" id="soundToggleBtn" onclick="toggleSound()" title="Toggle sound alerts">
+        🔇 SOUND
+      </button>
+      <div class="ws-indicator" id="wsIndicator" title="WebSocket Status">
+        <span class="ws-dot"></span>
+        <span class="ws-label">LINK</span>
+      </div>
+      <button class="btn-primary btn--sm" id="runCycleBtn" onclick="triggerCycle()">
+        ▶ RUN CYCLE
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════
+       LIVE MARKET TICKER STRIP
+  ═══════════════════════════════════════════════ -->
+  <div class="ticker-strip" id="tickerStrip">
+    <div class="ticker-inner" id="tickerInner">
+      <span class="ticker-loading">⌛ FETCHING LIVE PRICES...</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       NAVIGATION TABS
+  ═══════════════════════════════════════════════ -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="command-center">
+      <span class="tab-icon">⬡</span> COMMAND CENTER
+    </button>
+    <button class="tab-btn" data-tab="signal-ops">
+      <span class="tab-icon">⚡</span> SIGNAL OPS
+    </button>
+    <button class="tab-btn" data-tab="intel-center">
+      <span class="tab-icon">◉</span> INTEL CENTER
+    </button>
+    <button class="tab-btn" data-tab="holy-grail">
+      <span class="tab-icon">⬢</span> HOLY GRAIL
+    </button>
+    <button class="tab-btn" data-tab="risk-matrix">
+      <span class="tab-icon">⛊</span> RISK MATRIX
+    </button>
+    <button class="tab-btn" data-tab="backtest-lab">
+      <span class="tab-icon">◈</span> BACKTEST LAB
+    </button>
+    <button class="tab-btn" data-tab="paper-trading">
+      <span class="tab-icon">📄</span> PAPER TRADING
+    </button>
+    <button class="tab-btn" data-tab="live-trading">
+      <span class="tab-icon">🔴</span> LIVE TRADING
+    </button>
+    <button class="tab-btn" data-tab="comms-config">
+      <span class="tab-icon">📡</span> COMMS
+    </button>
+    <button class="tab-help-btn" id="helpBtn" title="Show tutorial for this page" onclick="openCurrentTutorial()">?</button>
+    <button class="search-nav-btn" onclick="openSearch()" title="Search all assets (Ctrl+K)">🔍 SEARCH 71 ASSETS <span style="opacity:0.5;font-size:8px;margin-left:4px">Ctrl+K</span></button>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════════
+       TAB PANELS
+  ═══════════════════════════════════════════════ -->
+  <main class="tab-content">
+
+    <!-- ─────────────────────────────────────
+         TAB 1: COMMAND CENTER
+    ───────────────────────────────────── -->
+    <section id="tab-command-center" class="tab-panel active">
+      <div class="panel-grid panel-grid--command">
+
+        <!-- Quadrant Display -->
+        <div class="panel panel--quadrant" id="quadrantPanel">
+          <div class="panel-header">
+            <span class="panel-title">ECONOMIC QUADRANT</span>
+            <span class="panel-tag">DALIO MACHINE</span>
+          </div>
+          <div class="quadrant-display">
+            <div class="quadrant-grid">
+              <div class="q-cell" id="q-rising_growth">
+                <div class="q-label">RISING GROWTH</div>
+                <div class="q-icon">▲</div>
+                <div class="q-desc">Equities · Commodities · Corp Bonds</div>
+              </div>
+              <div class="q-cell" id="q-rising_inflation">
+                <div class="q-label">RISING INFLATION</div>
+                <div class="q-icon">↑</div>
+                <div class="q-desc">Gold · Energy · TIPS · Real Assets</div>
+              </div>
+              <div class="q-cell" id="q-falling_growth">
+                <div class="q-label">FALLING GROWTH</div>
+                <div class="q-icon">▼</div>
+                <div class="q-desc">Long Bonds · Defensive · Gold · Cash</div>
+              </div>
+              <div class="q-cell" id="q-falling_inflation">
+                <div class="q-label">FALLING INFLATION</div>
+                <div class="q-icon">↓</div>
+                <div class="q-desc">Equities · Nom. Bonds · Staples</div>
+              </div>
+            </div>
+            <div class="quadrant-status" id="quadrantStatus">
+              <div class="qs-label">ACTIVE QUADRANT</div>
+              <div class="qs-value" id="activeQuadrantName">SCANNING...</div>
+              <div class="qs-desc" id="activeQuadrantDesc">Awaiting macro data classification</div>
+              <div class="qs-meta">
+                <span>GDP: <strong id="gdpVal">--</strong>%</span>
+                <span>CPI: <strong id="cpiVal">--</strong>%</span>
+                <span>CONF: <strong id="quadConf">--</strong>%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Equity Curve -->
+        <div class="panel panel--chart" id="equityPanel">
+          <div class="panel-header">
+            <span class="panel-title">EQUITY CURVE</span>
+            <div class="panel-stats">
+              <span class="stat-item">NAV: <strong id="navValue">$--</strong></span>
+              <span class="stat-item" id="totalReturnBadge">ROI: <strong>--</strong></span>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="equityChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Portfolio Health Gauges -->
+        <div class="panel panel--gauges">
+          <div class="panel-header">
+            <span class="panel-title">PORTFOLIO VITALS</span>
+            <span class="panel-tag" id="circuitBreakerBadge">CB: ARMED</span>
+          </div>
+          <div class="vitals-grid">
+            <div class="vital-item">
+              <div class="vital-label">DAILY P&L</div>
+              <div class="vital-value" id="dailyPnl">--</div>
+              <div class="vital-bar-wrap">
+                <div class="vital-bar" id="dailyPnlBar" style="width:0%"></div>
+              </div>
+            </div>
+            <div class="vital-item">
+              <div class="vital-label">DRAWDOWN</div>
+              <div class="vital-value danger" id="drawdownVal">--</div>
+              <div class="vital-bar-wrap">
+                <div class="vital-bar vital-bar--danger" id="drawdownBar" style="width:0%"></div>
+              </div>
+            </div>
+            <div class="vital-item">
+              <div class="vital-label">SHARPE RATIO</div>
+              <div class="vital-value accent" id="sharpeVal">--</div>
+            </div>
+            <div class="vital-item">
+              <div class="vital-label">OPEN POSITIONS</div>
+              <div class="vital-value" id="openPositions">--</div>
+            </div>
+            <div class="vital-item">
+              <div class="vital-label">DIVERSIFICATION</div>
+              <div class="vital-value" id="divStatus">--</div>
+            </div>
+            <div class="vital-item">
+              <div class="vital-label">CYCLE COUNT</div>
+              <div class="vital-value" id="cycleCount">--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alert Feed -->
+        <div class="panel panel--alerts">
+          <div class="panel-header">
+            <span class="panel-title">ALERT FEED</span>
+            <span class="pulse-dot"></span>
+          </div>
+          <div class="alert-feed" id="alertFeed">
+            <div class="alert-item alert--info">
+              <span class="alert-time">--:--:--</span>
+              <span class="alert-msg">SYSTEM INITIALISING...</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────
+         TAB 2: SIGNAL OPS
+    ───────────────────────────────────── -->
+    <section id="tab-signal-ops" class="tab-panel">
+
+      <!-- Strong signal in-page alert (per-tab version) -->
+      <div id="strongSignalInPage" class="strong-signal-inpage hidden">
+        <span class="ssi-pulse"></span>
+        <span class="ssi-action" id="ssiAction">⚡ STRONG BUY DETECTED</span>
+        <span class="ssi-detail" id="ssiDetail"></span>
+        <button class="ssi-scroll" onclick="scrollToTopSignal()">↓ JUMP TO SIGNAL</button>
+      </div>
+
+      <div class="panel-grid panel-grid--signals">
+
+        <!-- Controls -->
+        <div class="panel panel--controls">
+          <div class="panel-header">
+            <span class="panel-title">SIGNAL PARAMETERS</span>
+          </div>
+          <div class="controls-row">
+            <div class="control-group">
+              <label class="ctrl-label">MIN CONFIDENCE</label>
+              <input type="range" class="ctrl-slider" id="minConfidence" min="50" max="95" value="60"
+                     oninput="document.getElementById('minConfVal').textContent=this.value+'%'" />
+              <span class="ctrl-val" id="minConfVal">60%</span>
+            </div>
+            <div class="control-group">
+              <label class="ctrl-label">SIGNAL TYPE</label>
+              <select class="ctrl-select" id="signalFilter">
+                <option value="ALL">ALL SIGNALS</option>
+                <option value="BUY">BUY / LONG</option>
+                <option value="SELL">SELL / SHORT</option>
+                <option value="OPTIONS">OPTIONS</option>
+              </select>
+            </div>
+            <div class="control-group">
+              <label class="ctrl-label">MARKET</label>
+              <select class="ctrl-select" id="marketFilter">
+                <option value="ALL">ALL MARKETS</option>
+                <option value="ASX">ASX EQUITIES</option>
+                <option value="COMMODITIES">COMMODITIES</option>
+              </select>
+            </div>
+            <button class="btn-primary" onclick="loadSignals()">⚡ SCAN NOW</button>
+          </div>
+        </div>
+
+        <!-- Signal Cards -->
+        <div class="panel panel--signal-list">
+          <div class="panel-header">
+            <span class="panel-title">ACTIVE SIGNALS</span>
+            <span class="panel-tag" id="signalCount">0 SIGNALS</span>
+          </div>
+          <div class="signal-grid" id="signalGrid">
+            <div class="signal-loading">
+              <div class="loading-spinner"></div>
+              <span>SCANNING UNIVERSE...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Opportunities Panel -->
+        <div class="panel panel--opportunities">
+          <div class="panel-header">
+            <span class="panel-title">NEW OPPORTUNITIES</span>
+            <span class="panel-tag">AI SUGGESTED</span>
+          </div>
+          <div class="opportunity-list" id="opportunityList"></div>
+        </div>
+
+        <!-- Justification Detail -->
+        <div class="panel panel--justification" id="justificationPanel">
+          <div class="panel-header">
+            <span class="panel-title">DALIO JUSTIFICATION</span>
+            <span class="panel-tag">SYSTEMATIC ANALYSIS</span>
+          </div>
+          <div class="just-content" id="justContent">
+            <div class="just-placeholder">
+              <span>SELECT A SIGNAL TO VIEW JUSTIFICATION</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────
+         TAB 3: INTEL CENTER
+    ───────────────────────────────────── -->
+    <section id="tab-intel-center" class="tab-panel">
+      <div class="panel-grid panel-grid--intel">
+
+        <!-- Conflict Risk Meter -->
+        <div class="panel panel--conflict">
+          <div class="panel-header">
+            <span class="panel-title">GEOPOLITICAL RISK MONITOR</span>
+            <span class="pulse-dot" id="conflictPulse"></span>
+          </div>
+          <div class="conflict-meter">
+            <div class="conflict-ring" id="conflictRing">
+              <div class="conflict-inner">
+                <div class="conflict-val" id="conflictScore">--</div>
+                <div class="conflict-label">RISK ARTICLES</div>
+              </div>
+            </div>
+            <div class="conflict-status" id="conflictStatus">SCANNING...</div>
+          </div>
+          <div class="conflict-keywords">
+            <div class="kw-title">CONFLICT TRIGGERS</div>
+            <div class="kw-list">
+              <span class="kw-tag">WAR</span><span class="kw-tag">INVASION</span>
+              <span class="kw-tag">MISSILE</span><span class="kw-tag">SANCTIONS</span>
+              <span class="kw-tag">NUCLEAR</span><span class="kw-tag">COUP</span>
+              <span class="kw-tag">CEASEFIRE</span><span class="kw-tag">TROOPS</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sentiment Quadrant Distribution -->
+        <div class="panel panel--sentiment-chart">
+          <div class="panel-header">
+            <span class="panel-title">SENTIMENT DISTRIBUTION</span>
+            <span class="panel-tag" id="totalArticles">-- ARTICLES</span>
+          </div>
+          <div class="chart-container chart-container--sm">
+            <canvas id="sentimentChart"></canvas>
+          </div>
+          <div class="sentiment-quadrant-stats" id="sentimentStats"></div>
+        </div>
+
+        <!-- FinBERT News Feed -->
+        <div class="panel panel--newsfeed">
+          <div class="panel-header">
+            <span class="panel-title">FINBERT NEWS SCANNER</span>
+            <button class="btn-ghost btn--sm" onclick="loadSentiment()">↻ REFRESH</button>
+          </div>
+          <div class="news-feed" id="newsFeed">
+            <div class="news-loading">
+              <div class="loading-spinner"></div>
+              <span>SCANNING NEWS FEEDS...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dominant Quadrant from News -->
+        <div class="panel panel--news-quadrant">
+          <div class="panel-header">
+            <span class="panel-title">NEWS QUADRANT SIGNAL</span>
+          </div>
+          <div class="news-quad-display">
+            <div class="nq-dominant" id="newsDominantQuadrant">--</div>
+            <div class="nq-desc" id="newsDominantDesc">--</div>
+            <div class="nq-stats">
+              <div class="nq-stat">
+                <span class="nq-stat-label">BULLISH ARTICLES</span>
+                <span class="nq-stat-val" id="bullishPct">--</span>
+              </div>
+              <div class="nq-stat">
+                <span class="nq-stat-label">BEARISH ARTICLES</span>
+                <span class="nq-stat-val danger" id="bearishPct">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────
+         TAB 4: HOLY GRAIL
+    ───────────────────────────────────── -->
+    <section id="tab-holy-grail" class="tab-panel">
+      <div class="panel-grid panel-grid--grail">
+
+        <!-- Diversification Status -->
+        <div class="panel panel--div-status">
+          <div class="panel-header">
+            <span class="panel-title">HOLY GRAIL DIVERSIFICATION</span>
+          </div>
+          <div class="div-status-content">
+            <div class="div-counter">
+              <div class="div-num" id="divCount">--</div>
+              <div class="div-label">UNCORRELATED<br/>ASSETS</div>
+            </div>
+            <div class="div-rule">
+              <div class="div-rule-text">"15+ ASSETS  &lt;  0.3 CORRELATION"</div>
+              <div class="div-rule-sub">Ray Dalio's Holy Grail of Investing</div>
+            </div>
+            <div class="div-threshold-bar">
+              <div class="div-bar-label">THRESHOLD COMPLIANCE</div>
+              <div class="div-bar-wrap">
+                <div class="div-bar-fill" id="divBarFill" style="width:0%"></div>
+              </div>
+              <div class="div-bar-vals">
+                <span>0</span><span>5</span><span>10</span>
+                <span class="threshold-mark">15 ★</span><span>20</span>
+              </div>
+            </div>
+            <div class="div-stats-row">
+              <div class="div-stat">
+                <div class="div-stat-val" id="meanCorr">--</div>
+                <div class="div-stat-label">MEAN CORR</div>
+              </div>
+              <div class="div-stat">
+                <div class="div-stat-val" id="maxCorr">--</div>
+                <div class="div-stat-label">MAX CORR</div>
+              </div>
+              <div class="div-stat">
+                <div class="div-stat-val accent" id="corrThreshold">0.30</div>
+                <div class="div-stat-label">THRESHOLD</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Correlation Matrix Heatmap -->
+        <div class="panel panel--heatmap">
+          <div class="panel-header">
+            <span class="panel-title">CORRELATION MATRIX — ASX UNIVERSE</span>
+            <span id="corrDataSource" style="font-size:9px;letter-spacing:1px;font-family:var(--font-mono)">● LOADING</span>
+            <button class="btn-ghost btn--sm" onclick="loadCorrelation()">↻ REFRESH</button>
+          </div>
+          <div class="heatmap-wrap" id="heatmapWrap">
+            <canvas id="correlationCanvas"></canvas>
+          </div>
+        </div>
+
+        <!-- Risk Parity Weights -->
+        <div class="panel panel--weights">
+          <div class="panel-header">
+            <span class="panel-title">RISK PARITY WEIGHTS</span>
+            <span class="panel-tag">RISKFOLIO-LIB</span>
+          </div>
+          <div class="weights-chart-container">
+            <canvas id="weightsChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Asset Allocation Table -->
+        <div class="panel panel--alloc-table">
+          <div class="panel-header">
+            <span class="panel-title">SELECTED PORTFOLIO</span>
+          </div>
+          <table class="data-table" id="allocTable">
+            <thead>
+              <tr>
+                <th>TICKER</th>
+                <th>WEIGHT</th>
+                <th>RISK CONTRIB</th>
+                <th>QUADRANT FIT</th>
+              </tr>
+            </thead>
+            <tbody id="allocTableBody"></tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────
+         TAB 5: RISK MATRIX
+    ───────────────────────────────────── -->
+    <section id="tab-risk-matrix" class="tab-panel">
+      <div class="panel-grid panel-grid--risk">
+
+        <!-- Circuit Breaker -->
+        <div class="panel panel--circuit-breaker" id="cbPanel">
+          <div class="panel-header">
+            <span class="panel-title">CIRCUIT BREAKER</span>
+          </div>
+          <div class="cb-display">
+            <div class="cb-status" id="cbStatus">
+              <div class="cb-icon" id="cbIcon">⬡</div>
+              <div class="cb-label" id="cbLabel">ARMED</div>
+              <div class="cb-sublabel" id="cbSublabel">Trading permitted</div>
+            </div>
+            <div class="cb-limits">
+              <div class="cb-limit-item">
+                <div class="cb-limit-label">DAILY STOP-LOSS</div>
+                <div class="cb-limit-val">2.0% of equity</div>
+                <div class="cb-limit-current" id="cbDailyUsed">Used: --</div>
+                <div class="limit-bar-wrap">
+                  <div class="limit-bar" id="cbDailyBar" style="width:0%"></div>
+                </div>
+              </div>
+              <div class="cb-limit-item">
+                <div class="cb-limit-label">MAX DRAWDOWN</div>
+                <div class="cb-limit-val">10.0% of peak equity</div>
+                <div class="cb-limit-current" id="cbDrawdownUsed">Used: --</div>
+                <div class="limit-bar-wrap">
+                  <div class="limit-bar limit-bar--danger" id="cbDrawdownBar" style="width:0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- P&L Chart -->
+        <div class="panel panel--pnl-chart">
+          <div class="panel-header">
+            <span class="panel-title">DAILY P&L HISTORY</span>
+          </div>
+          <div class="chart-container">
+            <canvas id="pnlChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Position Risk Table -->
+        <div class="panel panel--pos-table">
+          <div class="panel-header">
+            <span class="panel-title">OPEN POSITIONS — RISK VIEW</span>
+          </div>
+          <table class="data-table" id="posTable">
+            <thead>
+              <tr>
+                <th>TICKER</th>
+                <th>SIDE</th>
+                <th>SIZE %</th>
+                <th>UNREALISED PNL</th>
+                <th>STATUS</th>
+              </tr>
+            </thead>
+            <tbody id="posTableBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Risk Metrics -->
+        <div class="panel panel--risk-metrics">
+          <div class="panel-header">
+            <span class="panel-title">RISK METRICS</span>
+          </div>
+          <div class="metrics-grid">
+            <div class="metric-item">
+              <div class="metric-label">SHARPE RATIO</div>
+              <div class="metric-val accent" id="rm-sharpe">--</div>
+            </div>
+            <div class="metric-item">
+              <div class="metric-label">SORTINO RATIO</div>
+              <div class="metric-val accent" id="rm-sortino">--</div>
+            </div>
+            <div class="metric-item">
+              <div class="metric-label">MAX DRAWDOWN</div>
+              <div class="metric-val danger" id="rm-maxdd">--</div>
+            </div>
+            <div class="metric-item">
+              <div class="metric-label">WIN RATE</div>
+              <div class="metric-val" id="rm-winrate">--</div>
+            </div>
+            <div class="metric-item">
+              <div class="metric-label">TOTAL RETURN</div>
+              <div class="metric-val" id="rm-totalret">--</div>
+            </div>
+            <div class="metric-item">
+              <div class="metric-label">PORTFOLIO VALUE</div>
+              <div class="metric-val" id="rm-nav">--</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────
+         TAB 6: BACKTEST LAB
+    ───────────────────────────────────── -->
+    <section id="tab-backtest-lab" class="tab-panel">
+      <div class="panel-grid panel-grid--backtest">
+
+        <!-- Backtest Summary -->
+        <div class="panel panel--bt-summary">
+          <div class="panel-header">
+            <span class="panel-title">WALK-FORWARD OPTIMIZATION</span>
+            <span class="panel-tag">TRAIN: 12M  TEST: 3M</span>
+          </div>
+          <div class="bt-summary-content">
+            <div class="bt-stat-grid">
+              <div class="bt-stat">
+                <div class="bt-stat-val" id="bt-totalRet">--</div>
+                <div class="bt-stat-label">TOTAL RETURN</div>
+              </div>
+              <div class="bt-stat">
+                <div class="bt-stat-val accent" id="bt-sharpe">--</div>
+                <div class="bt-stat-label">SHARPE RATIO</div>
+              </div>
+              <div class="bt-stat">
+                <div class="bt-stat-val accent" id="bt-sortino">--</div>
+                <div class="bt-stat-label">SORTINO</div>
+              </div>
+              <div class="bt-stat">
+                <div class="bt-stat-val accent" id="bt-calmar">--</div>
+                <div class="bt-stat-label">CALMAR</div>
+              </div>
+              <div class="bt-stat">
+                <div class="bt-stat-val danger" id="bt-maxdd">--</div>
+                <div class="bt-stat-label">MAX DRAWDOWN</div>
+              </div>
+              <div class="bt-stat">
+                <div class="bt-stat-val" id="bt-winrate">--</div>
+                <div class="bt-stat-label">WIN RATE</div>
+              </div>
+              <div class="bt-stat">
+                <div class="bt-stat-val" id="bt-periods">--</div>
+                <div class="bt-stat-label">PERIODS</div>
+              </div>
+              <div class="bt-stat">
+                <div class="bt-stat-val" id="bt-annRet">--</div>
+                <div class="bt-stat-label">ANN. RETURN</div>
+              </div>
+            </div>
+            <div class="bt-method-note">
+              <span class="method-icon">◈</span>
+              Walk-forward prevents overfitting and look-ahead bias.
+              Model trained on 12 months, validated on 3-month out-of-sample windows.
+            </div>
+          </div>
+        </div>
+
+        <!-- Walk-Forward Period Chart -->
+        <div class="panel panel--wf-chart">
+          <div class="panel-header">
+            <span class="panel-title">WALK-FORWARD PERIOD RETURNS</span>
+            <button class="btn-ghost btn--sm" onclick="loadBacktest()">↻ RUN BACKTEST</button>
+          </div>
+          <div class="chart-container">
+            <canvas id="wfChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Period Table -->
+        <div class="panel panel--period-table">
+          <div class="panel-header">
+            <span class="panel-title">PERIOD BREAKDOWN</span>
+          </div>
+          <table class="data-table" id="periodTable">
+            <thead>
+              <tr>
+                <th>PERIOD</th>
+                <th>TRAIN</th>
+                <th>RETURN</th>
+                <th>SHARPE</th>
+                <th>MAX DD</th>
+                <th>WIN%</th>
+                <th>TRADES</th>
+              </tr>
+            </thead>
+            <tbody id="periodTableBody"></tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────
+         TAB 7: PAPER TRADING
+    ───────────────────────────────────── -->
+    <section id="tab-paper-trading" class="tab-panel">
+      <div class="panel-grid panel-grid--paper">
+
+        <!-- ── ORDER ENTRY ── -->
+        <div class="panel panel--paper-order">
+          <div class="panel-header">
+            <span class="panel-title">◈ PLACE ORDER</span>
+            <span class="panel-tag" style="color:var(--amber)">PAPER MODE</span>
+          </div>
+          <div class="paper-order-form">
+            <div class="po-row">
+              <label class="po-label">ASSET</label>
+              <div class="po-asset-wrap">
+                <input type="text" id="poTicker" class="po-input po-ticker-input"
+                  placeholder="e.g. BTC, CBA.AX, GLD"
+                  oninput="onPoTickerInput(this.value)"
+                  autocomplete="off" spellcheck="false"/>
+                <div id="poQuoteResult" class="po-quote-result"></div>
+              </div>
+            </div>
+            <div class="po-row">
+              <label class="po-label">SIDE</label>
+              <div class="po-side-btns">
+                <button class="po-side-btn po-buy active" id="poBuyBtn" onclick="setPoSide('BUY',this)">▲ BUY / LONG</button>
+                <button class="po-side-btn po-sell" id="poSellBtn" onclick="setPoSide('SELL',this)">▼ SELL / CLOSE</button>
+              </div>
+            </div>
+            <div class="po-row">
+              <label class="po-label">QUANTITY</label>
+              <input type="number" id="poQty" class="po-input" value="1" min="0.0001" step="any" oninput="updatePoEstimate()"/>
+            </div>
+            <div class="po-estimate" id="poEstimate">
+              <span class="po-est-label">EST. COST</span>
+              <span class="po-est-val" id="poEstVal">—</span>
+            </div>
+            <div class="po-cash-row">
+              <span class="po-cash-label">AVAILABLE CASH</span>
+              <span class="po-cash-val" id="poCashDisplay">$100,000.00</span>
+            </div>
+            <button class="btn-primary btn--full" id="poSubmitBtn" onclick="submitPaperOrder()">▶ EXECUTE TRADE</button>
+            <div class="po-result" id="poResult"></div>
+          </div>
+        </div>
+
+        <!-- ── PORTFOLIO SUMMARY ── -->
+        <div class="panel panel--paper-summary">
+          <div class="panel-header">
+            <span class="panel-title">◈ PORTFOLIO</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span class="panel-tag" id="paperPnlBadge">P&amp;L: --</span>
+              <button class="btn-ghost btn--sm" onclick="resetPaperPortfolio()" title="Reset to $100k">↺ RESET</button>
+            </div>
+          </div>
+          <div class="paper-summary-grid">
+            <div class="ps-stat">
+              <div class="ps-label">TOTAL VALUE</div>
+              <div class="ps-val" id="paperTotalVal">$100,000.00</div>
+            </div>
+            <div class="ps-stat">
+              <div class="ps-label">CASH</div>
+              <div class="ps-val" id="paperCash">$100,000.00</div>
+            </div>
+            <div class="ps-stat">
+              <div class="ps-label">INVESTED</div>
+              <div class="ps-val" id="paperInvested">$0.00</div>
+            </div>
+            <div class="ps-stat">
+              <div class="ps-label">UNREALISED P&amp;L</div>
+              <div class="ps-val" id="paperPnl" style="color:var(--text-2)">$0.00</div>
+            </div>
+            <div class="ps-stat">
+              <div class="ps-label">RETURN</div>
+              <div class="ps-val" id="paperReturn" style="color:var(--text-2)">0.00%</div>
+            </div>
+            <div class="ps-stat">
+              <div class="ps-label">OPEN POSITIONS</div>
+              <div class="ps-val" id="paperOpenCount">0</div>
+            </div>
+          </div>
+
+          <!-- Equity Curve Chart -->
+          <div class="paper-equity-chart-wrap">
+            <div class="pec-header">
+              <span class="pec-label">EQUITY CURVE</span>
+              <span class="pec-hint" id="paperEquityHint">— no trades yet —</span>
+            </div>
+            <canvas id="paperEquityChart" height="90"></canvas>
+          </div>
+
+          <!-- Position Heatmap -->
+          <div class="pos-heatmap-wrap" id="posHeatmapWrap" style="display:none">
+            <div class="pec-header">
+              <span class="pec-label">POSITION HEATMAP</span>
+            </div>
+            <div class="pos-heatmap" id="posHeatmap"></div>
+          </div>
+
+          <!-- Open Positions table -->
+          <div class="panel-header" style="margin-top:12px;border-top:1px solid var(--border)">
+            <span class="panel-title" style="font-size:9px">OPEN POSITIONS</span>
+            <button class="btn-ghost btn--sm" onclick="loadPaperPortfolio()">↻ REFRESH</button>
+          </div>
+          <div class="paper-positions-wrap">
+            <table class="data-table" id="paperPositionsTable">
+              <thead>
+                <tr>
+                  <th>TICKER</th><th>SIDE</th><th>QTY</th>
+                  <th>ENTRY</th><th>CURRENT</th><th>MKT VAL</th>
+                  <th>P&amp;L</th><th>P&amp;L %</th><th>ACTION</th>
+                </tr>
+              </thead>
+              <tbody id="paperPositionsBody">
+                <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:16px">No open positions — place a trade above</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── QUICK SIGNALS (1-CLICK TRADE) ── -->
+        <div class="panel panel--paper-signals">
+          <div class="panel-header">
+            <span class="panel-title">⚡ SIGNAL QUICK-TRADE</span>
+            <span class="panel-tag">1-CLICK FROM SIGNALS</span>
+          </div>
+          <div class="paper-signal-list" id="paperSignalList">
+            <div style="padding:14px;color:var(--text-muted);font-size:10px">Loading signals...</div>
+          </div>
+        </div>
+
+        <!-- ── TRADE HISTORY ── -->
+        <div class="panel panel--paper-history">
+          <div class="panel-header">
+            <span class="panel-title">◈ TRADE HISTORY</span>
+            <span class="panel-tag" id="paperTradeCount">0 TRADES</span>
+          </div>
+          <div class="paper-positions-wrap">
+            <table class="data-table" id="paperHistoryTable">
+              <thead>
+                <tr>
+                  <th>#</th><th>TICKER</th><th>SIDE</th><th>QTY</th>
+                  <th>ENTRY</th><th>EXIT</th><th>P&amp;L</th><th>P&amp;L %</th><th>TIME</th>
+                </tr>
+              </thead>
+              <tbody id="paperHistoryBody">
+                <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:16px">No closed trades yet</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────
+         TAB 8: LIVE TRADING
+    ───────────────────────────────────── -->
+    <section id="tab-live-trading" class="tab-panel">
+      <div class="panel-grid panel-grid--live">
+
+        <!-- ── BROKER CONNECTION ── -->
+        <div class="panel panel--broker-connect">
+          <div class="panel-header">
+            <span class="panel-title">⚡ BROKER CONNECTION</span>
+            <span class="panel-tag" id="brokerStatusBadge">NOT CONNECTED</span>
+          </div>
+          <div class="broker-connect-form">
+            <div class="po-row">
+              <label class="po-label">BROKER</label>
+              <select class="ctrl-select" id="brokerSelect" onchange="onBrokerSelect(this.value)">
+                <option value="">-- SELECT BROKER --</option>
+                <optgroup label="Equities / Multi-asset">
+                  <option value="alpaca">ALPACA (REST API)</option>
+                  <option value="ibkr">INTERACTIVE BROKERS (TWS)</option>
+                </optgroup>
+                <optgroup label="Crypto">
+                  <option value="binance">BINANCE (Spot / Futures)</option>
+                  <option value="coinbase">COINBASE ADVANCED TRADE</option>
+                </optgroup>
+                <optgroup label="ASX / Retail">
+                  <option value="stake">STAKE (ASX / US)</option>
+                </optgroup>
+              </select>
+            </div>
+
+            <!-- Alpaca fields -->
+            <div id="alpacaFields" style="display:none">
+              <div class="po-row">
+                <label class="po-label">API KEY</label>
+                <input type="text" id="alpacaKey" class="po-input" placeholder="PKXXXXXXXXXXXXXXXX" autocomplete="off"/>
+              </div>
+              <div class="po-row">
+                <label class="po-label">API SECRET</label>
+                <input type="password" id="alpacaSecret" class="po-input" placeholder="••••••••••••••••••" autocomplete="off"/>
+              </div>
+              <div class="po-row">
+                <label class="po-label">ENDPOINT</label>
+                <select class="ctrl-select" id="alpacaUrl">
+                  <option value="https://paper-api.alpaca.markets">Paper (Sandbox)</option>
+                  <option value="https://api.alpaca.markets">Live (Real Money)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- IBKR fields -->
+            <div id="ibkrFields" style="display:none">
+              <div class="po-row">
+                <label class="po-label">TWS HOST</label>
+                <input type="text" id="ibkrHost" class="po-input" value="127.0.0.1"/>
+              </div>
+              <div class="po-row">
+                <label class="po-label">TWS PORT</label>
+                <input type="number" id="ibkrPort" class="po-input" value="7497"/>
+              </div>
+              <div class="po-row">
+                <label class="po-label">CLIENT ID</label>
+                <input type="number" id="ibkrClientId" class="po-input" value="1"/>
+              </div>
+              <div class="broker-hint">
+                Ensure TWS or IB Gateway is running and API connections are enabled.<br>
+                Paper trading port: <strong>7497</strong> · Live port: <strong>7496</strong>
+              </div>
+            </div>
+
+            <!-- Binance fields -->
+            <div id="binanceFields" style="display:none">
+              <div class="po-row">
+                <label class="po-label">API KEY</label>
+                <input type="text" id="binanceKey" class="po-input" placeholder="Binance API key" autocomplete="off"/>
+              </div>
+              <div class="po-row">
+                <label class="po-label">API SECRET</label>
+                <input type="password" id="binanceSecret" class="po-input" placeholder="••••••••••••••••••" autocomplete="off"/>
+              </div>
+              <div class="po-row">
+                <label class="po-label">MODE</label>
+                <select class="ctrl-select" id="binanceTestnet">
+                  <option value="false">Live (Real Funds)</option>
+                  <option value="true">Testnet (Paper)</option>
+                </select>
+              </div>
+              <div class="broker-hint">
+                Generate keys at binance.com → API Management. Enable <strong>Spot Trading</strong> permission.<br>
+                Restrict to server IP for security. Futures requires separate USDⓈ-M keys.
+              </div>
+            </div>
+
+            <!-- Coinbase fields -->
+            <div id="coinbaseFields" style="display:none">
+              <div class="po-row">
+                <label class="po-label">API KEY NAME</label>
+                <input type="text" id="coinbaseKey" class="po-input" placeholder="organizations/…/apiKeys/…" autocomplete="off"/>
+              </div>
+              <div class="po-row">
+                <label class="po-label">PRIVATE KEY</label>
+                <textarea id="coinbaseSecret" class="po-input" rows="3" placeholder="-----BEGIN EC PRIVATE KEY-----&#10;..." style="resize:vertical;font-size:9px;" autocomplete="off"></textarea>
+              </div>
+              <div class="broker-hint">
+                Use <strong>Coinbase Advanced Trade API</strong> (CDP keys). Generate at<br>
+                coinbase.com → Settings → API. Requires <strong>Trade</strong> permission.
+              </div>
+            </div>
+
+            <!-- Stake fields -->
+            <div id="stakeFields" style="display:none">
+              <div class="broker-hint" style="color:var(--amber);border-color:var(--amber-dim);background:var(--amber-glow)">
+                ⚠ <strong>Stake does not offer a public bot-trading API.</strong><br>
+                Orders cannot be automated — use Alpaca or IBKR for algorithmic ASX/US trading.<br>
+                This entry is informational only.
+              </div>
+            </div>
+
+            <button class="btn-primary btn--full" id="brokerConnectBtn" onclick="connectBroker()">▶ CONNECT BROKER</button>
+            <div class="po-result" id="brokerConnectResult"></div>
+
+            <!-- Account summary (shown after connect) -->
+            <div id="brokerAccountSummary" style="display:none" class="broker-account-summary">
+              <div class="bas-row"><span class="bas-label">ACCOUNT VALUE</span><span class="bas-val" id="basValue">—</span></div>
+              <div class="bas-row"><span class="bas-label">BUYING POWER</span><span class="bas-val" id="basBuying">—</span></div>
+              <div class="bas-row"><span class="bas-label">CASH</span><span class="bas-val" id="basCash">—</span></div>
+              <div class="bas-row"><span class="bas-label">BROKER</span><span class="bas-val" id="basBroker">—</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── LIVE ORDER ENTRY ── -->
+        <div class="panel panel--live-order">
+          <div class="panel-header">
+            <span class="panel-title">🔴 PLACE LIVE ORDER</span>
+            <span class="panel-tag live-mode-tag" id="liveModeTag">PAPER MODE</span>
+          </div>
+          <div class="paper-order-form">
+            <div class="live-mode-warning" id="liveModeWarning">
+              ⚠ Connect a broker and switch to LIVE mode to place real orders.
+            </div>
+            <div class="po-row">
+              <label class="po-label">ASSET</label>
+              <input type="text" id="livePoTicker" class="po-input po-ticker-input"
+                placeholder="e.g. AAPL, SPY, BTC/USD"
+                oninput="onLiveTickerInput(this.value)"
+                autocomplete="off" spellcheck="false"/>
+              <div id="livePoQuoteResult" class="po-quote-result"></div>
+            </div>
+            <div class="po-row">
+              <label class="po-label">SIDE</label>
+              <div class="po-side-btns">
+                <button class="po-side-btn po-buy active" id="livePoBuyBtn" onclick="setLivePoSide('BUY',this)">▲ BUY</button>
+                <button class="po-side-btn po-sell" id="livePoSellBtn" onclick="setLivePoSide('SELL',this)">▼ SELL</button>
+              </div>
+            </div>
+            <div class="po-row">
+              <label class="po-label">QUANTITY</label>
+              <input type="number" id="livePoQty" class="po-input" value="1" min="0.0001" step="any"/>
+            </div>
+            <div class="po-row">
+              <label class="po-label">LIMIT PRICE (optional — blank = market)</label>
+              <input type="number" id="livePoPrice" class="po-input" placeholder="Market order if empty" step="any"/>
+            </div>
+            <button class="btn-primary btn--full live-order-btn" id="livePoSubmitBtn" onclick="submitLiveOrder()">🔴 PLACE LIVE ORDER</button>
+            <div class="po-result" id="livePoResult"></div>
+          </div>
+        </div>
+
+        <!-- ── LIVE PORTFOLIO ── -->
+        <div class="panel panel--live-portfolio">
+          <div class="panel-header">
+            <span class="panel-title">◈ LIVE PORTFOLIO</span>
+            <button class="btn-ghost btn--sm" onclick="loadRealPortfolio()">↻ REFRESH</button>
+          </div>
+
+          <!-- Equity Curve -->
+          <div class="paper-equity-chart-wrap">
+            <div class="pec-header">
+              <span class="pec-label">EQUITY CURVE</span>
+              <span class="pec-hint" id="liveEquityHint">— connect a broker to track —</span>
+            </div>
+            <canvas id="liveEquityChart" height="90"></canvas>
+          </div>
+
+          <!-- Account stats -->
+          <div class="paper-summary-grid" id="livePortfolioStats" style="display:none">
+            <div class="ps-stat"><div class="ps-label">ACCOUNT VALUE</div><div class="ps-val" id="liveAcctVal">—</div></div>
+            <div class="ps-stat"><div class="ps-label">BUYING POWER</div><div class="ps-val" id="liveBuyPow">—</div></div>
+            <div class="ps-stat"><div class="ps-label">CASH</div><div class="ps-val" id="liveCash">—</div></div>
+          </div>
+
+          <!-- Positions table -->
+          <div class="panel-header" style="margin-top:12px;border-top:1px solid var(--border)">
+            <span class="panel-title" style="font-size:9px">OPEN POSITIONS</span>
+          </div>
+          <div class="paper-positions-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>TICKER</th><th>SIDE</th><th>QTY</th><th>AVG COST</th><th>MKT VAL</th><th>P&amp;L</th><th>P&amp;L %</th><th>ACTION</th></tr>
+              </thead>
+              <tbody id="livePositionsBody">
+                <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:16px">Connect a broker to see live positions</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── LIVE HISTORY ── -->
+        <div class="panel panel--live-history">
+          <div class="panel-header">
+            <span class="panel-title">◈ ORDER HISTORY</span>
+            <button class="btn-ghost btn--sm" onclick="loadRealHistory()">↻ REFRESH</button>
+          </div>
+          <div class="paper-positions-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>TICKER</th><th>SIDE</th><th>QTY</th><th>PRICE</th><th>TIME</th></tr>
+              </thead>
+              <tbody id="liveHistoryBody">
+                <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px">No order history</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────
+         TAB 9: COMMS CONFIG
+    ───────────────────────────────────── -->
+    <section id="tab-comms-config" class="tab-panel">
+      <div class="panel-grid panel-grid--comms">
+
+        <!-- Discord Config -->
+        <div class="panel panel--discord">
+          <div class="panel-header">
+            <span class="panel-title">DISCORD WEBHOOK</span>
+            <span class="badge badge--green" id="discordStatus">● CONFIGURED</span>
+          </div>
+          <div class="config-form">
+            <div class="form-group">
+              <label class="form-label">WEBHOOK URL</label>
+              <input type="text" class="form-input" id="discordWebhook"
+                     placeholder="https://discord.com/api/webhooks/..." />
+            </div>
+            <div class="form-group">
+              <label class="form-label">ALERT TYPES</label>
+              <div class="checkbox-group">
+                <label class="checkbox-item"><input type="checkbox" checked /> TRADE SIGNALS</label>
+                <label class="checkbox-item"><input type="checkbox" checked /> CIRCUIT BREAKER</label>
+                <label class="checkbox-item"><input type="checkbox" checked /> SENTIMENT ALERTS</label>
+                <label class="checkbox-item"><input type="checkbox" checked /> HEALTH REPORTS</label>
+                <label class="checkbox-item"><input type="checkbox" /> EVERY CYCLE</label>
+              </div>
+            </div>
+            <button class="btn-primary" onclick="testNotification('discord')">📡 TEST DISCORD</button>
+          </div>
+        </div>
+
+        <!-- Telegram Config -->
+        <div class="panel panel--telegram">
+          <div class="panel-header">
+            <span class="panel-title">TELEGRAM BOT</span>
+            <span class="badge badge--amber" id="telegramStatus">● UNCONFIGURED</span>
+          </div>
+          <div class="config-form">
+            <div class="form-group">
+              <label class="form-label">BOT TOKEN</label>
+              <input type="password" class="form-input" id="telegramToken"
+                     placeholder="1234567890:ABCdef..." />
+            </div>
+            <div class="form-group">
+              <label class="form-label">CHAT ID</label>
+              <input type="text" class="form-input" id="telegramChatId"
+                     placeholder="-100123456789" />
+            </div>
+            <button class="btn-primary" onclick="testNotification('telegram')">📡 TEST TELEGRAM</button>
+          </div>
+        </div>
+
+        <!-- Broker & Exchange Integrations -->
+        <div class="panel panel--brokers" style="grid-column: 1 / -1;">
+          <div class="panel-header">
+            <span class="panel-title">BROKER &amp; EXCHANGE CONNECTIONS</span>
+            <span class="panel-tag">CONNECT TO EXECUTE</span>
+          </div>
+
+          <!-- Category tabs -->
+          <div class="broker-tabs">
+            <button class="broker-tab active" data-bcat="au" onclick="switchBrokerTab('au',this)">🇦🇺 AUSTRALIAN BROKERS</button>
+            <button class="broker-tab" data-bcat="us" onclick="switchBrokerTab('us',this)">🇺🇸 US BROKERS</button>
+            <button class="broker-tab" data-bcat="crypto" onclick="switchBrokerTab('crypto',this)">₿ CRYPTO EXCHANGES</button>
+          </div>
+
+          <!-- AU Brokers -->
+          <div class="broker-grid" id="bcat-au">
+            <div class="broker-card" data-broker="commsec">
+              <div class="broker-logo">CBA</div>
+              <div class="broker-info">
+                <div class="broker-name">CommSec</div>
+                <div class="broker-desc">Australia's #1 broker. ASX, ETFs, options. CBA-backed.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">ETF</span><span class="btag">Options</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Manual</span>
+                <a class="broker-link" href="https://www.commsec.com.au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="selfwealth">
+              <div class="broker-logo">SW</div>
+              <div class="broker-info">
+                <div class="broker-name">SelfWealth</div>
+                <div class="broker-desc">Flat $9.50/trade. ASX & US markets. Has REST API.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.selfwealth.com.au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="stake">
+              <div class="broker-logo">STK</div>
+              <div class="broker-info">
+                <div class="broker-name">Stake</div>
+                <div class="broker-desc">US & ASX stocks. $0 brokerage on US. Popular with younger investors.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Manual</span>
+                <a class="broker-link" href="https://hellostake.com/au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="moomoo">
+              <div class="broker-logo">MM</div>
+              <div class="broker-info">
+                <div class="broker-name">moomoo</div>
+                <div class="broker-desc">Advanced charting, fractional shares. ASX, US, HK markets.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span><span class="btag">HK</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Manual</span>
+                <a class="broker-link" href="https://www.moomoo.com/au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="superhero">
+              <div class="broker-logo">SH</div>
+              <div class="broker-info">
+                <div class="broker-name">Superhero</div>
+                <div class="broker-desc">$0 ETF brokerage. $2 ASX trades. CHESS-sponsored.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">ETF</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Manual</span>
+                <a class="broker-link" href="https://www.superhero.com.au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="ig-au">
+              <div class="broker-logo">IG</div>
+              <div class="broker-info">
+                <div class="broker-name">IG Markets AU</div>
+                <div class="broker-desc">CFDs, FX, indices, options. Shorting supported. Has API.</div>
+                <div class="broker-tags"><span class="btag">CFD</span><span class="btag">FX</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.ig.com/au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="cmc">
+              <div class="broker-logo">CMC</div>
+              <div class="broker-info">
+                <div class="broker-name">CMC Markets</div>
+                <div class="broker-desc">Stockbroking & CFDs. $0 on ETFs. Has trading API.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">CFD</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.cmcmarkets.com/en-au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="nabtrade">
+              <div class="broker-logo">NAB</div>
+              <div class="broker-info">
+                <div class="broker-name">nabtrade</div>
+                <div class="broker-desc">NAB's investing platform. ASX, US, bonds, managed funds.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span><span class="btag">Bonds</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Manual</span>
+                <a class="broker-link" href="https://www.nabtrade.com.au" target="_blank">Open →</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- US Brokers -->
+          <div class="broker-grid hidden" id="bcat-us">
+            <div class="broker-card featured" data-broker="alpaca">
+              <div class="broker-logo api-glow">ALP</div>
+              <div class="broker-info">
+                <div class="broker-name">Alpaca <span class="btag api-tag" style="font-size:9px">FULL API</span></div>
+                <div class="broker-desc">Commission-free US stocks & crypto. Free paper trading. Full REST + WebSocket API. Best for automation.</div>
+                <div class="broker-tags"><span class="btag">US Stocks</span><span class="btag">Crypto</span><span class="btag api-tag">Paper Trading</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline" id="alpacaStatus">● Not Connected</span>
+                <a class="broker-link" href="https://alpaca.markets" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="ibkr">
+              <div class="broker-logo">IB</div>
+              <div class="broker-info">
+                <div class="broker-name">Interactive Brokers</div>
+                <div class="broker-desc">Professional-grade. Stocks, options, futures, FX, bonds. TWS & REST API. ASX access available.</div>
+                <div class="broker-tags"><span class="btag">Global</span><span class="btag">Options</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.interactivebrokers.com.au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="schwab">
+              <div class="broker-logo">SCH</div>
+              <div class="broker-info">
+                <div class="broker-name">Charles Schwab</div>
+                <div class="broker-desc">$0 commissions. Stocks, ETFs, options, futures. Has Schwab API (thinkorswim).</div>
+                <div class="broker-tags"><span class="btag">US</span><span class="btag">Options</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.schwab.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="robinhood">
+              <div class="broker-logo">RH</div>
+              <div class="broker-info">
+                <div class="broker-name">Robinhood</div>
+                <div class="broker-desc">$0 commissions. Stocks, options, crypto. Simple interface, limited API access.</div>
+                <div class="broker-tags"><span class="btag">US</span><span class="btag">Options</span><span class="btag">Crypto</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Manual</span>
+                <a class="broker-link" href="https://robinhood.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="webull">
+              <div class="broker-logo">WB</div>
+              <div class="broker-info">
+                <div class="broker-name">Webull</div>
+                <div class="broker-desc">Advanced charts, extended hours, fractional shares. Paper trading available.</div>
+                <div class="broker-tags"><span class="btag">US</span><span class="btag">Options</span><span class="btag">Paper</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Manual</span>
+                <a class="broker-link" href="https://www.webull.com" target="_blank">Open →</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Crypto Exchanges -->
+          <div class="broker-grid hidden" id="bcat-crypto">
+            <div class="broker-card featured" data-broker="binance">
+              <div class="broker-logo api-glow">BNB</div>
+              <div class="broker-info">
+                <div class="broker-name">Binance <span class="btag api-tag" style="font-size:9px">FULL API</span></div>
+                <div class="broker-desc">World's largest crypto exchange by volume. 350+ coins. Spot, futures, margin. Full REST + WebSocket API.</div>
+                <div class="broker-tags"><span class="btag">350+ Coins</span><span class="btag">Futures</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.binance.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card featured" data-broker="coinbase">
+              <div class="broker-logo api-glow">CB</div>
+              <div class="broker-info">
+                <div class="broker-name">Coinbase Advanced <span class="btag api-tag" style="font-size:9px">API</span></div>
+                <div class="broker-desc">US-regulated. 250+ coins. Most trusted in US. Advanced Trade API available.</div>
+                <div class="broker-tags"><span class="btag">250+ Coins</span><span class="btag">US Regulated</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://advanced.coinbase.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="kraken">
+              <div class="broker-logo">KRK</div>
+              <div class="broker-info">
+                <div class="broker-name">Kraken</div>
+                <div class="broker-desc">200+ coins. Trusted since 2011. Spot + futures. Full API with WebSocket.</div>
+                <div class="broker-tags"><span class="btag">200+ Coins</span><span class="btag">Futures</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.kraken.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="bybit">
+              <div class="broker-logo">BBT</div>
+              <div class="broker-info">
+                <div class="broker-name">Bybit</div>
+                <div class="broker-desc">Top derivatives exchange. Spot, perpetuals, options. Very popular in AU.</div>
+                <div class="broker-tags"><span class="btag">Perpetuals</span><span class="btag">Options</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.bybit.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="okx">
+              <div class="broker-logo">OKX</div>
+              <div class="broker-info">
+                <div class="broker-name">OKX</div>
+                <div class="broker-desc">3rd largest exchange. Spot, futures, options, DEX aggregator. Full API.</div>
+                <div class="broker-tags"><span class="btag">350+ Coins</span><span class="btag">DEX</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.okx.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="kucoin">
+              <div class="broker-logo">KCS</div>
+              <div class="broker-info">
+                <div class="broker-name">KuCoin</div>
+                <div class="broker-desc">700+ coins including small-caps. Spot, margin, futures. Popular for altcoins.</div>
+                <div class="broker-tags"><span class="btag">700+ Coins</span><span class="btag">Altcoins</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.kucoin.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="bitget">
+              <div class="broker-logo">BGT</div>
+              <div class="broker-info">
+                <div class="broker-name">Bitget</div>
+                <div class="broker-desc">Copy trading + spot + futures. 700+ coins. Growing AU user base.</div>
+                <div class="broker-tags"><span class="btag">Copy Trade</span><span class="btag">Futures</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.bitget.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="independentreserve">
+              <div class="broker-logo">IR</div>
+              <div class="broker-info">
+                <div class="broker-name">Independent Reserve</div>
+                <div class="broker-desc">🇦🇺 AU-regulated crypto exchange. AUSTRAC registered. AUD deposits. API available.</div>
+                <div class="broker-tags"><span class="btag">AU Regulated</span><span class="btag">AUD</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.independentreserve.com" target="_blank">Open →</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Alpaca API connect panel -->
+          <div class="broker-connect-panel" id="alpacaPanel">
+            <div class="bcp-title">⚡ ALPACA — AUTOMATED ORDER ROUTING</div>
+            <div class="bcp-desc">Connect Alpaca to have DALIOS send trade signals directly as orders. Start with paper trading — it's free and has zero risk.</div>
+            <div class="bcp-fields">
+              <div class="bcp-field">
+                <label>API KEY ID</label>
+                <input type="password" class="form-input form-input--sm" id="alpacaKey" placeholder="PKxxx..." />
+              </div>
+              <div class="bcp-field">
+                <label>SECRET KEY</label>
+                <input type="password" class="form-input form-input--sm" id="alpacaSecret" placeholder="••••••••••••••••" />
+              </div>
+              <div class="bcp-field">
+                <label>ENDPOINT</label>
+                <select class="ctrl-select" id="alpacaEnv">
+                  <option value="paper">Paper Trading (safe — recommended)</option>
+                  <option value="live">Live Trading</option>
+                </select>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn-primary" onclick="connectAlpaca()">⚡ TEST CONNECTION</button>
+              <span id="alpacaConnectResult" style="font-size:10px;align-self:center;color:var(--text-2)"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- API Keys -->
+        <div class="panel panel--api-keys">
+          <div class="panel-header">
+            <span class="panel-title">DATA SOURCE API CREDENTIALS</span>
+            <span class="panel-tag">ENCRYPTED AT REST</span>
+          </div>
+          <div class="api-key-list">
+            <div class="api-key-item">
+              <div class="api-key-name">ALPHA VANTAGE</div>
+              <input type="password" class="form-input form-input--sm" placeholder="••••••••••••" />
+              <span class="api-key-link"><a href="https://www.alphavantage.co/support/#api-key" target="_blank">FREE KEY →</a></span>
+            </div>
+            <div class="api-key-item">
+              <div class="api-key-name">EODHD</div>
+              <input type="password" class="form-input form-input--sm" placeholder="••••••••••••" />
+              <span class="api-key-link"><a href="https://eodhd.com/register" target="_blank">FREE KEY →</a></span>
+            </div>
+            <div class="api-key-item">
+              <div class="api-key-name">FINNHUB</div>
+              <input type="password" class="form-input form-input--sm" placeholder="••••••••••••" />
+              <span class="api-key-link"><a href="https://finnhub.io/register" target="_blank">FREE KEY →</a></span>
+            </div>
+            <div class="api-key-item">
+              <div class="api-key-name">NEWSAPI</div>
+              <input type="password" class="form-input form-input--sm" placeholder="••••••••••••" />
+              <span class="api-key-link"><a href="https://newsapi.org/register" target="_blank">FREE KEY →</a></span>
+            </div>
+            <div class="api-key-item">
+              <div class="api-key-name">TRADING ECONOMICS</div>
+              <input type="password" class="form-input form-input--sm" placeholder="••••••••••••" />
+              <span class="api-key-link"><a href="https://tradingeconomics.com/api/" target="_blank">FREE KEY →</a></span>
+            </div>
+          </div>
+          <button class="btn-primary btn--full" onclick="saveApiKeys()">💾 SAVE CREDENTIALS</button>
+        </div>
+
+        <!-- System Config -->
+        <div class="panel panel--sys-config">
+          <div class="panel-header">
+            <span class="panel-title">SYSTEM PARAMETERS</span>
+          </div>
+          <div class="config-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">INITIAL EQUITY ($)</label>
+                <input type="number" class="form-input" id="cfgEquity" value="100000" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">TRADING MODE</label>
+                <select class="ctrl-select" id="cfgMode">
+                  <option value="paper">PAPER TRADING</option>
+                  <option value="live">LIVE TRADING</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">DAILY STOP-LOSS (%)</label>
+                <input type="number" class="form-input" id="cfgDailySL" value="2.0" step="0.1" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">MAX DRAWDOWN (%)</label>
+                <input type="number" class="form-input" id="cfgMaxDD" value="10.0" step="0.5" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">MIN ASSETS (HOLY GRAIL)</label>
+                <input type="number" class="form-input" id="cfgMinAssets" value="15" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">MAX CORRELATION</label>
+                <input type="number" class="form-input" id="cfgMaxCorr" value="0.3" step="0.05" />
+              </div>
+            </div>
+            <button class="btn-primary btn--full" onclick="saveConfig()">⚙ APPLY CONFIG</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ═══════════════════════════════════════════════
+       STATUS BAR
+  ═══════════════════════════════════════════════ -->
+  <footer class="status-bar">
+    <span id="sb-mode">MODE: PAPER</span>
+    <span id="sb-cycle">CYCLE: 0</span>
+    <span id="sb-quadrant">QUADRANT: --</span>
+    <span id="sb-equity">NAV: $--</span>
+    <span id="sb-ws">WS: CONNECTING</span>
+    <span class="sb-version">DALIOS v1.0.0 — RAY DALIO ALL WEATHER FRAMEWORK</span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+
+  <!-- ═══════════════════════════════════════════════
+       SPEECH BUBBLE SPOTLIGHT TOOLTIP
+  ═══════════════════════════════════════════════ -->
+  <div id="spotBubble" class="spot-bubble hidden" role="tooltip" aria-live="polite">
+    <div class="spot-header">
+      <span class="spot-title" id="spotTitle">Feature</span>
+      <button class="spot-close" onclick="skipAllSpots()" title="Dismiss all tips">✕</button>
+    </div>
+    <p class="spot-text" id="spotText"></p>
+    <div class="spot-footer">
+      <span class="spot-count" id="spotCount">1 / 3</span>
+      <div class="spot-btns">
+        <button class="spot-btn-skip" onclick="skipAllSpots()">Skip</button>
+        <button class="spot-btn-next" onclick="nextSpot()" id="spotNextBtn">Next →</button>
+      </div>
+    </div>
+    <div class="spot-arrow" id="spotArrow"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       ASSET SEARCH MODAL
+  ═══════════════════════════════════════════════ -->
+  <div id="searchModal" class="search-modal hidden" role="dialog" aria-label="Asset Search" aria-hidden="true">
+    <div class="search-box">
+      <div class="search-header">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="Search ASX, crypto, commodities..." oninput="onSearchInput(this.value)" autocomplete="off" spellcheck="false"/>
+        <span class="search-kbd">ESC</span>
+        <button class="search-close-btn" onclick="closeSearch()">✕</button>
+      </div>
+      <div id="searchResults">
+        <div class="sr-empty">Type to search 67 assets across ASX, Crypto &amp; Commodities</div>
+      </div>
+      <div class="search-footer">
+        <span id="searchCount">71 assets available</span>
+        <span>↑↓ navigate &nbsp;·&nbsp; Enter select &nbsp;·&nbsp; Ctrl+K open</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       CLI — AI INTERACTION BAR (fixed bottom)
+  ═══════════════════════════════════════════════ -->
+  <div class="cli-bar" id="cliBar">
+    <div class="cli-header" onclick="toggleCli()">
+      <span class="cli-title">
+        <span class="cli-icon">▶_</span>
+        DALIOS AI TERMINAL
+      </span>
+      <div class="cli-header-right">
+        <span class="cli-hint" id="cliHint">Type a command or question — try: <em>buy 10 BHP.AX</em>, <em>analyse TSLA</em>, <em>portfolio</em>, <em>risk</em></span>
+        <button class="cli-toggle-btn" id="cliToggleBtn" title="Expand / collapse terminal">▲</button>
+      </div>
+    </div>
+    <div class="cli-body" id="cliBody">
+      <div class="cli-output" id="cliOutput">
+        <div class="cli-msg cli-msg--system">DALIOS AI TERMINAL v1.0 — Powered by Dalio All-Weather Framework<br>
+        Commands: <span class="cli-cmd-hint">buy &lt;qty&gt; &lt;ticker&gt;</span> · <span class="cli-cmd-hint">sell &lt;qty&gt; &lt;ticker&gt;</span> · <span class="cli-cmd-hint">analyse &lt;ticker&gt;</span> · <span class="cli-cmd-hint">portfolio</span> · <span class="cli-cmd-hint">risk</span> · <span class="cli-cmd-hint">quadrant</span> · <span class="cli-cmd-hint">signals</span> · <span class="cli-cmd-hint">help</span></div>
+      </div>
+      <div class="cli-input-row">
+        <span class="cli-prompt">DALIOS&gt;</span>
+        <input type="text" id="cliInput" class="cli-input" placeholder="Enter command or ask a question..." autocomplete="off" spellcheck="false"
+          onkeydown="onCliKey(event)"/>
+        <button class="cli-send-btn" onclick="sendCliCommand()">SEND ↵</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Strong signal overlay banner (inside body, fixed) -->
+  <div id="strongSignalBanner" class="strong-signal-banner hidden">
+    <div class="ssb-inner">
+      <span class="ssb-icon" id="ssbIcon">⚡</span>
+      <div class="ssb-content">
+        <div class="ssb-action" id="ssbAction">STRONG BUY SIGNAL</div>
+        <div class="ssb-detail" id="ssbDetail"></div>
+      </div>
+      <button class="ssb-cta" id="ssbCta" onclick="goToSignals()">VIEW SIGNAL →</button>
+      <button class="ssb-close" onclick="dismissStrongSignal()">✕</button>
+    </div>
+  </div>
+</body>
+</html>
