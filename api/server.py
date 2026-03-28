@@ -793,46 +793,134 @@ WS_MANAGER = ConnectionManager()
 
 ASX_TICKERS = [
     # ── Big 4 Banks ──────────────────────────────────────
-    "CBA.AX", "ANZ.AX", "NAB.AX", "WBC.AX",
-    # ── Mining / Resources ───────────────────────────────
+    "CBA.AX", "WBC.AX", "ANZ.AX", "NAB.AX",
+    # ── Other Banks & Financials ─────────────────────────
+    "MQG.AX", "BEN.AX", "BOQ.AX", "SUN.AX", "QBE.AX", "IAG.AX",
+    "AMP.AX", "ASX.AX", "PPT.AX", "CGF.AX", "CPU.AX", "NHF.AX",
+    "MPL.AX", "NIB.AX", "AUB.AX",
+    # ── Mining & Resources ───────────────────────────────
     "BHP.AX", "RIO.AX", "FMG.AX", "S32.AX", "MIN.AX", "LYC.AX",
+    "IGO.AX", "SFR.AX", "PLS.AX", "ILU.AX", "AWC.AX",
+    "LTR.AX", "NIC.AX", "WSA.AX",
+    # ── Gold & Precious Metals ───────────────────────────
+    "NST.AX", "EVN.AX", "SBM.AX", "RRL.AX", "SAR.AX",
+    "GOR.AX", "CMM.AX", "RMS.AX", "DEG.AX", "WAF.AX",
     # ── Energy ───────────────────────────────────────────
     "WDS.AX", "STO.AX", "BPT.AX", "AGL.AX", "ORG.AX",
-    # ── Finance ──────────────────────────────────────────
-    "MQG.AX", "SUN.AX", "QBE.AX", "AMP.AX",
-    # ── Healthcare ───────────────────────────────────────
-    "CSL.AX", "COH.AX", "RMD.AX", "PME.AX",
+    "APA.AX", "KAR.AX", "CVN.AX",
+    # ── Healthcare & Biotech ─────────────────────────────
+    "CSL.AX", "RMD.AX", "COH.AX", "SHL.AX", "ANN.AX",
+    "PME.AX", "EBO.AX", "HLS.AX", "PNV.AX", "RHC.AX",
+    "CUV.AX", "NEU.AX", "TLX.AX", "MSB.AX",
+    # ── Technology ───────────────────────────────────────
+    "WTC.AX", "XRO.AX", "ALU.AX", "MP1.AX", "TNE.AX",
+    "REA.AX", "APX.AX", "TYR.AX", "SDR.AX", "DTL.AX",
+    "ZIP.AX", "EML.AX", "HUB.AX", "NXT.AX",
     # ── Consumer / Retail ────────────────────────────────
     "WES.AX", "WOW.AX", "COL.AX", "JBH.AX", "TWE.AX",
-    # ── Technology ───────────────────────────────────────
-    "REA.AX", "XRO.AX", "WTC.AX", "ALU.AX",
-    # ── Real Estate ──────────────────────────────────────
-    "GMG.AX", "SCG.AX", "GPT.AX",
-    # ── Transport / Infra ────────────────────────────────
-    "QAN.AX", "TCL.AX", "TLS.AX",
-    # ── Gold / Materials ─────────────────────────────────
-    "NCM.AX", "EVN.AX", "NST.AX",
+    "HVN.AX", "DMP.AX", "SUL.AX", "LOV.AX", "KGN.AX",
+    "TPW.AX", "MYR.AX", "NCK.AX",
+    # ── Consumer Staples & Food ──────────────────────────
+    "GNC.AX", "NUF.AX", "ELD.AX", "BKL.AX",
+    # ── REITs ────────────────────────────────────────────
+    "GMG.AX", "SCG.AX", "GPT.AX", "VCX.AX", "CLW.AX",
+    "MGR.AX", "DXS.AX", "CHC.AX", "BWP.AX", "NSR.AX",
+    "CQR.AX", "HMC.AX", "ABP.AX", "SCP.AX", "HDN.AX",
+    # ── Industrials & Infrastructure ─────────────────────
+    "TCL.AX", "QAN.AX", "BXB.AX", "AZJ.AX", "QUB.AX",
+    "WOR.AX", "MND.AX", "JHX.AX", "CSR.AX", "BLD.AX",
+    "DOW.AX", "SVW.AX",
+    # ── Telecom ──────────────────────────────────────────
+    "TLS.AX", "TPG.AX", "SPK.AX",
+    # ── Media ────────────────────────────────────────────
+    "NWS.AX", "SEK.AX", "CAR.AX", "REA.AX", "NEC.AX",
+    # ── LICs & ETFs ──────────────────────────────────────
+    "VAS.AX", "VGS.AX", "IOZ.AX", "STW.AX", "NDQ.AX",
+    "A200.AX", "GOLD.AX", "ETHI.AX",
+    # ── Diversified ──────────────────────────────────────
+    "AFI.AX", "ARG.AX", "MLT.AX", "WAM.AX",
 ]
 
-# Crypto tickers available on all major platforms (Binance/Coinbase/Kraken)
+# Crypto — top liquid pairs from Binance/Coinbase/Kraken in yfinance USD format
 CRYPTO_TICKERS = [
+    # ── Layer 1 Major ─────────────────────────────────────
     "BTC-USD", "ETH-USD", "BNB-USD", "SOL-USD", "XRP-USD",
-    "ADA-USD", "AVAX-USD", "DOT-USD", "LINK-USD", "MATIC-USD",
-    "DOGE-USD", "LTC-USD", "UNI-USD", "ATOM-USD", "NEAR-USD",
-    "FTM-USD", "ALGO-USD", "XLM-USD", "AAVE-USD", "SNX-USD",
+    "ADA-USD", "AVAX-USD", "DOT-USD", "TRX-USD", "LTC-USD",
+    "ATOM-USD", "NEAR-USD", "ALGO-USD", "XLM-USD", "VET-USD",
+    "ICP-USD", "HBAR-USD", "FIL-USD", "EOS-USD", "XTZ-USD",
+    "NEO-USD", "IOTA-USD", "XMR-USD", "ZEC-USD", "DASH-USD",
+    "WAVES-USD", "ICX-USD", "ONT-USD", "QTUM-USD", "ZIL-USD",
+    # ── Layer 2 & Scaling ─────────────────────────────────
+    "MATIC-USD", "ARB-USD", "OP-USD", "IMX-USD", "LRC-USD",
+    "SKL-USD", "METIS-USD",
+    # ── New-Gen L1 ────────────────────────────────────────
+    "APT-USD", "SUI-USD", "INJ-USD", "SEI-USD", "TIA-USD",
+    "PYTH-USD", "JUP-USD",
+    # ── DeFi — DEX & Lending ──────────────────────────────
+    "UNI-USD", "AAVE-USD", "MKR-USD", "COMP-USD", "YFI-USD",
+    "SUSHI-USD", "1INCH-USD", "CRV-USD", "BAL-USD", "DYDX-USD",
+    "GMX-USD", "SNX-USD", "PENDLE-USD", "CAKE-USD",
+    "CVX-USD", "FXS-USD",
+    # ── DeFi — Staking ────────────────────────────────────
+    "LDO-USD", "RPL-USD", "ANKR-USD",
+    # ── Gaming & Metaverse ────────────────────────────────
+    "SAND-USD", "MANA-USD", "ENJ-USD", "AXS-USD", "GALA-USD",
+    "FLOW-USD", "BEAM-USD", "RONIN-USD",
+    # ── Meme Coins ────────────────────────────────────────
+    "DOGE-USD", "SHIB-USD", "PEPE-USD", "FLOKI-USD", "BONK-USD",
+    "WIF-USD",
+    # ── Infrastructure & Oracles ──────────────────────────
+    "LINK-USD", "BAND-USD", "API3-USD", "TRB-USD",
+    # ── Storage & Data ────────────────────────────────────
+    "AR-USD", "STORJ-USD",
+    # ── Privacy ───────────────────────────────────────────
+    "SCRT-USD", "ROSE-USD",
+    # ── Cross-chain & Interop ─────────────────────────────
+    "RUNE-USD", "AXL-USD",
+    # ── AI & Data ─────────────────────────────────────────
+    "FET-USD", "AGIX-USD", "OCEAN-USD", "NMR-USD",
+    "TAO-USD", "RNDR-USD", "WLD-USD",
+    # ── Exchange Tokens ───────────────────────────────────
+    "CRO-USD", "KCS-USD",
+    # ── Web3 & Social ─────────────────────────────────────
+    "BAT-USD", "ZRX-USD", "GRT-USD", "LPT-USD",
+    # ── RWA ───────────────────────────────────────────────
+    "ONDO-USD",
+    # ── Misc High-liquidity ───────────────────────────────
+    "THETA-USD", "CHZ-USD", "CELR-USD", "MINA-USD",
+    "KAVA-USD", "CFX-USD", "JASMY-USD", "FTM-USD",
+    "HOT-USD", "WIN-USD", "REEF-USD", "OMG-USD",
 ]
 
 COMMODITY_TICKERS = [
-    "GLD",   # Gold ETF
-    "SLV",   # Silver ETF
-    "USO",   # Crude Oil
-    "UNG",   # Natural Gas
-    "COPX",  # Copper Miners
-    "WEAT",  # Wheat
-    "DBA",   # Agriculture broad
-    "PALL",  # Palladium
-    "XOM",   # Exxon (oil proxy)
-    "CVX",   # Chevron (oil proxy)
+    # ── Precious Metals ETFs ──────────────────────────────
+    "GLD", "IAU", "SLV", "SIVR", "PPLT", "PALL",
+    # ── Precious Metals Futures ───────────────────────────
+    "GC=F", "SI=F", "PL=F", "PA=F",
+    # ── Energy ETFs ───────────────────────────────────────
+    "USO", "BNO", "UNG", "UGA", "XLE", "VDE",
+    # ── Energy Futures ────────────────────────────────────
+    "CL=F", "BZ=F", "NG=F", "RB=F", "HO=F",
+    # ── Base Metals ETFs ──────────────────────────────────
+    "COPX", "CPER", "DBB", "XME", "REMX", "LIT", "URA",
+    # ── Base Metals Futures ───────────────────────────────
+    "HG=F", "ALI=F",
+    # ── Agriculture ETFs ──────────────────────────────────
+    "DBA", "MOO", "WEAT", "CORN", "SOYB", "CANE",
+    # ── Agriculture Futures ───────────────────────────────
+    "ZW=F", "ZC=F", "ZS=F", "ZO=F", "KC=F", "CT=F", "SB=F",
+    # ── Livestock Futures ─────────────────────────────────
+    "LE=F", "GF=F", "HE=F",
+    # ── Broad Commodity ETFs ──────────────────────────────
+    "PDBC", "GSG", "FTGC",
+    # ── Timber & Water ────────────────────────────────────
+    "WOOD", "PHO",
+    # ── Carbon ────────────────────────────────────────────
+    "KRBN",
+    # ── Miner Proxies ─────────────────────────────────────
+    "GDX", "GDXJ", "SIL", "FCX", "NEM", "GOLD", "AEM", "WPM",
+    # ── Oil Majors ────────────────────────────────────────
+    "XOM", "CVX",
 ]
 
 ALL_TICKERS  = ASX_TICKERS + CRYPTO_TICKERS + COMMODITY_TICKERS

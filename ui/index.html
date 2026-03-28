@@ -120,7 +120,7 @@
       <span class="tab-icon">🔴</span> LIVE TRADING
     </button>
     <button class="tab-btn" data-tab="comms-config">
-      <span class="tab-icon">📡</span> COMMS
+      <span class="tab-icon">⚙</span> SETTINGS
     </button>
     <button class="tab-help-btn" id="helpBtn" title="Show tutorial for this page" onclick="openCurrentTutorial()">?</button>
     <button class="search-nav-btn" onclick="openSearch()" title="Search all assets (Ctrl+K)">🔍 SEARCH 71 ASSETS <span style="opacity:0.5;font-size:8px;margin-left:4px">Ctrl+K</span></button>
@@ -1224,16 +1224,152 @@
     </section>
 
     <!-- ─────────────────────────────────────
-         TAB 9: COMMS CONFIG
+         SETTINGS TAB
     ───────────────────────────────────── -->
     <section id="tab-comms-config" class="tab-panel">
-      <div class="panel-grid panel-grid--comms">
+      <div class="panel-grid panel-grid--settings">
 
-        <!-- Discord Config -->
+        <!-- ── GENERAL SETTINGS ── -->
+        <div class="panel panel--sett-general">
+          <div class="panel-header">
+            <span class="panel-title">⚙ GENERAL</span>
+          </div>
+          <div class="config-form">
+
+            <div class="sett-section-label">TRADING DEFAULTS</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">STARTING CASH ($)</label>
+                <input type="number" class="form-input" id="settStartCash" value="1000" min="1" step="any" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">DEFAULT TRADE SIZE ($)</label>
+                <input type="number" class="form-input" id="settTradeSize" value="100" min="1" step="any" />
+              </div>
+            </div>
+
+            <div class="sett-section-label" style="margin-top:14px">RISK MANAGEMENT</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">DAILY STOP-LOSS (%)</label>
+                <input type="number" class="form-input" id="settDailySL" value="2.0" step="0.1" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">MAX DRAWDOWN (%)</label>
+                <input type="number" class="form-input" id="settMaxDD" value="10.0" step="0.5" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">MAX POSITION SIZE (%)</label>
+                <input type="number" class="form-input" id="settMaxPos" value="10.0" step="0.5" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">MAX OPEN POSITIONS</label>
+                <input type="number" class="form-input" id="settMaxOpen" value="20" min="1" />
+              </div>
+            </div>
+
+            <div class="sett-section-label" style="margin-top:14px">SIGNAL THRESHOLDS</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">MIN CONFIDENCE (%)</label>
+                <input type="number" class="form-input" id="settMinConf" value="60" min="1" max="100" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">MIN DALIO SCORE (%)</label>
+                <input type="number" class="form-input" id="settMinDalio" value="50" min="1" max="100" />
+              </div>
+            </div>
+
+            <div class="sett-section-label" style="margin-top:14px">HOLY GRAIL PARAMETERS</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">MIN ASSETS</label>
+                <input type="number" class="form-input" id="cfgMinAssets" value="15" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">MAX CORRELATION</label>
+                <input type="number" class="form-input" id="cfgMaxCorr" value="0.3" step="0.05" />
+              </div>
+            </div>
+
+            <button class="btn-primary btn--full" style="margin-top:14px" onclick="saveGeneralSettings()">💾 SAVE GENERAL SETTINGS</button>
+          </div>
+        </div>
+
+        <!-- ── UI / DISPLAY SETTINGS ── -->
+        <div class="panel panel--sett-ui">
+          <div class="panel-header">
+            <span class="panel-title">🖥 UI &amp; DISPLAY</span>
+          </div>
+          <div class="config-form">
+
+            <div class="sett-section-label">TUTORIALS</div>
+            <div class="sett-toggle-row">
+              <div class="sett-toggle-info">
+                <div class="sett-toggle-name">TUTORIAL TOOLTIPS</div>
+                <div class="sett-toggle-desc">Show speech bubble guides when switching tabs</div>
+              </div>
+              <button class="sett-toggle-btn on" id="settTutorialBtn" onclick="toggleTutorials(this)">ON</button>
+            </div>
+            <button class="btn-ghost btn--full" style="margin-top:8px" onclick="resetAllTutorials()">↺ RESET — SHOW ALL TUTORIALS AGAIN</button>
+
+            <div class="sett-section-label" style="margin-top:16px">SOUND &amp; ALERTS</div>
+            <div class="sett-toggle-row">
+              <div class="sett-toggle-info">
+                <div class="sett-toggle-name">SOUND EFFECTS</div>
+                <div class="sett-toggle-desc">Beeps on signals, orders, alerts</div>
+              </div>
+              <button class="sett-toggle-btn" id="settSoundBtn" onclick="toggleSoundSetting(this)">OFF</button>
+            </div>
+            <div class="sett-toggle-row">
+              <div class="sett-toggle-info">
+                <div class="sett-toggle-name">BROWSER NOTIFICATIONS</div>
+                <div class="sett-toggle-desc">OS-level push on strong signals</div>
+              </div>
+              <button class="sett-toggle-btn" id="settNotifBtn" onclick="requestNotificationPermission()">ENABLE</button>
+            </div>
+
+            <div class="sett-section-label" style="margin-top:16px">REFRESH INTERVALS</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">DATA REFRESH (SEC)</label>
+                <select class="ctrl-select" id="settRefreshInterval">
+                  <option value="15">15s</option>
+                  <option value="30" selected>30s</option>
+                  <option value="60">60s</option>
+                  <option value="120">2 min</option>
+                  <option value="300">5 min</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">TICKER STRIP (SEC)</label>
+                <select class="ctrl-select" id="settTickerInterval">
+                  <option value="30">30s</option>
+                  <option value="60" selected>60s</option>
+                  <option value="120">2 min</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="sett-section-label" style="margin-top:16px">THEME</div>
+            <div class="sett-theme-row">
+              <button class="sett-theme-btn active" data-theme="cyber" onclick="setTheme('cyber',this)">⚡ CYBER</button>
+              <button class="sett-theme-btn" data-theme="matrix" onclick="setTheme('matrix',this)">◈ MATRIX</button>
+              <button class="sett-theme-btn" data-theme="void" onclick="setTheme('void',this)">◉ VOID</button>
+              <button class="sett-theme-btn" data-theme="amber" onclick="setTheme('amber',this)">⬡ AMBER</button>
+            </div>
+
+            <button class="btn-primary btn--full" style="margin-top:14px" onclick="saveUiSettings()">💾 SAVE UI SETTINGS</button>
+          </div>
+        </div>
+
+        <!-- ── DISCORD ── -->
         <div class="panel panel--discord">
           <div class="panel-header">
             <span class="panel-title">DISCORD WEBHOOK</span>
-            <span class="badge badge--green" id="discordStatus">● CONFIGURED</span>
+            <span class="badge badge--amber" id="discordStatus">● UNCONFIGURED</span>
           </div>
           <div class="config-form">
             <div class="form-group">
@@ -1247,7 +1383,7 @@
                 <label class="checkbox-item"><input type="checkbox" checked /> TRADE SIGNALS</label>
                 <label class="checkbox-item"><input type="checkbox" checked /> CIRCUIT BREAKER</label>
                 <label class="checkbox-item"><input type="checkbox" checked /> SENTIMENT ALERTS</label>
-                <label class="checkbox-item"><input type="checkbox" checked /> HEALTH REPORTS</label>
+                <label class="checkbox-item"><input type="checkbox" /> HEALTH REPORTS</label>
                 <label class="checkbox-item"><input type="checkbox" /> EVERY CYCLE</label>
               </div>
             </div>
@@ -1618,48 +1754,8 @@
           <button class="btn-primary btn--full" onclick="saveApiKeys()">💾 SAVE CREDENTIALS</button>
         </div>
 
-        <!-- System Config -->
-        <div class="panel panel--sys-config">
-          <div class="panel-header">
-            <span class="panel-title">SYSTEM PARAMETERS</span>
-          </div>
-          <div class="config-form">
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">INITIAL EQUITY ($)</label>
-                <input type="number" class="form-input" id="cfgEquity" value="100000" />
-              </div>
-              <div class="form-group">
-                <label class="form-label">TRADING MODE</label>
-                <select class="ctrl-select" id="cfgMode">
-                  <option value="paper">PAPER TRADING</option>
-                  <option value="live">LIVE TRADING</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">DAILY STOP-LOSS (%)</label>
-                <input type="number" class="form-input" id="cfgDailySL" value="2.0" step="0.1" />
-              </div>
-              <div class="form-group">
-                <label class="form-label">MAX DRAWDOWN (%)</label>
-                <input type="number" class="form-input" id="cfgMaxDD" value="10.0" step="0.5" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">MIN ASSETS (HOLY GRAIL)</label>
-                <input type="number" class="form-input" id="cfgMinAssets" value="15" />
-              </div>
-              <div class="form-group">
-                <label class="form-label">MAX CORRELATION</label>
-                <input type="number" class="form-input" id="cfgMaxCorr" value="0.3" step="0.05" />
-              </div>
-            </div>
-            <button class="btn-primary btn--full" onclick="saveConfig()">⚙ APPLY CONFIG</button>
-          </div>
-        </div>
+        <!-- DATA SOURCE API KEYS panel stays here -->
+
 
       </div>
     </section>

@@ -54,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initNotifications();
   initTradingMode();
   loadWatchlist();
+  _applyStoredTheme();
   loadAll();
   loadMarketSummary();
   setInterval(loadAll, 30_000);           // Refresh all data every 30s
@@ -82,6 +83,7 @@ function initTabs() {
       if (id === 'asx-scanner')         loadScanner('asx');
       if (id === 'crypto-scanner')      loadScanner('crypto');
       if (id === 'commodities-scanner') loadScanner('commodities');
+      if (id === 'comms-config')        initSettingsTab();
       // Show tutorial on first visit
       showTutorial(id);
     });
@@ -1329,6 +1331,136 @@ function saveApiKeys() {
 
 function saveConfig() {
   pushAlert('CONFIG', 'System parameters updated. Restart required to apply.', 'warning');
+}
+
+// ═══════════════════════════════════════════════════════════
+// SETTINGS TAB
+// ═══════════════════════════════════════════════════════════
+
+const _SETT_KEY = 'dalios_settings';
+
+function _loadSettings() {
+  try { return JSON.parse(localStorage.getItem(_SETT_KEY) || '{}'); } catch { return {}; }
+}
+function _saveSetting(key, val) {
+  const s = _loadSettings(); s[key] = val;
+  localStorage.setItem(_SETT_KEY, JSON.stringify(s));
+}
+
+// ─── Tutorial toggle ───────────────────────────────────────
+function initSettingsTab() {
+  const s = _loadSettings();
+  // Tutorial btn
+  const tBtn = el('settTutorialBtn');
+  const tutOff = s.tutorials_off === true;
+  if (tBtn) { tBtn.textContent = tutOff ? 'OFF' : 'ON'; tBtn.classList.toggle('on', !tutOff); }
+  // Sound btn
+  const sBtn = el('settSoundBtn');
+  if (sBtn) { sBtn.textContent = _soundOn ? 'ON' : 'OFF'; sBtn.classList.toggle('on', _soundOn); }
+  // Notification btn
+  const nBtn = el('settNotifBtn');
+  if (nBtn) { nBtn.textContent = Notification.permission === 'granted' ? 'ENABLED' : 'ENABLE'; nBtn.classList.toggle('on', Notification.permission === 'granted'); }
+  // Populate cash from server
+  fetchJSON('/api/paper/config').then(d => {
+    const inp = el('settStartCash'); if (inp) inp.value = d.starting_cash;
+    const inp2 = el('startingCashInput'); if (inp2) inp2.value = d.starting_cash;
+  }).catch(() => {});
+}
+
+function toggleTutorials(btn) {
+  const s = _loadSettings();
+  const nowOff = !(s.tutorials_off === true);
+  _saveSetting('tutorials_off', nowOff);
+  btn.textContent = nowOff ? 'OFF' : 'ON';
+  btn.classList.toggle('on', !nowOff);
+  pushAlert('SETTINGS', `Tutorial tooltips ${nowOff ? 'disabled' : 'enabled'}`, 'info');
+}
+
+function resetAllTutorials() {
+  Object.keys(localStorage).filter(k => k.startsWith('dalios_spot_')).forEach(k => localStorage.removeItem(k));
+  _saveSetting('tutorials_off', false);
+  const btn = el('settTutorialBtn'); if (btn) { btn.textContent = 'ON'; btn.classList.add('on'); }
+  pushAlert('SETTINGS', 'All tutorials reset — they will show again on next tab visit', 'info');
+}
+
+// Patch showTutorial to respect the setting
+const _origShowTutorial = showTutorial;
+window.showTutorial = function(tabId, force = false) {
+  if (!force && _loadSettings().tutorials_off) return;
+  _origShowTutorial(tabId, force);
+};
+
+function toggleSoundSetting(btn) {
+  toggleSound();
+  btn.textContent = _soundOn ? 'ON' : 'OFF';
+  btn.classList.toggle('on', _soundOn);
+  const mainBtn = el('soundToggleBtn');
+  if (mainBtn) mainBtn.textContent = _soundOn ? '🔊 SOUND' : '🔇 SOUND';
+}
+
+function requestNotificationPermission() {
+  initNotifications();
+  setTimeout(() => {
+    const btn = el('settNotifBtn');
+    if (btn) { btn.textContent = Notification.permission === 'granted' ? 'ENABLED' : 'BLOCKED'; btn.classList.toggle('on', Notification.permission === 'granted'); }
+  }, 1500);
+}
+
+// ─── Theme switcher ────────────────────────────────────────
+const _THEMES = {
+  cyber:  { primary: '#00d4ff', green: '#00ff88', red: '#ff3355', amber: '#ffb000', bg0: '#04080e' },
+  matrix: { primary: '#00ff41', green: '#00ff41', red: '#ff3355', amber: '#ccff00', bg0: '#000d02' },
+  void:   { primary: '#c084fc', green: '#a3e635', red: '#f87171', amber: '#fbbf24', bg0: '#06020f' },
+  amber:  { primary: '#ffb000', green: '#00d4ff', red: '#ff3355', amber: '#ffb000', bg0: '#0c0700' },
+};
+
+function setTheme(name, btn) {
+  const t = _THEMES[name]; if (!t) return;
+  const root = document.documentElement;
+  root.style.setProperty('--primary',      t.primary);
+  root.style.setProperty('--green',        t.green);
+  root.style.setProperty('--red',          t.red);
+  root.style.setProperty('--amber',        t.amber);
+  root.style.setProperty('--bg-0',         t.bg0);
+  root.style.setProperty('--primary-glow', t.primary + '40');
+  root.style.setProperty('--green-glow',   t.green + '40');
+  document.querySelectorAll('.sett-theme-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _saveSetting('theme', name);
+  pushAlert('SETTINGS', `Theme set to ${name.toUpperCase()}`, 'info');
+}
+
+function _applyStoredTheme() {
+  const s = _loadSettings();
+  if (s.theme && s.theme !== 'cyber') {
+    const btn = document.querySelector(`[data-theme="${s.theme}"]`);
+    if (btn) setTheme(s.theme, btn);
+  }
+}
+
+// ─── Save general settings ─────────────────────────────────
+async function saveGeneralSettings() {
+  const cash = parseFloat(el('settStartCash')?.value);
+  if (cash && cash >= 1) {
+    await postJSON('/api/paper/config', { starting_cash: cash }).catch(() => {});
+    const inp = el('startingCashInput'); if (inp) inp.value = cash;
+  }
+  _saveSetting('trade_size',    parseFloat(el('settTradeSize')?.value) || 100);
+  _saveSetting('daily_sl',      parseFloat(el('settDailySL')?.value) || 2.0);
+  _saveSetting('max_dd',        parseFloat(el('settMaxDD')?.value) || 10.0);
+  _saveSetting('max_pos_size',  parseFloat(el('settMaxPos')?.value) || 10.0);
+  _saveSetting('max_open',      parseInt(el('settMaxOpen')?.value) || 20);
+  _saveSetting('min_conf',      parseFloat(el('settMinConf')?.value) || 60);
+  _saveSetting('min_dalio',     parseFloat(el('settMinDalio')?.value) || 50);
+  pushAlert('SETTINGS', 'General settings saved', 'info');
+  playBeep(660, 0.08);
+}
+
+function saveUiSettings() {
+  _saveSetting('refresh_interval', parseInt(el('settRefreshInterval')?.value) || 30);
+  _saveSetting('ticker_interval',  parseInt(el('settTickerInterval')?.value) || 60);
+  pushAlert('SETTINGS', 'UI settings saved', 'info');
+  playBeep(660, 0.08);
 }
 
 // ═══════════════════════════════════════════════════════════
