@@ -1670,6 +1670,9 @@ function applyPaperPortfolio(d) {
       <td><button class="po-close-btn" onclick="closePaperPosition('${p.ticker}')">✕ CLOSE</button></td>
     </tr>`;
   }).join('');
+
+  // Mirror to Command Centre
+  applyCommandCentre(d, null);
 }
 
 async function closePaperPosition(ticker) {
@@ -1678,6 +1681,7 @@ async function closePaperPosition(ticker) {
     loadPaperPortfolio();
     loadPaperHistory();
     pushAlert('PAPER', `Closed position: ${ticker}`, 'info');
+    pushActivityItem('✕', `Closed position: ${ticker.replace('-USD','')}`, 'sell');
   } catch (e) {
     pushAlert('PAPER', `Close failed: ${e.message}`, 'warning');
   }
@@ -1752,6 +1756,7 @@ async function submitPaperOrder() {
     loadPaperPortfolio();
     loadPaperHistory();
     pushAlert('PAPER', `${d.side} ${qty}× ${d.ticker} @ ${fmt$(d.price)}`, 'info');
+    pushActivityItem(d.side === 'BUY' ? '▲' : '▼', `ORDER #${d.order_id} — ${d.side} ${qty}× ${d.ticker} @ ${fmt$(d.price)}`, d.side === 'BUY' ? 'buy' : 'sell');
   } catch (e) {
     const msg = e.message || 'Order failed';
     if (res) res.innerHTML = `<span style="color:var(--red)">✗ ${msg}</span>`;
@@ -1792,6 +1797,18 @@ function applyPaperHistory(d) {
       <td style="color:var(--text-muted)">${time}</td>
     </tr>`;
   }).join('');
+
+  // Mirror to Command Centre
+  applyCommandCentre(null, d);
+
+  // Push most recent trade to activity feed (only the latest one to avoid spam)
+  if (d.trades.length) {
+    const t = d.trades[0];
+    const pnlSign = t.pnl >= 0 ? '+' : '';
+    const cls = t.pnl >= 0 ? 'buy' : 'sell';
+    const icon = t.side === 'BUY' ? '▲' : '▼';
+    pushActivityItem(icon, `${t.side} ${t.ticker.replace('-USD','')} ${t.qty % 1 === 0 ? t.qty : t.qty.toFixed(4)}x | P&L: ${pnlSign}${fmt$(t.pnl)} (${pnlSign}${t.pnl_pct.toFixed(2)}%)`, cls);
+  }
 }
 
 // ─── Quick-trade from signals ──────────────────────────────
@@ -2517,6 +2534,186 @@ function formatCliResponse(text) {
 }
 
 // ─── END CLI ─────────────────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════
+// COMMAND CENTRE — Portfolio Stats Mirror
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Mirror portfolio data into the Command Centre panels.
+ * Called from applyPaperPortfolio() and applyPaperHistory().
+ */
+function applyCommandCentre(portfolioData, historyData) {
+  if (portfolioData) _applyCCPortfolio(portfolioData);
+  if (historyData)   _applyCCHistory(historyData);
+}
+
+function _applyCCPortfolio(d) {
+  const pnlPos  = d.total_pnl >= 0;
+  const pnlCol  = pnlPos ? 'var(--green)' : 'var(--red)';
+  const pnlSign = pnlPos ? '+' : '';
+
+  _ccSet('ccTotalVal',   fmt$(d.total_value),   pnlPos ? 'acc' : '');
+  _ccSet('ccCash',       fmt$(d.cash));
+  _ccSet('ccInvested',   fmt$(d.invested));
+  _ccSet('ccOpenCount',  d.open_count,   'acc');
+
+  const unreal = el('ccUnrealPnl');
+  if (unreal) {
+    unreal.textContent  = `${pnlSign}${fmt$(d.total_pnl)}`;
+    unreal.style.color  = pnlCol;
+  }
+  const ret = el('ccReturn');
+  if (ret) {
+    ret.textContent = `${pnlSign}${d.total_pnl_pct.toFixed(2)}%`;
+    ret.style.color  = pnlCol;
+  }
+  const badge = el('ccPnlBadge');
+  if (badge) {
+    badge.textContent = `P&L: ${pnlSign}${d.total_pnl_pct.toFixed(2)}%`;
+    badge.style.color  = pnlCol;
+  }
+
+  // Open positions table mirror
+  const posCount = el('ccPosCount');
+  if (posCount) posCount.textContent = `${d.open_count} OPEN`;
+
+  const body = el('ccPositionsBody');
+  if (body) {
+    if (!d.positions || !d.positions.length) {
+      body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:14px">No open positions</td></tr>`;
+    } else {
+      body.innerHTML = d.positions.map(p => {
+        const pnlCls = p.pnl >= 0 ? 'td-green' : 'td-red';
+        const pnlTxt = (p.pnl >= 0 ? '+' : '') + fmt$(p.pnl);
+        const pctTxt = (p.pnl_pct >= 0 ? '+' : '') + p.pnl_pct.toFixed(2) + '%';
+        return `<tr>
+          <td class="td-cyan" style="font-weight:700">${p.ticker.replace('-USD','')}</td>
+          <td class="${p.side === 'LONG' ? 'td-green' : 'td-red'}">${p.side}</td>
+          <td>${p.qty % 1 === 0 ? p.qty : p.qty.toFixed(4)}</td>
+          <td>${fmt$(p.entry_price)}</td>
+          <td style="color:var(--text-1)">${fmt$(p.current_price)}</td>
+          <td>${fmt$(p.market_value)}</td>
+          <td class="${pnlCls}">${pnlTxt}</td>
+          <td class="${pnlCls}">${pctTxt}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+  // Push activity entry for a portfolio refresh
+  if (d.positions && d.positions.length) {
+    pushActivityItem('◈', `Portfolio live: ${d.open_count} open | ${fmt$(d.total_value)} NAV`, 'info');
+  }
+}
+
+function _applyCCHistory(d) {
+  const total = d.total || 0;
+  _ccSet('ccTotalTrades', total, 'acc');
+  _ccSet('ccHistCount', `${total} TRADES`);
+
+  const trades = d.trades || [];
+
+  // Win rate
+  const closed = trades.filter(t => t.pnl != null);
+  const wins   = closed.filter(t => t.pnl > 0).length;
+  const winRate = closed.length ? ((wins / closed.length) * 100).toFixed(1) : '--';
+  const winEl   = el('ccWinRate');
+  if (winEl) {
+    winEl.textContent = closed.length ? `${winRate}%` : '--%';
+    winEl.style.color = closed.length ? (parseFloat(winRate) >= 50 ? 'var(--green)' : 'var(--red)') : '';
+  }
+
+  // Avg P&L, realised P&L, best, worst
+  if (closed.length) {
+    const pnls     = closed.map(t => t.pnl);
+    const totalPnl = pnls.reduce((a, b) => a + b, 0);
+    const avgPnl   = totalPnl / closed.length;
+    const best     = Math.max(...pnls);
+    const worst    = Math.min(...pnls);
+
+    _ccSetPnl('ccAvgPnl',      avgPnl);
+    _ccSetPnl('ccRealisedPnl', totalPnl);
+    const bestEl = el('ccBestTrade');
+    if (bestEl) { bestEl.textContent = `+${fmt$(best)}`; bestEl.style.color = 'var(--green)'; }
+    const worstEl = el('ccWorstTrade');
+    if (worstEl) { worstEl.textContent = `${worst < 0 ? '' : '+'}${fmt$(worst)}`; worstEl.style.color = worst < 0 ? 'var(--red)' : 'var(--green)'; }
+  }
+
+  // Recent trades table (last 15)
+  const body = el('ccHistoryBody');
+  if (body) {
+    if (!trades.length) {
+      body.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:14px">No closed trades yet</td></tr>`;
+    } else {
+      body.innerHTML = trades.slice(0, 15).map(t => {
+        const pnlCls  = t.pnl >= 0 ? 'td-green' : 'td-red';
+        const pnlSign = t.pnl >= 0 ? '+' : '';
+        const time    = new Date(t.timestamp).toLocaleTimeString('en-AU', { hour12: false, hour: '2-digit', minute: '2-digit' });
+        return `<tr>
+          <td style="color:var(--text-muted)">#${t.id}</td>
+          <td class="td-cyan" style="font-weight:700">${t.ticker.replace('-USD','')}</td>
+          <td class="${t.pnl >= 0 ? 'td-green' : 'td-red'}">${t.side}</td>
+          <td>${t.qty % 1 === 0 ? t.qty : t.qty.toFixed(4)}</td>
+          <td>${fmt$(t.entry_price)}</td>
+          <td>${fmt$(t.exit_price)}</td>
+          <td class="${pnlCls}">${pnlSign}${fmt$(t.pnl)}</td>
+          <td class="${pnlCls}">${pnlSign}${t.pnl_pct.toFixed(2)}%</td>
+          <td style="color:var(--text-muted)">${time}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+}
+
+// ─── Activity Feed ─────────────────────────────────────────
+const _activityLog = [];
+const MAX_ACTIVITY = 50;
+
+function pushActivityItem(icon, text, cls = 'info') {
+  const feed = el('ccActivityFeed');
+  if (!feed) return;
+
+  const now  = new Date().toLocaleTimeString('en-AU', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  _activityLog.unshift({ icon, text, cls, time: now });
+  if (_activityLog.length > MAX_ACTIVITY) _activityLog.pop();
+
+  // Remove placeholder
+  const placeholder = feed.querySelector('.cc-activity-item');
+  if (placeholder && placeholder.querySelector('.cc-act-text')?.textContent === 'Waiting for activity...') {
+    placeholder.remove();
+  }
+
+  const item = document.createElement('div');
+  item.className = `cc-activity-item ${cls}`;
+  item.innerHTML = `
+    <span class="cc-act-icon">${icon}</span>
+    <span class="cc-act-text">${text}</span>
+    <span class="cc-act-time">${now}</span>
+  `;
+  feed.insertBefore(item, feed.firstChild);
+
+  // Cap feed at MAX_ACTIVITY items
+  while (feed.children.length > MAX_ACTIVITY) {
+    feed.removeChild(feed.lastChild);
+  }
+}
+
+// ─── Helper setters ────────────────────────────────────────
+function _ccSet(id, val, extraCls = '') {
+  const e = el(id);
+  if (!e) return;
+  e.textContent = val;
+  if (extraCls) e.className = `cc-stat-value ${extraCls}`;
+}
+
+function _ccSetPnl(id, val) {
+  const e = el(id);
+  if (!e) return;
+  const pos = val >= 0;
+  e.textContent  = `${pos ? '+' : ''}${fmt$(val)}`;
+  e.style.color  = pos ? 'var(--green)' : 'var(--red)';
+}
 
 // Keyboard: Ctrl+K to open search, Escape to close
 document.addEventListener('DOMContentLoaded', () => {

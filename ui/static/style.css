@@ -442,7 +442,7 @@ a:hover { color: var(--primary); text-decoration: underline; }
 }
 .panel-grid--command {
   grid-template-columns: 1fr 2fr;
-  grid-template-rows: auto auto;
+  grid-template-rows: auto auto auto auto auto auto;
 }
 .panel-grid--signals {
   grid-template-columns: 1fr 2fr;
@@ -1859,15 +1859,14 @@ canvas { display: block; max-width: 100%; }
 
 .panel-grid--paper {
   grid-template-columns: 340px 1fr;
-  grid-template-rows: auto auto auto auto;
+  grid-template-rows: auto auto auto;
   gap: 12px;
 }
 .panel--paper-order    { grid-column: 1;      grid-row: 1; }
 .panel--paper-summary  { grid-column: 2;      grid-row: 1 / span 2; }
-.panel--paper-settings { grid-column: 1;      grid-row: 2; }
 /* Signals spans full width as its own row */
-.panel--paper-signals  { grid-column: 1 / -1; grid-row: 3; min-height: 340px; }
-.panel--paper-history  { grid-column: 1 / -1; grid-row: 4; }
+.panel--paper-signals  { grid-column: 1 / -1; grid-row: 2; min-height: 340px; }
+.panel--paper-history  { grid-column: 1 / -1; grid-row: 3; }
 
 /* ─── Order Form ─── */
 .paper-order-form {
@@ -2657,3 +2656,136 @@ body.cli-expanded { padding-bottom: 272px; }
   background: rgba(0,212,255,0.08);
 }
 .sett-theme-btn:hover { color: var(--text-1); }
+
+/* ═══════════════════════════════════════════════════════════
+   COMMAND CENTRE — PORTFOLIO STATS PANELS
+   ═══════════════════════════════════════════════════════════ */
+
+/* Grid placements for new CC panels */
+.panel--cc-strip     { grid-column: 1 / -1; grid-row: 4; }
+.panel--cc-perf      { grid-column: 1;      grid-row: 5; }
+.panel--cc-positions { grid-column: 2;      grid-row: 5; }
+.panel--cc-feed      { grid-column: 1;      grid-row: 6; }
+.panel--cc-history   { grid-column: 2;      grid-row: 6; }
+
+/* ─── Portfolio Stats Strip ─── */
+.cc-stats-strip {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  padding: 0;
+}
+.cc-stat-box {
+  background: var(--bg-panel);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cc-stat-label {
+  font-family: var(--font-hud);
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.cc-stat-value {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: 0.5px;
+}
+.cc-stat-value.pos { color: var(--green); }
+.cc-stat-value.neg { color: var(--red); }
+.cc-stat-value.acc { color: var(--primary); }
+
+/* ─── Performance Metrics Grid ─── */
+.cc-perf-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px 12px;
+}
+.cc-perf-item {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 8px 10px;
+}
+.cc-perf-label {
+  font-family: var(--font-hud);
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.cc-perf-value {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+.cc-perf-value.pos { color: var(--green); }
+.cc-perf-value.neg { color: var(--red); }
+.cc-perf-value.acc { color: var(--primary); }
+
+/* ─── Activity Feed ─── */
+.cc-activity-feed {
+  overflow-y: auto;
+  max-height: 260px;
+  padding: 6px 0;
+}
+.cc-activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  animation: cc-slide-in 0.25s ease;
+}
+.cc-activity-item:last-child { border-bottom: none; }
+.cc-act-icon {
+  font-size: 12px;
+  min-width: 18px;
+  text-align: center;
+  margin-top: 1px;
+}
+.cc-act-text {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-2);
+  line-height: 1.5;
+  flex: 1;
+}
+.cc-act-time {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.cc-activity-item.buy  .cc-act-text { color: var(--green); }
+.cc-activity-item.sell .cc-act-text { color: var(--red); }
+.cc-activity-item.info .cc-act-text { color: var(--primary); }
+.cc-activity-item.warn .cc-act-text { color: var(--amber); }
+
+@keyframes cc-slide-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes cc-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+/* ─── CC scrollable positions table ─── */
+.cc-table-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 260px;
+  padding: 0 2px 4px;
+}

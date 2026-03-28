@@ -247,6 +247,131 @@
           </div>
         </div>
 
+        <!-- ── CC PORTFOLIO STATS STRIP (full width) ── -->
+        <div class="panel panel--cc-strip">
+          <div class="panel-header">
+            <span class="panel-title">◈ PAPER PORTFOLIO OVERVIEW</span>
+            <span class="panel-tag" id="ccPnlBadge" style="color:var(--text-muted)">P&amp;L: --</span>
+          </div>
+          <div class="cc-stats-strip">
+            <div class="cc-stat-box">
+              <div class="cc-stat-label">TOTAL VALUE</div>
+              <div class="cc-stat-value acc" id="ccTotalVal">$--</div>
+            </div>
+            <div class="cc-stat-box">
+              <div class="cc-stat-label">CASH</div>
+              <div class="cc-stat-value" id="ccCash">$--</div>
+            </div>
+            <div class="cc-stat-box">
+              <div class="cc-stat-label">INVESTED</div>
+              <div class="cc-stat-value" id="ccInvested">$--</div>
+            </div>
+            <div class="cc-stat-box">
+              <div class="cc-stat-label">UNREALISED P&amp;L</div>
+              <div class="cc-stat-value" id="ccUnrealPnl">$--</div>
+            </div>
+            <div class="cc-stat-box">
+              <div class="cc-stat-label">RETURN</div>
+              <div class="cc-stat-value" id="ccReturn">--%</div>
+            </div>
+            <div class="cc-stat-box">
+              <div class="cc-stat-label">OPEN POSITIONS</div>
+              <div class="cc-stat-value acc" id="ccOpenCount">--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── CC PERFORMANCE METRICS ── -->
+        <div class="panel panel--cc-perf">
+          <div class="panel-header">
+            <span class="panel-title">◈ PERFORMANCE METRICS</span>
+          </div>
+          <div class="cc-perf-grid">
+            <div class="cc-perf-item">
+              <div class="cc-perf-label">TOTAL TRADES</div>
+              <div class="cc-perf-value acc" id="ccTotalTrades">0</div>
+            </div>
+            <div class="cc-perf-item">
+              <div class="cc-perf-label">WIN RATE</div>
+              <div class="cc-perf-value" id="ccWinRate">--%</div>
+            </div>
+            <div class="cc-perf-item">
+              <div class="cc-perf-label">AVG P&amp;L / TRADE</div>
+              <div class="cc-perf-value" id="ccAvgPnl">$--</div>
+            </div>
+            <div class="cc-perf-item">
+              <div class="cc-perf-label">REALISED P&amp;L</div>
+              <div class="cc-perf-value" id="ccRealisedPnl">$--</div>
+            </div>
+            <div class="cc-perf-item">
+              <div class="cc-perf-label">BEST TRADE</div>
+              <div class="cc-perf-value pos" id="ccBestTrade">$--</div>
+            </div>
+            <div class="cc-perf-item">
+              <div class="cc-perf-label">WORST TRADE</div>
+              <div class="cc-perf-value neg" id="ccWorstTrade">$--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── CC OPEN POSITIONS ── -->
+        <div class="panel panel--cc-positions">
+          <div class="panel-header">
+            <span class="panel-title">◈ OPEN POSITIONS</span>
+            <span class="panel-tag" id="ccPosCount">0 OPEN</span>
+          </div>
+          <div class="cc-table-wrap">
+            <table class="data-table" id="ccPositionsTable">
+              <thead>
+                <tr>
+                  <th>TICKER</th><th>SIDE</th><th>QTY</th>
+                  <th>ENTRY</th><th>CURRENT</th><th>MKT VAL</th>
+                  <th>P&amp;L</th><th>P&amp;L %</th>
+                </tr>
+              </thead>
+              <tbody id="ccPositionsBody">
+                <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:14px">No open positions</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── CC ACTIVITY FEED ── -->
+        <div class="panel panel--cc-feed">
+          <div class="panel-header">
+            <span class="panel-title">◈ LIVE ACTIVITY</span>
+            <span class="pulse-dot"></span>
+          </div>
+          <div class="cc-activity-feed" id="ccActivityFeed">
+            <div class="cc-activity-item info">
+              <span class="cc-act-icon">◎</span>
+              <span class="cc-act-text">Waiting for activity...</span>
+              <span class="cc-act-time">--:--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── CC TRADE HISTORY ── -->
+        <div class="panel panel--cc-history">
+          <div class="panel-header">
+            <span class="panel-title">◈ RECENT TRADES</span>
+            <span class="panel-tag" id="ccHistCount">0 TRADES</span>
+          </div>
+          <div class="cc-table-wrap">
+            <table class="data-table" id="ccHistoryTable">
+              <thead>
+                <tr>
+                  <th>#</th><th>TICKER</th><th>SIDE</th><th>QTY</th>
+                  <th>ENTRY</th><th>EXIT</th><th>P&amp;L</th><th>P&amp;L %</th><th>TIME</th>
+                </tr>
+              </thead>
+              <tbody id="ccHistoryBody">
+                <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:14px">No closed trades yet</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -940,25 +1065,6 @@
           </div>
         </div>
 
-        <!-- ── PORTFOLIO SETTINGS ── -->
-        <div class="panel panel--paper-settings">
-          <div class="panel-header">
-            <span class="panel-title">⚙ PORTFOLIO SETTINGS</span>
-          </div>
-          <div class="psett-form">
-            <div class="psett-row">
-              <label class="po-label">STARTING CASH</label>
-              <div style="display:flex;gap:8px;align-items:center">
-                <span style="color:var(--text-2);font-size:12px">$</span>
-                <input type="number" id="startingCashInput" class="po-input" value="1000" min="1" step="any" style="flex:1"/>
-                <button class="btn-primary btn--sm" onclick="saveStartingCash()">SAVE</button>
-              </div>
-              <span class="po-label" style="margin-top:4px;opacity:0.6">Takes effect on next portfolio reset</span>
-            </div>
-            <button class="btn-ghost btn--full" style="margin-top:8px" onclick="resetPaperPortfolio()">↺ RESET PORTFOLIO TO NEW AMOUNT</button>
-          </div>
-        </div>
-
         <!-- ── QUICK SIGNALS (1-CLICK TRADE) ── -->
         <div class="panel panel--paper-signals">
           <div class="panel-header">
@@ -1296,6 +1402,10 @@
             </div>
 
             <button class="btn-primary btn--full" style="margin-top:14px" onclick="saveGeneralSettings()">💾 SAVE GENERAL SETTINGS</button>
+
+            <div class="sett-section-label" style="margin-top:16px">PAPER PORTFOLIO RESET</div>
+            <div style="color:var(--text-muted);font-size:9px;margin-bottom:8px">Changes starting cash above, then reset to apply it to your paper portfolio.</div>
+            <button class="btn-ghost btn--full" onclick="resetPaperPortfolio()" style="border-color:var(--amber);color:var(--amber)">↺ RESET PAPER PORTFOLIO TO STARTING CASH</button>
           </div>
         </div>
 
