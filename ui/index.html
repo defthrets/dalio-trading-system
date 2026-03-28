@@ -770,14 +770,15 @@
                 <th onclick="sortScanner('crypto','ticker')">TICKER ⇅</th>
                 <th>NAME</th>
                 <th onclick="sortScanner('crypto','price')">PRICE (USD) ⇅</th>
-                <th onclick="sortScanner('crypto','change_pct')">CHANGE% ⇅</th>
-                <th>24H VOL</th>
+                <th onclick="sortScanner('crypto','change_pct')">24H CHANGE ⇅</th>
+                <th>24H VOLUME</th>
+                <th>MARKET CAP</th>
                 <th>WATCHLIST</th>
                 <th>TRADE</th>
               </tr>
             </thead>
             <tbody id="cryptoTableBody">
-              <tr><td colspan="7" class="scanner-loading">⌛ Loading Crypto data...</td></tr>
+              <tr><td colspan="8" class="scanner-loading">⌛ Loading Crypto data...</td></tr>
             </tbody>
           </table>
         </div>
@@ -858,7 +859,7 @@
             </div>
             <div class="po-cash-row">
               <span class="po-cash-label">AVAILABLE CASH</span>
-              <span class="po-cash-val" id="poCashDisplay">$100,000.00</span>
+              <span class="po-cash-val" id="poCashDisplay">$1,000.00</span>
             </div>
             <button class="btn-primary btn--full" id="poSubmitBtn" onclick="submitPaperOrder()">▶ EXECUTE TRADE</button>
             <div class="po-result" id="poResult"></div>
@@ -877,11 +878,11 @@
           <div class="paper-summary-grid">
             <div class="ps-stat">
               <div class="ps-label">TOTAL VALUE</div>
-              <div class="ps-val" id="paperTotalVal">$100,000.00</div>
+              <div class="ps-val" id="paperTotalVal">$1,000.00</div>
             </div>
             <div class="ps-stat">
               <div class="ps-label">CASH</div>
-              <div class="ps-val" id="paperCash">$100,000.00</div>
+              <div class="ps-val" id="paperCash">$1,000.00</div>
             </div>
             <div class="ps-stat">
               <div class="ps-label">INVESTED</div>

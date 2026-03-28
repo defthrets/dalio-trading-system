@@ -1862,11 +1862,12 @@ canvas { display: block; max-width: 100%; }
   grid-template-rows: auto auto auto auto;
   gap: 12px;
 }
-.panel--paper-order    { grid-column: 1; grid-row: 1; }
-.panel--paper-summary  { grid-column: 2; grid-row: 1 / span 3; }
-.panel--paper-settings { grid-column: 1; grid-row: 2; }
-.panel--paper-signals  { grid-column: 1; grid-row: 3; }
-.panel--paper-history  { grid-column: 1 / span 2; grid-row: 4; }
+.panel--paper-order    { grid-column: 1;      grid-row: 1; }
+.panel--paper-summary  { grid-column: 2;      grid-row: 1 / span 2; }
+.panel--paper-settings { grid-column: 1;      grid-row: 2; }
+/* Signals spans full width as its own row */
+.panel--paper-signals  { grid-column: 1 / -1; grid-row: 3; min-height: 340px; }
+.panel--paper-history  { grid-column: 1 / -1; grid-row: 4; }
 
 /* ─── Order Form ─── */
 .paper-order-form {
@@ -2009,13 +2010,23 @@ canvas { display: block; max-width: 100%; }
 /* Quick-trade card override for grid layout */
 .paper-signal-grid .paper-sig-row {
   flex-direction: column;
-  padding: 10px 12px;
-  gap: 8px;
+  padding: 12px 14px;
+  gap: 10px;
   border-radius: 6px;
   border: 1px solid var(--border-bright);
+  background: var(--bg-1);
 }
-.paper-signal-grid .psr-left  { flex-wrap: wrap; }
-.paper-signal-grid .psr-right { justify-content: flex-end; }
+.paper-signal-grid .paper-sig-row:hover {
+  border-color: var(--primary);
+  background: var(--bg-2);
+}
+.paper-signal-grid .psr-left  { flex-wrap: wrap; gap: 8px; }
+.paper-signal-grid .psr-right { justify-content: space-between; align-items: center; }
+.paper-signal-grid .psr-qty   { flex: 1; min-width: 70px; max-width: 120px; }
+.paper-signal-grid .psr-btn   { flex-shrink: 0; padding: 6px 16px; font-size: 10px; }
+.paper-signal-grid .psr-ticker { font-size: 14px; }
+.paper-signal-grid .psr-price  { font-size: 11px; }
+.paper-signal-grid .psr-conf   { font-size: 10px; }
 
 .paper-sig-row {
   display: flex;
@@ -2043,10 +2054,10 @@ canvas { display: block; max-width: 100%; }
 /* ─── Signal Quick-Trade Grid ─── */
 .paper-signal-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 8px;
-  padding: 10px;
-  max-height: 340px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+  padding: 12px;
+  max-height: 290px;
   overflow-y: auto;
 }
 

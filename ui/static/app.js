@@ -1078,7 +1078,7 @@ const SPOTS = {
   ],
   'paper-trading': [
     { id:'pt-order',    sel:'.panel--paper-order',   arrow:'right',  title:'📄 PLACE AN ORDER',         text:'Type any ticker (ASX, crypto, commodity), choose BUY or SELL, set quantity, and hit Execute. Prices pull from real market data.' },
-    { id:'pt-summary',  sel:'.panel--paper-summary', arrow:'left',   title:'💼 PORTFOLIO TRACKER',      text:'Your paper portfolio starts with $100,000. Total value, P&L, and open positions all update live every 15 seconds.' },
+    { id:'pt-summary',  sel:'.panel--paper-summary', arrow:'left',   title:'💼 PORTFOLIO TRACKER',      text:'Your paper portfolio starts at your configured amount (default $1,000). Total value, P&L, and open positions update live every 15 seconds.' },
     { id:'pt-signals',  sel:'.panel--paper-signals', arrow:'right',  title:'⚡ 1-CLICK SIGNAL TRADES',   text:'The system\'s top signals appear here pre-loaded. Adjust quantity and click BUY or SELL to instantly paper trade the recommendation.' },
     { id:'pt-history',  sel:'.panel--paper-history', arrow:'top',    title:'📋 TRADE HISTORY',           text:'Every closed trade is recorded with entry price, exit price, and P&L. Use this to evaluate which signals perform best over time.' },
   ],
@@ -1853,18 +1853,22 @@ const _scannerSort = { asx: null, crypto: null, commodities: null };
 
 const _SCANNER_IDS = {
   asx:         { tbody: 'asxTableBody',         stats: 'asxStats',    cols: 8 },
-  crypto:      { tbody: 'cryptoTableBody',       stats: 'cryptoStats', cols: 7 },
+  crypto:      { tbody: 'cryptoTableBody',       stats: 'cryptoStats', cols: 8 },
   commodities: { tbody: 'commoditiesTableBody',  stats: 'commStats',   cols: 7 },
 };
 
 async function loadScanner(market) {
   const ids = _SCANNER_IDS[market];
   const tbody = el(ids.tbody);
+  const statsEl = el(ids.stats);
   if (!tbody) return;
-  tbody.innerHTML = `<tr><td colspan="${ids.cols}" class="scanner-loading">⌛ Fetching live data…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="${ids.cols}" class="scanner-loading">⌛ Fetching live data… (may take 5–15s for first load)</td></tr>`;
+  if (statsEl) statsEl.innerHTML = '';
   try {
     const d = await fetchJSON(`/api/markets/${market}`);
     _scannerData[market] = d.rows || [];
+    const cacheNote = d.cached ? ` <span style="opacity:.5">(cached ${d.cache_age}s ago)</span>` : '';
+    if (statsEl) statsEl.dataset.cacheNote = cacheNote;
     renderScanner(market);
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="${ids.cols}" class="scanner-loading" style="color:var(--red)">⚠ Failed to load — ${e.message}</td></tr>`;
@@ -1904,12 +1908,14 @@ function renderScanner(market, filterText = '', filterSector = '') {
     const down = rows.filter(r => r.change_pct < 0).length;
     const flat = rows.length - up - down;
     const avgChg = rows.length ? (rows.reduce((s,r) => s + r.change_pct, 0) / rows.length).toFixed(2) : 0;
+    const cacheNote = statsEl.dataset.cacheNote || '';
     statsEl.innerHTML = `
       <span class="scanner-stat-item">SHOWING <span class="scanner-stat-val">${rows.length}</span></span>
       <span class="scanner-stat-item">UP <span class="scanner-stat-val up">${up}</span></span>
       <span class="scanner-stat-item">DOWN <span class="scanner-stat-val down">${down}</span></span>
       <span class="scanner-stat-item">FLAT <span class="scanner-stat-val">${flat}</span></span>
-      <span class="scanner-stat-item">AVG CHANGE <span class="scanner-stat-val ${avgChg >= 0 ? 'up' : 'down'}">${avgChg}%</span></span>`;
+      <span class="scanner-stat-item">AVG CHANGE <span class="scanner-stat-val ${avgChg >= 0 ? 'up' : 'down'}">${avgChg}%</span></span>
+      <span class="scanner-stat-item" style="margin-left:auto;font-size:8px;opacity:.5">CoinGecko${market==='crypto'?' Free API':' / yfinance'}${cacheNote}</span>`;
   }
 
   if (!rows.length) {
@@ -1919,22 +1925,30 @@ function renderScanner(market, filterText = '', filterSector = '') {
 
   const isCrypto = market === 'crypto';
   tbody.innerHTML = rows.map(r => {
-    const dir   = r.change_pct > 0 ? 'up' : r.change_pct < 0 ? 'down' : 'flat';
-    const chgStr = `${r.change_pct >= 0 ? '+' : ''}${r.change_pct.toFixed(2)}%`;
-    const priceStr = r.price >= 1000 ? `$${r.price.toLocaleString()}` : r.price >= 1 ? `$${r.price.toFixed(2)}` : `$${r.price.toFixed(6)}`;
-    const volStr = r.volume ? (r.volume > 1e6 ? `${(r.volume/1e6).toFixed(1)}M` : r.volume > 1e3 ? `${(r.volume/1e3).toFixed(0)}K` : r.volume) : '—';
-    const wlLabel = r.in_watchlist ? '★ WATCHING' : '☆ WATCH';
-    const wlCls   = r.in_watchlist ? 'in' : '';
-    const ticker  = r.ticker;
-    const sectorCol = market === 'asx' ? `<td>${r.sector || '—'}</td>` : '';
-    const nameShort = r.name.length > 22 ? r.name.slice(0,22) + '…' : r.name;
+    const dir      = r.change_pct > 0 ? 'up' : r.change_pct < 0 ? 'down' : 'flat';
+    const chgStr   = `${r.change_pct >= 0 ? '+' : ''}${r.change_pct.toFixed(2)}%`;
+    const priceStr = r.price <= 0 ? '—'
+                   : r.price >= 1000 ? `$${Number(r.price).toLocaleString('en-AU', {minimumFractionDigits:2, maximumFractionDigits:2})}`
+                   : r.price >= 1    ? `$${r.price.toFixed(2)}`
+                   : r.price >= 0.001 ? `$${r.price.toFixed(4)}`
+                   : `$${r.price.toFixed(8)}`;
+    // Use pre-formatted volume from server (includes B/M/K suffix)
+    const volStr   = r.volume_fmt || (r.volume > 0 ? r.volume.toLocaleString() : '—');
+    const wlLabel  = r.in_watchlist ? '★ WATCHING' : '☆ WATCH';
+    const wlCls    = r.in_watchlist ? 'in' : '';
+    const ticker   = r.ticker;
+    const sectorCol  = market === 'asx' ? `<td>${r.sector || '—'}</td>` : '';
+    const mktCapCol  = isCrypto ? `<td style="color:var(--text-2);font-size:10px">${r.market_cap_fmt || '—'}</td>` : '';
+    const dispName   = isCrypto ? ticker.replace('-USD','') : ticker;
+    const nameShort  = r.name.length > 26 ? r.name.slice(0,26) + '…' : r.name;
     return `<tr class="scanner-row ${dir}">
-      <td><strong>${isCrypto ? ticker.replace('-USD','') : ticker}</strong></td>
-      <td title="${r.name}">${nameShort}</td>
+      <td><strong style="font-family:var(--font-hud)">${dispName}</strong></td>
+      <td title="${r.name}" style="color:var(--text-2)">${nameShort}</td>
       ${sectorCol}
-      <td>${priceStr}</td>
+      <td style="font-weight:700">${priceStr}</td>
       <td class="change-cell"><strong>${chgStr}</strong></td>
-      <td>${volStr}</td>
+      <td style="color:var(--text-2);font-size:10px">${volStr}</td>
+      ${mktCapCol}
       <td><button class="scan-wl-btn ${wlCls}" onclick="toggleWatchlist('${ticker}',this)">${wlLabel}</button></td>
       <td><button class="scan-trade-btn" onclick="scannerOpenTrade('${ticker}',${r.price})">▶ TRADE</button></td>
     </tr>`;
@@ -2155,10 +2169,11 @@ async function loadPaperEquityCurve() {
     if (!_paperEquityChart) return;
     _paperEquityChart.data.labels   = pts.map(p => p.t.slice(11, 16));
     _paperEquityChart.data.datasets[0].data = pts.map(p => p.v);
-    // Colour red if below starting value
+    // Colour red if below starting value (use server's starting_cash)
     const last = pts[pts.length - 1].v;
-    _paperEquityChart.data.datasets[0].borderColor     = last >= 100000 ? '#00d4ff' : '#ff3355';
-    _paperEquityChart.data.datasets[0].backgroundColor = last >= 100000 ? 'rgba(0,212,255,0.06)' : 'rgba(255,51,85,0.05)';
+    let _startCash = parseFloat(el('startingCashInput')?.value) || parseFloat(el('settStartCash')?.value) || 1000;
+    _paperEquityChart.data.datasets[0].borderColor     = last >= _startCash ? '#00d4ff' : '#ff3355';
+    _paperEquityChart.data.datasets[0].backgroundColor = last >= _startCash ? 'rgba(0,212,255,0.06)' : 'rgba(255,51,85,0.05)';
     _paperEquityChart.update('none');
   } catch {}
 }

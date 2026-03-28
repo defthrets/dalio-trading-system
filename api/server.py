@@ -1,5 +1,5 @@
 """
-Dalios — Automated Trading Framework
+Dalios -- Automated Trading Framework
 FastAPI Backend Server
 
 Exposes all trading system engines via REST + WebSocket endpoints.
@@ -40,10 +40,10 @@ try:
     import yfinance as yf
     import pandas as pd
     YF_AVAILABLE = True
-    logger.info("yfinance available — real market data enabled")
+    logger.info("yfinance available -- real market data enabled")
 except ImportError:
     YF_AVAILABLE = False
-    logger.warning("yfinance not installed — using demo data (run: pip install yfinance pandas)")
+    logger.warning("yfinance not installed -- using demo data (run: pip install yfinance pandas)")
 
 # ── 5-minute data cache ──────────────────────────────────
 _DATA_CACHE: dict = {}
@@ -114,7 +114,7 @@ async def _get_prices(tickers: list, period: str = "3mo") -> Optional[dict]:
             timeout=12.0,
         )
     except asyncio.TimeoutError:
-        logger.warning("yfinance timed out — using demo data")
+        logger.warning("yfinance timed out -- using demo data")
         result = None
     if result:
         _cache_set(key, result)
@@ -212,8 +212,8 @@ def _calc_atr(closes: list, period: int = 14) -> float:
 # ─────────────────────────────────────────────
 
 app = FastAPI(
-    title="Dalios — Automated Trading Framework",
-    description="Ray Dalio All Weather + Economic Machine — Autonomous ASX & Commodities Trading",
+    title="Dalios -- Automated Trading Framework",
+    description="Ray Dalio All Weather + Economic Machine -- Autonomous ASX & Commodities Trading",
     version="1.0.0",
 )
 
@@ -236,7 +236,7 @@ async def _on_startup():
     global REAL_EQUITY_CURVE
     _load_paper_state()
     REAL_EQUITY_CURVE = _load_real_equity()
-    logger.info(f"Startup complete — trading mode: {TRADING_MODE}")
+    logger.info(f"Startup complete -- trading mode: {TRADING_MODE}")
 
 # ─────────────────────────────────────────────
 # State
@@ -326,7 +326,7 @@ def _load_paper_state() -> None:
         PAPER.history        = payload.get("history", [])
         PAPER.equity_history = payload.get("equity_history", [])
         PAPER.order_id       = int(payload.get("order_id", 0))
-        logger.info(f"Paper portfolio loaded — cash=${PAPER.cash:,.2f}, "
+        logger.info(f"Paper portfolio loaded -- cash=${PAPER.cash:,.2f}, "
                     f"{len(PAPER.positions)} positions, {len(PAPER.equity_history)} equity pts")
     except Exception as exc:
         logger.warning(f"Failed to load paper state (starting fresh): {exc}")
@@ -424,7 +424,7 @@ class PaperPortfolio:
 
         if side == "BUY":
             if cost > self.cash:
-                raise ValueError(f"Insufficient cash — need ${cost:,.2f}, have ${self.cash:,.2f}")
+                raise ValueError(f"Insufficient cash -- need ${cost:,.2f}, have ${self.cash:,.2f}")
             self.cash -= cost
             if ticker in self.positions and self.positions[ticker]["side"] == "LONG":
                 # Add to existing long
@@ -459,7 +459,7 @@ class PaperPortfolio:
             pos["qty"] -= close_qty
             if pos["qty"] <= 0:
                 del self.positions[ticker]
-        STATE.add_alert("PAPER", f"Order #{oid}: {side} {qty:.4g}× {ticker} @ ${price:.4f}", "INFO")
+        STATE.add_alert("PAPER", f"Order #{oid}: {side} {qty:.4g}�-- {ticker} @ ${price:.4f}", "INFO")
         return {"order_id": oid, "ticker": ticker, "side": side, "qty": qty, "price": price, "timestamp": ts}
 
     def reset(self):
@@ -468,14 +468,14 @@ class PaperPortfolio:
         self.history         = []
         self.equity_history  = []
         self.order_id        = 0
-        STATE.add_alert("PAPER", "Portfolio reset to $100,000 starting cash", "INFO")
+        STATE.add_alert("PAPER", f"Portfolio reset to ${PAPER_STARTING_CASH:,.2f} starting cash", "INFO")
 
 
 PAPER = PaperPortfolio()
 
 
 # ─────────────────────────────────────────────
-# Broker Abstraction — live trading
+# Broker Abstraction -- live trading
 # ─────────────────────────────────────────────
 
 class BrokerBase:
@@ -508,7 +508,7 @@ class IBKRBroker(BrokerBase):
         await asyncio.get_event_loop().run_in_executor(_EXECUTOR, lambda: ib.connect(host, int(port), clientId=int(client_id), timeout=10))
         self._ib = ib
         self._connected = True
-        logger.info(f"IBKR connected — {host}:{port}")
+        logger.info(f"IBKR connected -- {host}:{port}")
 
     async def get_account(self) -> dict:
         if not self.is_connected(): raise RuntimeError("IBKR not connected")
@@ -566,7 +566,7 @@ class AlpacaBroker(BrokerBase):
         await asyncio.get_event_loop().run_in_executor(_EXECUTOR, api.get_account)
         self._api = api
         self._connected = True
-        logger.info(f"Alpaca connected — {base_url}")
+        logger.info(f"Alpaca connected -- {base_url}")
 
     async def get_account(self) -> dict:
         if not self.is_connected(): raise RuntimeError("Alpaca not connected")
@@ -626,7 +626,7 @@ class BinanceBroker(BrokerBase):
         await asyncio.get_event_loop().run_in_executor(_EXECUTOR, client.get_account)
         self._client = client
         self._connected = True
-        logger.info(f"Binance connected — {'testnet' if testnet else 'live'}")
+        logger.info(f"Binance connected -- {'testnet' if testnet else 'live'}")
 
     async def get_account(self) -> dict:
         if not self.is_connected(): raise RuntimeError("Binance not connected")
@@ -841,7 +841,7 @@ ASX_TICKERS = [
     "AFI.AX", "ARG.AX", "MLT.AX", "WAM.AX",
 ]
 
-# Crypto — top liquid pairs from Binance/Coinbase/Kraken in yfinance USD format
+# Crypto -- top liquid pairs from Binance/Coinbase/Kraken in yfinance USD format
 CRYPTO_TICKERS = [
     # ── Layer 1 Major ─────────────────────────────────────
     "BTC-USD", "ETH-USD", "BNB-USD", "SOL-USD", "XRP-USD",
@@ -856,12 +856,12 @@ CRYPTO_TICKERS = [
     # ── New-Gen L1 ────────────────────────────────────────
     "APT-USD", "SUI-USD", "INJ-USD", "SEI-USD", "TIA-USD",
     "PYTH-USD", "JUP-USD",
-    # ── DeFi — DEX & Lending ──────────────────────────────
+    # ── DeFi -- DEX & Lending ──────────────────────────────
     "UNI-USD", "AAVE-USD", "MKR-USD", "COMP-USD", "YFI-USD",
     "SUSHI-USD", "1INCH-USD", "CRV-USD", "BAL-USD", "DYDX-USD",
     "GMX-USD", "SNX-USD", "PENDLE-USD", "CAKE-USD",
     "CVX-USD", "FXS-USD",
-    # ── DeFi — Staking ────────────────────────────────────
+    # ── DeFi -- Staking ────────────────────────────────────
     "LDO-USD", "RPL-USD", "ANKR-USD",
     # ── Gaming & Metaverse ────────────────────────────────
     "SAND-USD", "MANA-USD", "ENJ-USD", "AXS-USD", "GALA-USD",
@@ -975,7 +975,7 @@ def _gen_price_history_demo(price: float, trend: str, n_points: int = 30) -> lis
 
 
 async def _gen_signals(n: int = 12) -> list[dict]:
-    """Generate trade signals — uses real yfinance prices when available."""
+    """Generate trade signals -- uses real yfinance prices when available."""
     candidates = random.sample(ALL_TICKERS, min(n + 6, len(ALL_TICKERS)))
     # Fetch real prices (capped to avoid very long API calls)
     prices_map = await _get_prices(candidates[:24], "3mo")
@@ -1095,9 +1095,9 @@ def _gen_justification(ticker: str, action: str) -> dict:
         "reasons": [
             f"Asset aligns with {quadrant_label} environment",
             f"FinBERT sentiment {sentiment_word} ({sent_score:+.3f}) for {ticker}",
-            f"RSI {rsi_val} — {rsi_desc} zone",
+            f"RSI {rsi_val} -- {rsi_desc} zone",
             f"Trade improves portfolio Sharpe by +{sharpe_imp:.3f}",
-            f"Correlation delta {corr:+.3f} — within Holy Grail threshold",
+            f"Correlation delta {corr:+.3f} -- within Holy Grail threshold",
         ],
     }
 
@@ -1302,7 +1302,7 @@ def _gen_backtest_results() -> dict:
 
 
 # ─────────────────────────────────────────────
-# Routes — UI
+# Routes -- UI
 # ─────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
@@ -1314,7 +1314,7 @@ async def root():
 
 
 # ─────────────────────────────────────────────
-# Routes — API
+# Routes -- API
 # ─────────────────────────────────────────────
 
 @app.get("/api/status")
@@ -1397,7 +1397,7 @@ _MARKET_DEMO = [
 
 @app.get("/api/market_summary")
 async def market_summary():
-    """Live prices for the market ticker strip — falls back to demo when offline."""
+    """Live prices for the market ticker strip -- falls back to demo when offline."""
     key = "market_summary"
     cached = _cache_get(key)
     if cached:
@@ -1561,7 +1561,7 @@ async def get_assets():
 
     assets = []
     for ticker in ALL_TICKERS:
-        meta = _ASSET_META.get(ticker, {"name": ticker, "cat": "Unknown", "sector": "—"})
+        meta = _ASSET_META.get(ticker, {"name": ticker, "cat": "Unknown", "sector": "--"})
         p = price_map.get(ticker, {})
         assets.append({
             "ticker": ticker,
@@ -1651,7 +1651,7 @@ QUADRANT_PLAYBOOK: dict = {
         "avoid":      ["long_bonds","gold","tips"],
         "narrative":  (
             "Rising Growth: economic expansion lifts earnings and risk appetite. "
-            "Dalio tilts heavily toward equities and commodities — cyclicals, EM equities, "
+            "Dalio tilts heavily toward equities and commodities -- cyclicals, EM equities, "
             "and industrial metals outperform. Duration risk in nominal bonds rises. "
             "Crypto can participate as a high-beta risk asset."
         ),
@@ -1662,7 +1662,7 @@ QUADRANT_PLAYBOOK: dict = {
         "avoid":      ["equities","commodities","crypto"],
         "narrative":  (
             "Falling Growth: recessionary pressure compresses corporate earnings. "
-            "Safe havens dominate — long-duration Treasuries rally as yields fall. "
+            "Safe havens dominate -- long-duration Treasuries rally as yields fall. "
             "Gold preserves wealth as central banks ease. "
             "Reduce cyclicals, commodities, and speculative crypto aggressively."
         ),
@@ -1673,7 +1673,7 @@ QUADRANT_PLAYBOOK: dict = {
         "avoid":      ["long_bonds","crypto"],
         "narrative":  (
             "Rising Inflation: purchasing power erosion favours hard assets. "
-            "Gold is the primary hedge — Dalio's cornerstone in this quadrant. "
+            "Gold is the primary hedge -- Dalio's cornerstone in this quadrant. "
             "Energy, agriculture, and industrial commodities benefit directly. "
             "TIPS provide real yield protection. Nominal bonds are the loser here."
         ),
@@ -1720,7 +1720,7 @@ def dalio_analyse_trade(ticker: str, side: str, quadrant: str,
     if n_pos >= 15: risk_flags.append("Portfolio at 15-position Holy Grail limit")
     if asset_class in playbook["avoid"] and side == "BUY":
         risk_flags.append(f"{asset_class.replace('_',' ').title()} is on the avoid list for {quadrant.replace('_',' ').title()}")
-    if total_pv > 0 and cash / total_pv < 0.05: risk_flags.append("Cash below 5% of portfolio — liquidity risk")
+    if total_pv > 0 and cash / total_pv < 0.05: risk_flags.append("Cash below 5% of portfolio -- liquidity risk")
     if asset_class == "crypto" and side == "BUY": risk_flags.append("Crypto: high volatility and regulatory risk")
     sig = next((s for s in current_signals if s.get("ticker") == ticker), None)
     if sig and sig.get("action") in ("SELL","SHORT") and side == "BUY":
@@ -1730,9 +1730,9 @@ def dalio_analyse_trade(ticker: str, side: str, quadrant: str,
     quadrant_label = quadrant.replace("_"," ").title()
     asset_label    = asset_class.replace("_"," ").title()
     reasoning = [
-        f"Quadrant is {quadrant_label} — Dalio favours {', '.join((playbook['strong_buy']+playbook['buy'])[:3]).replace('_',' ')}.",
-        f"{ticker} classified as {asset_label} — {'aligned' if asset_class in playbook['strong_buy']+playbook['buy'] else 'not aligned'} with {quadrant_label} playbook.",
-        f"Portfolio has {n_pos} positions across {len(set(existing_classes))} asset class(es) — {'diversified' if len(set(existing_classes))>=4 else 'needs more diversification'}.",
+        f"Quadrant is {quadrant_label} -- Dalio favours {', '.join((playbook['strong_buy']+playbook['buy'])[:3]).replace('_',' ')}.",
+        f"{ticker} classified as {asset_label} -- {'aligned' if asset_class in playbook['strong_buy']+playbook['buy'] else 'not aligned'} with {quadrant_label} playbook.",
+        f"Portfolio has {n_pos} positions across {len(set(existing_classes))} asset class(es) -- {'diversified' if len(set(existing_classes))>=4 else 'needs more diversification'}.",
     ]
     if sig:
         reasoning.append(f"Signal engine: {sig.get('action','HOLD')} {ticker} with {sig.get('confidence',0):.0%} confidence, RSI {sig.get('rsi',50)}.")
@@ -1748,13 +1748,13 @@ def dalio_analyse_trade(ticker: str, side: str, quadrant: str,
 
     # Recommendation
     if fit_label == "STRONG FIT":
-        rec = f"PROCEED — {ticker} strongly aligned with {quadrant_label} regime. Size within risk budget."
+        rec = f"PROCEED -- {ticker} strongly aligned with {quadrant_label} regime. Size within risk budget."
     elif fit_label == "MODERATE FIT":
-        rec = f"CONSIDER — Moderate alignment. Reduce size 30-50% vs a strong-fit signal."
+        rec = f"CONSIDER -- Moderate alignment. Reduce size 30-50% vs a strong-fit signal."
     elif fit_label == "COUNTER-TREND":
-        rec = f"CAUTION — {ticker} ({asset_label}) counters Dalio's {quadrant_label} playbook. Keep size <2% if high conviction."
+        rec = f"CAUTION -- {ticker} ({asset_label}) counters Dalio's {quadrant_label} playbook. Keep size <2% if high conviction."
     else:
-        rec = f"NEUTRAL — No strong quadrant signal. Assess diversification value before committing."
+        rec = f"NEUTRAL -- No strong quadrant signal. Assess diversification value before committing."
 
     return {"fit_score": fit_score, "fit_label": fit_label, "quadrant_narrative": playbook["narrative"],
             "asset_class": asset_class, "reasoning": reasoning, "recommendation": rec,
@@ -1782,15 +1782,15 @@ async def ai_chat(payload: dict):
 
     if msg_lower == "help":
         return {"type":"help","message":(
-            "Dalios AI — Commands:\n"
-            "  buy <qty> <ticker>      — Paper buy order\n"
-            "  sell <qty> <ticker>     — Paper sell order\n"
-            "  analyse <ticker>        — Dalio All Weather analysis\n"
-            "  portfolio               — Current paper portfolio\n"
-            "  risk                    — Dalio risk assessment\n"
-            "  quadrant                — Current economic regime\n"
-            "  signals                 — Top 3 active signals\n"
-            "  help                    — This list")}
+            "Dalios AI -- Commands:\n"
+            "  buy <qty> <ticker>      -- Paper buy order\n"
+            "  sell <qty> <ticker>     -- Paper sell order\n"
+            "  analyse <ticker>        -- Dalio All Weather analysis\n"
+            "  portfolio               -- Current paper portfolio\n"
+            "  risk                    -- Dalio risk assessment\n"
+            "  quadrant                -- Current economic regime\n"
+            "  signals                 -- Top 3 active signals\n"
+            "  help                    -- This list")}
 
     if msg_lower in ("portfolio","portfolio summary","show portfolio","positions"):
         tickers = list(PAPER.positions.keys())
@@ -1838,7 +1838,7 @@ async def ai_chat(payload: dict):
             f"  Asset classes: {len(set(exc))} ({', '.join(set(exc)).replace('_',' ')})\n"
             f"  Cash reserve:  {cash_pct:.1f}%\n"
             f"  All Weather Score: {aw}/100\n"
-            f"  Holy Grail met: {'YES' if n_pos>=12 else 'NO — add uncorrelated assets'}\n\n"
+            f"  Holy Grail met: {'YES' if n_pos>=12 else 'NO -- add uncorrelated assets'}\n\n"
             f"Rule: 15 uncorrelated streams reduce risk without reducing return."),
             "data":{"n_positions":n_pos,"all_weather_score":aw,"cash_pct":round(cash_pct,1)}}
 
@@ -1848,7 +1848,7 @@ async def ai_chat(payload: dict):
         qdata = STATE.last_quadrant or _gen_quadrant_data()
         res   = dalio_analyse_trade(tkr,"BUY",qdata.get("quadrant","rising_growth"),PAPER.cash,PAPER.positions,await _gen_signals(12))
         return {"type":"analyse","message":(
-            f"Dalio Analysis: {tkr}\n  Fit: {res['fit_score']}/100 — {res['fit_label']}\n"
+            f"Dalio Analysis: {tkr}\n  Fit: {res['fit_score']}/100 -- {res['fit_label']}\n"
             f"  Asset Class: {res['asset_class'].replace('_',' ').title()}\n"
             f"  All Weather: {res['all_weather_score']}/100\n"
             f"  {res['recommendation']}\n"
@@ -2063,45 +2063,205 @@ async def watchlist_remove(payload: dict):
 
 
 # ─────────────────────────────────────────────
-# Market Scanner endpoints
+# Market Scanner endpoints  (fast bulk fetch)
 # ─────────────────────────────────────────────
 
-_SCANNER_META = {}  # populated from _ASSET_META
+# Simple in-memory cache so the UI doesn't hammer APIs
+_scanner_cache: dict = {}   # market -> {"ts": float, "rows": list}
+_CACHE_TTL = 90             # seconds
 
-async def _scanner_row(ticker: str) -> dict:
-    """Fetch live price + 1d change for a single ticker."""
+
+def _fmt_vol(v) -> str:
+    if not v: return "--"
+    v = float(v)
+    if v >= 1e9: return f"{v/1e9:.2f}B"
+    if v >= 1e6: return f"{v/1e6:.1f}M"
+    if v >= 1e3: return f"{v/1e3:.0f}K"
+    return str(int(v))
+
+
+async def _scan_yfinance(tickers: list, market: str) -> list:
+    """Bulk-download 2-day OHLCV via yfinance for non-crypto markets."""
+    import yfinance as yf
+    loop = asyncio.get_event_loop()
+
+    def _download():
+        # download 5 days (covers weekends/holidays) for all tickers at once
+        raw = yf.download(
+            tickers,
+            period="5d",
+            interval="1d",
+            group_by="ticker",
+            auto_adjust=True,
+            progress=False,
+            threads=True,
+        )
+        return raw
+
     try:
-        import yfinance as yf
-        t   = yf.Ticker(ticker)
-        inf = t.fast_info
-        price  = float(inf.last_price or 0)
-        prev   = float(inf.previous_close or price)
-        chg    = price - prev
-        chg_pct = (chg / prev * 100) if prev else 0
-        vol    = int(inf.three_month_average_volume or 0)
-        meta   = _ASSET_META.get(ticker, {"name": ticker, "cat": "—", "sector": "—"})
-        return {
-            "ticker":   ticker,
-            "name":     meta.get("name", ticker),
-            "sector":   meta.get("sector", "—"),
-            "price":    round(price, 4),
-            "change":   round(chg, 4),
+        raw = await loop.run_in_executor(None, _download)
+    except Exception as e:
+        logger.warning(f"yfinance bulk download failed: {e}")
+        return []
+
+    rows = []
+    # raw can be multi-level (ticker/col) or single-level when only 1 ticker
+    multi = len(tickers) > 1
+
+    for ticker in tickers:
+        meta = _ASSET_META.get(ticker, {"name": ticker, "cat": "--", "sector": "--"})
+        try:
+            df = raw[ticker] if multi else raw
+            df = df.dropna(subset=["Close"])
+            if len(df) < 2:
+                raise ValueError("insufficient rows")
+            price = float(df["Close"].iloc[-1])
+            prev  = float(df["Close"].iloc[-2])
+            chg   = price - prev
+            chg_pct = (chg / prev * 100) if prev else 0
+            vol   = float(df["Volume"].iloc[-1]) if "Volume" in df.columns else 0
+        except Exception:
+            price, chg, chg_pct, vol = 0.0, 0.0, 0.0, 0.0
+
+        rows.append({
+            "ticker":     ticker,
+            "name":       meta.get("name", ticker),
+            "sector":     meta.get("sector", "--"),
+            "price":      round(price, 4),
+            "change":     round(chg, 4),
             "change_pct": round(chg_pct, 2),
-            "volume":   vol,
+            "volume_fmt": _fmt_vol(vol),
+            "volume":     int(vol),
             "in_watchlist": ticker in WATCHLIST,
-        }
-    except Exception:
-        meta = _ASSET_META.get(ticker, {"name": ticker, "cat": "—", "sector": "—"})
-        return {
-            "ticker": ticker, "name": meta.get("name", ticker),
-            "sector": meta.get("sector","—"), "price": 0, "change": 0,
-            "change_pct": 0, "volume": 0, "in_watchlist": ticker in WATCHLIST,
-        }
+        })
+    return rows
+
+
+# CoinGecko ID map for the tickers we care about
+_CG_SYMBOL_MAP: dict = {
+    "BTC-USD":"bitcoin","ETH-USD":"ethereum","BNB-USD":"binancecoin",
+    "SOL-USD":"solana","XRP-USD":"ripple","ADA-USD":"cardano",
+    "AVAX-USD":"avalanche-2","DOT-USD":"polkadot","TRX-USD":"tron",
+    "LTC-USD":"litecoin","ATOM-USD":"cosmos","NEAR-USD":"near",
+    "ALGO-USD":"algorand","XLM-USD":"stellar","VET-USD":"vechain",
+    "ICP-USD":"internet-computer","HBAR-USD":"hedera-hashgraph",
+    "FIL-USD":"filecoin","EOS-USD":"eos","XTZ-USD":"tezos",
+    "NEO-USD":"neo","IOTA-USD":"iota","XMR-USD":"monero",
+    "ZEC-USD":"zcash","DASH-USD":"dash","WAVES-USD":"waves",
+    "MATIC-USD":"matic-network","ARB-USD":"arbitrum","OP-USD":"optimism",
+    "IMX-USD":"immutable-x","LRC-USD":"loopring","APT-USD":"aptos",
+    "SUI-USD":"sui","INJ-USD":"injective-protocol","SEI-USD":"sei-network",
+    "TIA-USD":"celestia","PYTH-USD":"pyth-network","JUP-USD":"jupiter-exchange-solana",
+    "UNI-USD":"uniswap","AAVE-USD":"aave","MKR-USD":"maker",
+    "COMP-USD":"compound-governance-token","YFI-USD":"yearn-finance",
+    "SUSHI-USD":"sushi","1INCH-USD":"1inch","CRV-USD":"curve-dao-token",
+    "BAL-USD":"balancer","DYDX-USD":"dydx","GMX-USD":"gmx",
+    "SNX-USD":"synthetix-network-token","PENDLE-USD":"pendle",
+    "CAKE-USD":"pancakeswap-token","CVX-USD":"convex-finance",
+    "FXS-USD":"frax-share","LDO-USD":"lido-dao","RPL-USD":"rocket-pool",
+    "ANKR-USD":"ankr","SAND-USD":"the-sandbox","MANA-USD":"decentraland",
+    "ENJ-USD":"enjincoin","AXS-USD":"axie-infinity","GALA-USD":"gala",
+    "FLOW-USD":"flow","BEAM-USD":"beam-2","RONIN-USD":"ronin",
+    "DOGE-USD":"dogecoin","SHIB-USD":"shiba-inu","PEPE-USD":"pepe",
+    "FLOKI-USD":"floki","BONK-USD":"bonk","WIF-USD":"dogwifcoin",
+    "LINK-USD":"chainlink","BAND-USD":"band-protocol","TRB-USD":"tellor",
+    "AR-USD":"arweave","STORJ-USD":"storj","SCRT-USD":"secret",
+    "ROSE-USD":"oasis-network","RUNE-USD":"thorchain","AXL-USD":"axelar",
+    "FET-USD":"fetch-ai","AGIX-USD":"singularitynet","OCEAN-USD":"ocean-protocol",
+    "NMR-USD":"numeraire","TAO-USD":"bittensor","RNDR-USD":"render-token",
+    "WLD-USD":"worldcoin-wld","CRO-USD":"crypto-com-chain",
+    "KCS-USD":"kucoin-shares","BAT-USD":"basic-attention-token",
+    "ZRX-USD":"0x","GRT-USD":"the-graph","LPT-USD":"livepeer",
+    "ONDO-USD":"ondo-finance","THETA-USD":"theta-token","CHZ-USD":"chiliz",
+    "MINA-USD":"mina-protocol","KAVA-USD":"kava","CFX-USD":"conflux-token",
+    "FTM-USD":"fantom","OMG-USD":"omisego","METIS-USD":"metis-token",
+    "SKL-USD":"skale","ICX-USD":"icon","ONT-USD":"ontology",
+    "QTUM-USD":"qtum","ZIL-USD":"zilliqa","VET-USD":"vechain",
+    "HOT-USD":"holotoken","WIN-USD":"wink","REEF-USD":"reef",
+    "JASMY-USD":"jasmycoin","API3-USD":"api3","CELR-USD":"celer-network",
+}
+
+
+async def _scan_coingecko(tickers: list) -> list:
+    """Fetch crypto prices from CoinGecko free API (no key required)."""
+    import urllib.request, json as _json
+
+    # Build id list from our symbol map
+    cg_ids  = []
+    id_to_ticker: dict = {}
+    for t in tickers:
+        cg_id = _CG_SYMBOL_MAP.get(t)
+        if cg_id:
+            cg_ids.append(cg_id)
+            id_to_ticker[cg_id] = t
+
+    if not cg_ids:
+        return []
+
+    # Fetch in pages of 250
+    all_data: dict = {}
+    loop = asyncio.get_event_loop()
+
+    def _fetch_page(ids_chunk):
+        url = (
+            "https://api.coingecko.com/api/v3/coins/markets"
+            f"?vs_currency=usd&ids={','.join(ids_chunk)}"
+            "&order=market_cap_desc&per_page=250&page=1"
+            "&price_change_percentage=24h&sparkline=false"
+        )
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "DALIOS/1.0"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                return _json.loads(r.read().decode())
+        except Exception as e:
+            logger.warning(f"CoinGecko fetch failed: {e}")
+            return []
+
+    chunk_size = 100
+    for i in range(0, len(cg_ids), chunk_size):
+        chunk = cg_ids[i:i+chunk_size]
+        data  = await loop.run_in_executor(None, _fetch_page, chunk)
+        for coin in data:
+            all_data[coin["id"]] = coin
+
+    rows = []
+    for cg_id in cg_ids:
+        ticker = id_to_ticker[cg_id]
+        coin   = all_data.get(cg_id, {})
+        price     = float(coin.get("current_price") or 0)
+        chg_pct   = float(coin.get("price_change_percentage_24h") or 0)
+        chg       = price * chg_pct / 100 if price else 0
+        vol       = float(coin.get("total_volume") or 0)
+        mkt_cap   = float(coin.get("market_cap") or 0)
+        name      = coin.get("name", ticker.replace("-USD",""))
+        rows.append({
+            "ticker":     ticker,
+            "name":       name,
+            "sector":     "Crypto",
+            "price":      round(price, 6) if price < 1 else round(price, 2),
+            "change":     round(chg, 6),
+            "change_pct": round(chg_pct, 2),
+            "volume_fmt": _fmt_vol(vol),
+            "volume":     int(vol),
+            "market_cap_fmt": _fmt_vol(mkt_cap),
+            "in_watchlist": ticker in WATCHLIST,
+        })
+    # Tickers not found in CoinGecko -- return zeroed rows
+    found = {r["ticker"] for r in rows}
+    for t in tickers:
+        if t not in found:
+            rows.append({
+                "ticker": t, "name": t.replace("-USD",""), "sector": "Crypto",
+                "price": 0, "change": 0, "change_pct": 0,
+                "volume_fmt": "--", "volume": 0, "market_cap_fmt": "--",
+                "in_watchlist": t in WATCHLIST,
+            })
+    return rows
 
 
 @app.get("/api/markets/{market}")
 async def market_scanner(market: str):
-    """Scan a market: asx | crypto | commodities"""
+    """Scan a market: asx | crypto | commodities. Uses cache (90s TTL)."""
     market = market.lower()
     ticker_map = {
         "asx":         ASX_TICKERS,
@@ -2110,11 +2270,34 @@ async def market_scanner(market: str):
     }
     if market not in ticker_map:
         raise HTTPException(400, f"Unknown market '{market}'. Use: asx, crypto, commodities")
+
+    # Check cache
+    import time
+    cached = _scanner_cache.get(market)
+    if cached and (time.time() - cached["ts"]) < _CACHE_TTL:
+        return {"market": market, "rows": cached["rows"],
+                "count": len(cached["rows"]), "cached": True,
+                "cache_age": int(time.time() - cached["ts"])}
+
     tickers = ticker_map[market]
-    rows = await asyncio.gather(*[_scanner_row(t) for t in tickers])
-    # Sort by abs change_pct descending
-    rows = sorted(rows, key=lambda r: abs(r["change_pct"]), reverse=True)
-    return {"market": market, "rows": rows, "count": len(rows)}
+    if market == "crypto":
+        rows = await _scan_coingecko(tickers)
+    else:
+        rows = await _scan_yfinance(tickers, market)
+
+    # Filter out zero-price rows only if we got real data
+    good = [r for r in rows if r["price"] > 0]
+    if good:
+        rows = good
+
+    # Sort: crypto by market cap (if available), others by abs change
+    if market == "crypto":
+        rows = sorted(rows, key=lambda r: r.get("volume", 0), reverse=True)
+    else:
+        rows = sorted(rows, key=lambda r: abs(r["change_pct"]), reverse=True)
+
+    _scanner_cache[market] = {"ts": time.time(), "rows": rows}
+    return {"market": market, "rows": rows, "count": len(rows), "cached": False}
 
 
 @app.get("/api/paper/quote")
@@ -2122,7 +2305,7 @@ async def get_quote(ticker: str):
     """Get current price + metadata for a ticker."""
     ticker = ticker.upper().strip()
     price  = await _live_price(ticker)
-    meta   = _ASSET_META.get(ticker, {"name": ticker, "cat": "Unknown", "sector": "—"})
+    meta   = _ASSET_META.get(ticker, {"name": ticker, "cat": "Unknown", "sector": "--"})
     return {
         "ticker": ticker,
         "price":  price,
@@ -2250,7 +2433,7 @@ async def place_real_order(payload: dict):
         _save_real_equity(REAL_EQUITY_CURVE[-2000:])
     except Exception:
         pass
-    STATE.add_alert("LIVE", f"{side} {qty}× {ticker}", "INFO")
+    STATE.add_alert("LIVE", f"{side} {qty}�-- {ticker}", "INFO")
     await WS_MANAGER.broadcast({"type": "REAL_ORDER", "data": result})
     return result
 
@@ -2308,7 +2491,7 @@ async def trigger_cycle(background_tasks: BackgroundTasks):
         "timestamp": datetime.utcnow().isoformat(),
     }
     STATE.last_cycle = result
-    STATE.add_alert("CYCLE", f"Cycle #{STATE.cycle_count} complete — {len(signals)} signals found", "INFO")
+    STATE.add_alert("CYCLE", f"Cycle #{STATE.cycle_count} complete -- {len(signals)} signals found", "INFO")
     background_tasks.add_task(WS_MANAGER.broadcast, {"type": "CYCLE_UPDATE", "data": result})
     return result
 
@@ -2316,7 +2499,7 @@ async def trigger_cycle(background_tasks: BackgroundTasks):
 @app.post("/api/agent/boot")
 async def boot_agent():
     STATE.booted = True
-    STATE.add_alert("BOOT", "Dalio Agent initialised — FinBERT loaded, correlations computed", "INFO")
+    STATE.add_alert("BOOT", "Dalio Agent initialised -- FinBERT loaded, correlations computed", "INFO")
     await WS_MANAGER.broadcast({"type": "AGENT_BOOT", "message": "DALIO AGENT ONLINE"})
     return {"status": "booted", "timestamp": datetime.utcnow().isoformat()}
 
