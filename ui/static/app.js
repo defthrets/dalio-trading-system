@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCharts();
   initNotifications();
   initTradingMode();
+  loadWatchlist();
   loadAll();
   loadMarketSummary();
   setInterval(loadAll, 30_000);           // Refresh all data every 30s
@@ -71,13 +72,16 @@ function initTabs() {
       btn.classList.add('active');
       document.getElementById(`tab-${id}`).classList.add('active');
       // Lazy-load tab data
-      if (id === 'signal-ops')   loadSignals();
-      if (id === 'intel-center') loadSentiment();
-      if (id === 'holy-grail')   loadCorrelation();
-      if (id === 'risk-matrix')  loadHealth();
-      if (id === 'backtest-lab')   loadBacktest();
-      if (id === 'paper-trading')  initPaperTrading();
-      if (id === 'live-trading')   initLiveTrading();
+      if (id === 'signal-ops')           loadSignals();
+      if (id === 'intel-center')         loadSentiment();
+      if (id === 'holy-grail')           loadCorrelation();
+      if (id === 'risk-matrix')          loadHealth();
+      if (id === 'backtest-lab')         loadBacktest();
+      if (id === 'paper-trading')        initPaperTrading();
+      if (id === 'live-trading')         initLiveTrading();
+      if (id === 'asx-scanner')         loadScanner('asx');
+      if (id === 'crypto-scanner')      loadScanner('crypto');
+      if (id === 'commodities-scanner') loadScanner('commodities');
       // Show tutorial on first visit
       showTutorial(id);
     });
@@ -1450,12 +1454,34 @@ function initPaperTrading() {
   loadPaperHistory();
   loadPaperSignals();
   loadPaperEquityCurve();
+  loadPaperConfig();
   // Auto-refresh positions every 15s while tab is active
   clearInterval(_poRefreshTimer);
   _poRefreshTimer = setInterval(() => {
     const activeTab = document.querySelector('.tab-btn.active')?.dataset?.tab;
     if (activeTab === 'paper-trading') loadPaperPortfolio();
   }, 15_000);
+}
+
+// ─── Paper Config (starting cash) ─────────────────────────
+async function loadPaperConfig() {
+  try {
+    const d = await fetchJSON('/api/paper/config');
+    const inp = el('startingCashInput');
+    if (inp) inp.value = d.starting_cash;
+  } catch {}
+}
+
+async function saveStartingCash() {
+  const inp = el('startingCashInput');
+  const cash = parseFloat(inp?.value);
+  if (!cash || cash < 1) { pushAlert('SETTINGS', 'Enter a valid starting cash amount', 'warning'); return; }
+  try {
+    await postJSON('/api/paper/config', { starting_cash: cash });
+    pushAlert('SETTINGS', `Starting cash set to $${cash.toLocaleString()}. Reset portfolio to apply.`, 'info');
+  } catch (e) {
+    pushAlert('SETTINGS', e.message || 'Failed to save config', 'warning');
+  }
 }
 
 // ─── Portfolio ────────────────────────────────────────────
@@ -1526,11 +1552,13 @@ async function closePaperPosition(ticker) {
 }
 
 async function resetPaperPortfolio() {
-  if (!confirm('Reset portfolio to $100,000 starting cash? All positions and history will be cleared.')) return;
+  const cfgCash = parseFloat(el('startingCashInput')?.value) || 1000;
+  if (!confirm(`Reset portfolio to $${cfgCash.toLocaleString()} starting cash? All positions and history will be cleared.`)) return;
   await postJSON('/api/paper/reset', {});
   loadPaperPortfolio();
   loadPaperHistory();
-  pushAlert('PAPER', 'Portfolio reset to $100,000', 'info');
+  loadPaperEquityCurve();
+  pushAlert('PAPER', `Portfolio reset to $${cfgCash.toLocaleString()}`, 'info');
 }
 
 // ─── Order Entry ──────────────────────────────────────────
@@ -1645,21 +1673,24 @@ async function loadPaperSignals() {
 function renderPaperSignalList(signals) {
   const list = el('paperSignalList');
   if (!list) return;
-  const active = signals.filter(s => s.action !== 'HOLD').slice(0, 8);
-  if (!active.length) { list.innerHTML = `<div style="padding:14px;color:var(--text-muted);font-size:10px">No active signals — run a cycle first</div>`; return; }
+  const active = signals.filter(s => s.action !== 'HOLD').slice(0, 12);
+  if (!active.length) { list.innerHTML = `<div style="padding:14px;color:var(--text-muted);font-size:10px;grid-column:1/-1">No active signals — run a cycle first</div>`; return; }
   list.innerHTML = active.map(s => {
     const isBuy  = ['BUY','LONG'].includes(s.action);
     const actCol = isBuy ? 'var(--green)' : 'var(--red)';
     const suggestQty = (1000 / (s.price || 100)).toFixed(s.price > 100 ? 2 : 4);
+    const dalioScore = s.dalio_score != null ? `<span class="psr-conf" title="Dalio Fit">⬡ ${s.dalio_score}%</span>` : '';
     return `<div class="paper-sig-row">
       <div class="psr-left">
         <span class="psr-ticker">${s.ticker.replace('-USD','')}</span>
-        <span class="psr-action" style="color:${actCol}">${s.action}</span>
+        <span class="psr-action" style="color:${actCol};font-size:10px">${s.action}</span>
         <span class="psr-price">${fmtSignalPrice(s)}</span>
         <span class="psr-conf">Conf: ${s.confidence.toFixed(0)}%</span>
+        ${dalioScore}
+        <span class="psr-conf" style="color:var(--text-2)">${s.reason || ''}</span>
       </div>
       <div class="psr-right">
-        <input type="number" class="po-input psr-qty" id="psrQty-${s.ticker}" value="${suggestQty}" min="0.0001" step="any" style="width:70px"/>
+        <input type="number" class="po-input psr-qty" id="psrQty-${s.ticker}" value="${suggestQty}" min="0.0001" step="any"/>
         <button class="psr-btn ${isBuy ? 'buy' : 'sell'}" onclick="quickTrade('${s.ticker}',${s.price},'${isBuy ? 'BUY' : 'SELL'}','psrQty-${s.ticker}')">
           ${isBuy ? '▲ BUY' : '▼ SELL'}
         </button>
@@ -1678,6 +1709,153 @@ async function quickTrade(ticker, price, side, qtyInputId) {
     loadPaperHistory();
   } catch (e) {
     pushAlert('PAPER', e.message || 'Order failed', 'warning');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// MARKET SCANNER (ASX / CRYPTO / COMMODITIES)
+// ═══════════════════════════════════════════════════════════
+
+const _scannerData = { asx: [], crypto: [], commodities: [] };
+const _scannerSort = { asx: null, crypto: null, commodities: null };
+
+const _SCANNER_IDS = {
+  asx:         { tbody: 'asxTableBody',         stats: 'asxStats',    cols: 8 },
+  crypto:      { tbody: 'cryptoTableBody',       stats: 'cryptoStats', cols: 7 },
+  commodities: { tbody: 'commoditiesTableBody',  stats: 'commStats',   cols: 7 },
+};
+
+async function loadScanner(market) {
+  const ids = _SCANNER_IDS[market];
+  const tbody = el(ids.tbody);
+  if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="${ids.cols}" class="scanner-loading">⌛ Fetching live data…</td></tr>`;
+  try {
+    const d = await fetchJSON(`/api/markets/${market}`);
+    _scannerData[market] = d.rows || [];
+    renderScanner(market);
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="${ids.cols}" class="scanner-loading" style="color:var(--red)">⚠ Failed to load — ${e.message}</td></tr>`;
+  }
+}
+
+function renderScanner(market, filterText = '', filterSector = '') {
+  const ids   = _SCANNER_IDS[market];
+  const tbody = el(ids.tbody);
+  const statsEl = el(ids.stats);
+  if (!tbody) return;
+
+  let rows = _scannerData[market];
+
+  // Filter
+  if (filterText) {
+    const q = filterText.toLowerCase();
+    rows = rows.filter(r => r.ticker.toLowerCase().includes(q) || r.name.toLowerCase().includes(q));
+  }
+  if (filterSector) {
+    rows = rows.filter(r => (r.sector || '').includes(filterSector));
+  }
+
+  // Sort
+  const sort = _scannerSort[market];
+  if (sort) {
+    rows = [...rows].sort((a, b) => {
+      const av = a[sort.key], bv = b[sort.key];
+      const cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
+      return sort.asc ? cmp : -cmp;
+    });
+  }
+
+  // Stats bar
+  if (statsEl) {
+    const up   = rows.filter(r => r.change_pct > 0).length;
+    const down = rows.filter(r => r.change_pct < 0).length;
+    const flat = rows.length - up - down;
+    const avgChg = rows.length ? (rows.reduce((s,r) => s + r.change_pct, 0) / rows.length).toFixed(2) : 0;
+    statsEl.innerHTML = `
+      <span class="scanner-stat-item">SHOWING <span class="scanner-stat-val">${rows.length}</span></span>
+      <span class="scanner-stat-item">UP <span class="scanner-stat-val up">${up}</span></span>
+      <span class="scanner-stat-item">DOWN <span class="scanner-stat-val down">${down}</span></span>
+      <span class="scanner-stat-item">FLAT <span class="scanner-stat-val">${flat}</span></span>
+      <span class="scanner-stat-item">AVG CHANGE <span class="scanner-stat-val ${avgChg >= 0 ? 'up' : 'down'}">${avgChg}%</span></span>`;
+  }
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="${ids.cols}" class="scanner-loading">No results</td></tr>`;
+    return;
+  }
+
+  const isCrypto = market === 'crypto';
+  tbody.innerHTML = rows.map(r => {
+    const dir   = r.change_pct > 0 ? 'up' : r.change_pct < 0 ? 'down' : 'flat';
+    const chgStr = `${r.change_pct >= 0 ? '+' : ''}${r.change_pct.toFixed(2)}%`;
+    const priceStr = r.price >= 1000 ? `$${r.price.toLocaleString()}` : r.price >= 1 ? `$${r.price.toFixed(2)}` : `$${r.price.toFixed(6)}`;
+    const volStr = r.volume ? (r.volume > 1e6 ? `${(r.volume/1e6).toFixed(1)}M` : r.volume > 1e3 ? `${(r.volume/1e3).toFixed(0)}K` : r.volume) : '—';
+    const wlLabel = r.in_watchlist ? '★ WATCHING' : '☆ WATCH';
+    const wlCls   = r.in_watchlist ? 'in' : '';
+    const ticker  = r.ticker;
+    const sectorCol = market === 'asx' ? `<td>${r.sector || '—'}</td>` : '';
+    const nameShort = r.name.length > 22 ? r.name.slice(0,22) + '…' : r.name;
+    return `<tr class="scanner-row ${dir}">
+      <td><strong>${isCrypto ? ticker.replace('-USD','') : ticker}</strong></td>
+      <td title="${r.name}">${nameShort}</td>
+      ${sectorCol}
+      <td>${priceStr}</td>
+      <td class="change-cell"><strong>${chgStr}</strong></td>
+      <td>${volStr}</td>
+      <td><button class="scan-wl-btn ${wlCls}" onclick="toggleWatchlist('${ticker}',this)">${wlLabel}</button></td>
+      <td><button class="scan-trade-btn" onclick="scannerOpenTrade('${ticker}',${r.price})">▶ TRADE</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function filterScanner(market, text) {
+  const sectorSel = el(`${market === 'asx' ? 'asx' : market === 'crypto' ? 'crypto' : 'comm'}SectorFilter`);
+  renderScanner(market, text, sectorSel?.value || '');
+}
+
+function sortScanner(market, key) {
+  const cur = _scannerSort[market];
+  _scannerSort[market] = (cur?.key === key) ? { key, asc: !cur.asc } : { key, asc: false };
+  renderScanner(market);
+}
+
+function scannerOpenTrade(ticker, price) {
+  // Jump to paper trading tab and pre-fill the ticker
+  document.querySelector('[data-tab="paper-trading"]')?.click();
+  setTimeout(() => {
+    const inp = el('poTicker');
+    if (inp) { inp.value = ticker; onPoTickerInput(ticker); }
+  }, 200);
+}
+
+// ─── Watchlist ─────────────────────────────────────────────
+let _watchlist = [];
+
+async function loadWatchlist() {
+  try {
+    const d = await fetchJSON('/api/watchlist');
+    _watchlist = d.watchlist || [];
+  } catch {}
+}
+
+async function toggleWatchlist(ticker, btn) {
+  const inList = _watchlist.includes(ticker);
+  try {
+    const endpoint = inList ? '/api/watchlist/remove' : '/api/watchlist/add';
+    const d = await postJSON(endpoint, { ticker });
+    _watchlist = d.watchlist || [];
+    // Update all buttons for this ticker across all scanner tables
+    document.querySelectorAll('.scan-wl-btn').forEach(b => {
+      if (b.closest('tr')?.querySelector('strong')?.textContent?.replace('-','') === ticker.replace('-USD','')) {
+        const nowIn = _watchlist.includes(ticker);
+        b.textContent = nowIn ? '★ WATCHING' : '☆ WATCH';
+        b.classList.toggle('in', nowIn);
+      }
+    });
+    pushAlert('WATCHLIST', `${ticker} ${inList ? 'removed from' : 'added to'} watchlist`, 'info');
+  } catch (e) {
+    pushAlert('WATCHLIST', e.message || 'Watchlist update failed', 'warning');
   }
 }
 
@@ -1757,12 +1935,13 @@ async function initTradingMode() {
 
 function updateModeUI(mode, brokerConnected = false) {
   _tradingMode = mode;
-  const btn   = el('modeToggleBtn');
-  const label = el('modeToggleLabel');
   const badge = el('modeBadge');
-  if (btn)   { btn.className = `mode-toggle-btn ${mode}`; }
-  if (label) { label.textContent = mode === 'live' ? 'LIVE' : 'PAPER'; }
   if (badge) { badge.textContent = mode === 'live' ? 'MODE: LIVE' : 'MODE: PAPER'; badge.className = mode === 'live' ? 'badge badge--red' : 'badge badge--amber'; }
+  // Update mode switcher pill
+  const paperBtn = el('modePaperBtn');
+  const liveBtn  = el('modeLiveBtn');
+  if (paperBtn) paperBtn.classList.toggle('active', mode === 'paper');
+  if (liveBtn)  liveBtn.classList.toggle('active',  mode === 'live');
   // Update live tab warning
   const warn = el('liveModeWarning');
   const tag  = el('liveModeTag');
@@ -1770,13 +1949,13 @@ function updateModeUI(mode, brokerConnected = false) {
   if (tag)  { tag.textContent = mode === 'live' ? 'LIVE MODE' : 'PAPER MODE'; tag.className = `panel-tag live-mode-tag${mode === 'live' ? ' live' : ''}`; }
 }
 
-async function toggleTradingMode() {
-  const newMode = _tradingMode === 'paper' ? 'live' : 'paper';
+// Called by the new mode switcher pill buttons
+async function setTradingMode(newMode) {
+  if (newMode === _tradingMode) return;
   if (newMode === 'live') {
     const status = await fetchJSON('/api/broker/status').catch(() => null);
     if (!status?.connected) {
       pushAlert('MODE', 'Connect a broker first on the LIVE TRADING tab', 'warning');
-      // Switch to live trading tab
       document.querySelector('[data-tab="live-trading"]')?.click();
       return;
     }
@@ -1788,8 +1967,15 @@ async function toggleTradingMode() {
     pushAlert('MODE', `Switched to ${d.mode.toUpperCase()} trading mode`, 'info');
     if (newMode === 'live') sendNotification('LIVE MODE ACTIVE', 'Real money trading is now active. Orders will be placed with your broker.');
   } catch (e) {
+    // Revert buttons if failed
+    updateModeUI(_tradingMode);
     pushAlert('MODE', e.message || 'Mode switch failed', 'warning');
   }
+}
+
+// Legacy toggle kept for any remaining onclick refs
+async function toggleTradingMode() {
+  await setTradingMode(_tradingMode === 'paper' ? 'live' : 'paper');
 }
 
 

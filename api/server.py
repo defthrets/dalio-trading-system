@@ -297,7 +297,9 @@ DATA_DIR = ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
 PAPER_STATE_FILE = DATA_DIR / "paper_portfolio.json"
-REAL_EQUITY_FILE = DATA_DIR / "real_equity.json"
+REAL_EQUITY_FILE   = DATA_DIR / "real_equity.json"
+WATCHLIST_FILE     = DATA_DIR / "watchlist.json"
+PAPER_CONFIG_FILE  = DATA_DIR / "paper_config.json"
 
 
 def _save_paper_state() -> None:
@@ -350,7 +352,40 @@ def _save_real_equity(curve: list) -> None:
 # Paper Trading Portfolio
 # ─────────────────────────────────────────────
 
-PAPER_STARTING_CASH = 100_000.0
+# ─── Paper config (persisted) ────────────────
+def _load_paper_config() -> dict:
+    if PAPER_CONFIG_FILE.exists():
+        try:
+            return json.loads(PAPER_CONFIG_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {"starting_cash": 1_000.0}
+
+def _save_paper_config(cfg: dict) -> None:
+    try:
+        PAPER_CONFIG_FILE.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+    except Exception as exc:
+        logger.warning(f"Failed to save paper config: {exc}")
+
+_paper_cfg         = _load_paper_config()
+PAPER_STARTING_CASH: float = float(_paper_cfg.get("starting_cash", 1_000.0))
+
+# ─── Watchlist ────────────────────────────────
+def _load_watchlist() -> list:
+    if WATCHLIST_FILE.exists():
+        try:
+            return json.loads(WATCHLIST_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return []
+
+def _save_watchlist(wl: list) -> None:
+    try:
+        WATCHLIST_FILE.write_text(json.dumps(wl, indent=2), encoding="utf-8")
+    except Exception as exc:
+        logger.warning(f"Failed to save watchlist: {exc}")
+
+WATCHLIST: list = _load_watchlist()
 
 class PaperPortfolio:
     def __init__(self):
@@ -1884,9 +1919,114 @@ async def close_paper_position(payload: dict):
 
 @app.post("/api/paper/reset")
 async def reset_paper_portfolio():
-    PAPER.reset()
+    global PAPER_STARTING_CASH
+    PAPER.cash = PAPER_STARTING_CASH
+    PAPER.positions = {}
+    PAPER.history = []
+    PAPER.equity_history = []
+    PAPER.order_id = 0
     _save_paper_state()
     return {"status": "reset", "cash": PAPER_STARTING_CASH}
+
+
+@app.get("/api/paper/config")
+async def get_paper_config():
+    return {"starting_cash": PAPER_STARTING_CASH}
+
+
+@app.post("/api/paper/config")
+async def set_paper_config(payload: dict):
+    global PAPER_STARTING_CASH
+    cash = float(payload.get("starting_cash", PAPER_STARTING_CASH))
+    if cash < 1:
+        raise HTTPException(400, "starting_cash must be >= 1")
+    PAPER_STARTING_CASH = cash
+    _save_paper_config({"starting_cash": cash})
+    return {"status": "ok", "starting_cash": PAPER_STARTING_CASH}
+
+
+# ─────────────────────────────────────────────
+# Watchlist endpoints
+# ─────────────────────────────────────────────
+
+@app.get("/api/watchlist")
+async def get_watchlist():
+    return {"watchlist": WATCHLIST}
+
+
+@app.post("/api/watchlist/add")
+async def watchlist_add(payload: dict):
+    ticker = payload.get("ticker", "").upper().strip()
+    if not ticker:
+        raise HTTPException(400, "ticker required")
+    if ticker not in WATCHLIST:
+        WATCHLIST.append(ticker)
+        _save_watchlist(WATCHLIST)
+    return {"watchlist": WATCHLIST}
+
+
+@app.post("/api/watchlist/remove")
+async def watchlist_remove(payload: dict):
+    ticker = payload.get("ticker", "").upper().strip()
+    if ticker in WATCHLIST:
+        WATCHLIST.remove(ticker)
+        _save_watchlist(WATCHLIST)
+    return {"watchlist": WATCHLIST}
+
+
+# ─────────────────────────────────────────────
+# Market Scanner endpoints
+# ─────────────────────────────────────────────
+
+_SCANNER_META = {}  # populated from _ASSET_META
+
+async def _scanner_row(ticker: str) -> dict:
+    """Fetch live price + 1d change for a single ticker."""
+    try:
+        import yfinance as yf
+        t   = yf.Ticker(ticker)
+        inf = t.fast_info
+        price  = float(inf.last_price or 0)
+        prev   = float(inf.previous_close or price)
+        chg    = price - prev
+        chg_pct = (chg / prev * 100) if prev else 0
+        vol    = int(inf.three_month_average_volume or 0)
+        meta   = _ASSET_META.get(ticker, {"name": ticker, "cat": "—", "sector": "—"})
+        return {
+            "ticker":   ticker,
+            "name":     meta.get("name", ticker),
+            "sector":   meta.get("sector", "—"),
+            "price":    round(price, 4),
+            "change":   round(chg, 4),
+            "change_pct": round(chg_pct, 2),
+            "volume":   vol,
+            "in_watchlist": ticker in WATCHLIST,
+        }
+    except Exception:
+        meta = _ASSET_META.get(ticker, {"name": ticker, "cat": "—", "sector": "—"})
+        return {
+            "ticker": ticker, "name": meta.get("name", ticker),
+            "sector": meta.get("sector","—"), "price": 0, "change": 0,
+            "change_pct": 0, "volume": 0, "in_watchlist": ticker in WATCHLIST,
+        }
+
+
+@app.get("/api/markets/{market}")
+async def market_scanner(market: str):
+    """Scan a market: asx | crypto | commodities"""
+    market = market.lower()
+    ticker_map = {
+        "asx":         ASX_TICKERS,
+        "crypto":      CRYPTO_TICKERS,
+        "commodities": COMMODITY_TICKERS,
+    }
+    if market not in ticker_map:
+        raise HTTPException(400, f"Unknown market '{market}'. Use: asx, crypto, commodities")
+    tickers = ticker_map[market]
+    rows = await asyncio.gather(*[_scanner_row(t) for t in tickers])
+    # Sort by abs change_pct descending
+    rows = sorted(rows, key=lambda r: abs(r["change_pct"]), reverse=True)
+    return {"market": market, "rows": rows, "count": len(rows)}
 
 
 @app.get("/api/paper/quote")

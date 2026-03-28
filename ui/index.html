@@ -56,10 +56,10 @@
     </div>
     <div class="header-right">
       <div class="live-clock" id="liveClock"></div>
-      <button class="mode-toggle-btn" id="modeToggleBtn" onclick="toggleTradingMode()" title="Switch paper / live trading">
-        <span class="mode-toggle-dot" id="modeToggleDot"></span>
-        <span id="modeToggleLabel">PAPER</span>
-      </button>
+      <div class="mode-switcher" title="Switch paper / live trading">
+        <button class="mode-sw-opt active" id="modePaperBtn" onclick="setTradingMode('paper')">📄 PAPER</button>
+        <button class="mode-sw-opt" id="modeLiveBtn" onclick="setTradingMode('live')">🔴 LIVE</button>
+      </div>
       <button class="sound-toggle-btn" id="soundToggleBtn" onclick="toggleSound()" title="Toggle sound alerts">
         🔇 SOUND
       </button>
@@ -103,6 +103,15 @@
     </button>
     <button class="tab-btn" data-tab="backtest-lab">
       <span class="tab-icon">◈</span> BACKTEST LAB
+    </button>
+    <button class="tab-btn" data-tab="asx-scanner">
+      <span class="tab-icon">🇦🇺</span> ASX
+    </button>
+    <button class="tab-btn" data-tab="crypto-scanner">
+      <span class="tab-icon">₿</span> CRYPTO
+    </button>
+    <button class="tab-btn" data-tab="commodities-scanner">
+      <span class="tab-icon">⛏</span> COMMODITIES
     </button>
     <button class="tab-btn" data-tab="paper-trading">
       <span class="tab-icon">📄</span> PAPER TRADING
@@ -695,7 +704,122 @@
     </section>
 
     <!-- ─────────────────────────────────────
-         TAB 7: PAPER TRADING
+         TAB 7: ASX SCANNER
+    ───────────────────────────────────── -->
+    <section id="tab-asx-scanner" class="tab-panel">
+      <div class="scanner-wrap">
+        <div class="scanner-toolbar">
+          <div class="scanner-title">🇦🇺 ASX MARKET SCANNER</div>
+          <div class="scanner-toolbar-right">
+            <input type="text" class="scanner-search" id="asxSearch" placeholder="Filter ticker or name..." oninput="filterScanner('asx',this.value)"/>
+            <select class="ctrl-select" id="asxSectorFilter" onchange="filterScanner('asx',el('asxSearch').value)">
+              <option value="">ALL SECTORS</option>
+              <option value="Banking">Banking</option>
+              <option value="Mining">Mining</option>
+              <option value="Energy">Energy</option>
+              <option value="Healthcare">Healthcare</option>
+              <option value="Technology">Technology</option>
+              <option value="Consumer">Consumer</option>
+              <option value="Finance">Finance</option>
+              <option value="REIT">REIT</option>
+              <option value="Gold">Gold</option>
+            </select>
+            <button class="btn-primary btn--sm" onclick="loadScanner('asx')">↻ REFRESH</button>
+          </div>
+        </div>
+        <div class="scanner-stats" id="asxStats"></div>
+        <div class="scanner-table-wrap">
+          <table class="data-table scanner-table" id="asxTable">
+            <thead>
+              <tr>
+                <th onclick="sortScanner('asx','ticker')">TICKER ⇅</th>
+                <th>NAME</th>
+                <th>SECTOR</th>
+                <th onclick="sortScanner('asx','price')">PRICE ⇅</th>
+                <th onclick="sortScanner('asx','change_pct')">CHANGE% ⇅</th>
+                <th>VOLUME</th>
+                <th>WATCHLIST</th>
+                <th>TRADE</th>
+              </tr>
+            </thead>
+            <tbody id="asxTableBody">
+              <tr><td colspan="8" class="scanner-loading">⌛ Loading ASX data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────
+         TAB 8: CRYPTO SCANNER
+    ───────────────────────────────────── -->
+    <section id="tab-crypto-scanner" class="tab-panel">
+      <div class="scanner-wrap">
+        <div class="scanner-toolbar">
+          <div class="scanner-title">₿ CRYPTO MARKET SCANNER</div>
+          <div class="scanner-toolbar-right">
+            <input type="text" class="scanner-search" id="cryptoSearch" placeholder="Filter ticker..." oninput="filterScanner('crypto',this.value)"/>
+            <button class="btn-primary btn--sm" onclick="loadScanner('crypto')">↻ REFRESH</button>
+          </div>
+        </div>
+        <div class="scanner-stats" id="cryptoStats"></div>
+        <div class="scanner-table-wrap">
+          <table class="data-table scanner-table" id="cryptoTable">
+            <thead>
+              <tr>
+                <th onclick="sortScanner('crypto','ticker')">TICKER ⇅</th>
+                <th>NAME</th>
+                <th onclick="sortScanner('crypto','price')">PRICE (USD) ⇅</th>
+                <th onclick="sortScanner('crypto','change_pct')">CHANGE% ⇅</th>
+                <th>24H VOL</th>
+                <th>WATCHLIST</th>
+                <th>TRADE</th>
+              </tr>
+            </thead>
+            <tbody id="cryptoTableBody">
+              <tr><td colspan="7" class="scanner-loading">⌛ Loading Crypto data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────
+         TAB 9: COMMODITIES SCANNER
+    ───────────────────────────────────── -->
+    <section id="tab-commodities-scanner" class="tab-panel">
+      <div class="scanner-wrap">
+        <div class="scanner-toolbar">
+          <div class="scanner-title">⛏ COMMODITIES SCANNER</div>
+          <div class="scanner-toolbar-right">
+            <input type="text" class="scanner-search" id="commSearch" placeholder="Filter ticker or name..." oninput="filterScanner('commodities',this.value)"/>
+            <button class="btn-primary btn--sm" onclick="loadScanner('commodities')">↻ REFRESH</button>
+          </div>
+        </div>
+        <div class="scanner-stats" id="commStats"></div>
+        <div class="scanner-table-wrap">
+          <table class="data-table scanner-table" id="commoditiesTable">
+            <thead>
+              <tr>
+                <th onclick="sortScanner('commodities','ticker')">TICKER ⇅</th>
+                <th>NAME</th>
+                <th onclick="sortScanner('commodities','price')">PRICE ⇅</th>
+                <th onclick="sortScanner('commodities','change_pct')">CHANGE% ⇅</th>
+                <th>VOLUME</th>
+                <th>WATCHLIST</th>
+                <th>TRADE</th>
+              </tr>
+            </thead>
+            <tbody id="commoditiesTableBody">
+              <tr><td colspan="7" class="scanner-loading">⌛ Loading Commodities data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────
+         TAB 10: PAPER TRADING
     ───────────────────────────────────── -->
     <section id="tab-paper-trading" class="tab-panel">
       <div class="panel-grid panel-grid--paper">
@@ -747,7 +871,7 @@
             <span class="panel-title">◈ PORTFOLIO</span>
             <div style="display:flex;gap:8px;align-items:center">
               <span class="panel-tag" id="paperPnlBadge">P&amp;L: --</span>
-              <button class="btn-ghost btn--sm" onclick="resetPaperPortfolio()" title="Reset to $100k">↺ RESET</button>
+              <button class="btn-ghost btn--sm" onclick="resetPaperPortfolio()" title="Reset to starting cash">↺ RESET</button>
             </div>
           </div>
           <div class="paper-summary-grid">
@@ -815,13 +939,33 @@
           </div>
         </div>
 
+        <!-- ── PORTFOLIO SETTINGS ── -->
+        <div class="panel panel--paper-settings">
+          <div class="panel-header">
+            <span class="panel-title">⚙ PORTFOLIO SETTINGS</span>
+          </div>
+          <div class="psett-form">
+            <div class="psett-row">
+              <label class="po-label">STARTING CASH</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <span style="color:var(--text-2);font-size:12px">$</span>
+                <input type="number" id="startingCashInput" class="po-input" value="1000" min="1" step="any" style="flex:1"/>
+                <button class="btn-primary btn--sm" onclick="saveStartingCash()">SAVE</button>
+              </div>
+              <span class="po-label" style="margin-top:4px;opacity:0.6">Takes effect on next portfolio reset</span>
+            </div>
+            <button class="btn-ghost btn--full" style="margin-top:8px" onclick="resetPaperPortfolio()">↺ RESET PORTFOLIO TO NEW AMOUNT</button>
+          </div>
+        </div>
+
         <!-- ── QUICK SIGNALS (1-CLICK TRADE) ── -->
         <div class="panel panel--paper-signals">
           <div class="panel-header">
             <span class="panel-title">⚡ SIGNAL QUICK-TRADE</span>
             <span class="panel-tag">1-CLICK FROM SIGNALS</span>
+            <button class="btn-ghost btn--sm" onclick="loadPaperSignals()">↻ REFRESH</button>
           </div>
-          <div class="paper-signal-list" id="paperSignalList">
+          <div class="paper-signal-grid" id="paperSignalList">
             <div style="padding:14px;color:var(--text-muted);font-size:10px">Loading signals...</div>
           </div>
         </div>
