@@ -1774,37 +1774,195 @@ async def ai_analyse(payload: dict):
     return dalio_analyse_trade(ticker, side, quadrant, PAPER.cash, PAPER.positions, signals)
 
 
-@app.post("/api/ai/chat")
-async def ai_chat(payload: dict):
-    message  = (payload.get("message") or "").strip()
-    if not message: raise HTTPException(400, "message required")
-    msg_lower = message.lower()
+async def _run_cmd(message: str) -> dict:
+    """Core command dispatcher — shared by /api/ai/chat and /api/cmd."""
+    global PAPER_STARTING_CASH
+    msg_lower = message.strip().lower()
 
-    if msg_lower == "help":
+    # ── help ──────────────────────────────────────────────────────────────
+    if msg_lower in ("help", "?", "commands"):
         return {"type":"help","message":(
-            "Dalios AI -- Commands:\n"
-            "  buy <qty> <ticker>      -- Paper buy order\n"
-            "  sell <qty> <ticker>     -- Paper sell order\n"
-            "  analyse <ticker>        -- Dalio All Weather analysis\n"
-            "  portfolio               -- Current paper portfolio\n"
-            "  risk                    -- Dalio risk assessment\n"
-            "  quadrant                -- Current economic regime\n"
-            "  signals                 -- Top 3 active signals\n"
-            "  help                    -- This list")}
+            "Dalios CLI Commands\n"
+            "-------------------\n"
+            "  buy <qty> <ticker>              -- Paper buy  (e.g. buy 10 BTC)\n"
+            "  sell <qty> <ticker>             -- Paper sell (e.g. sell 5 ETH)\n"
+            "  close <ticker>                  -- Close open position\n"
+            "  portfolio                       -- Full portfolio summary\n"
+            "  positions                       -- Open positions detail\n"
+            "  history [n]                     -- Last N trades (default 10)\n"
+            "  quote <ticker>                  -- Live price lookup\n"
+            "  watchlist                       -- Show watchlist\n"
+            "  watchlist add <ticker>          -- Add to watchlist\n"
+            "  watchlist remove <ticker>       -- Remove from watchlist\n"
+            "  scanner asx                     -- ASX scanner data\n"
+            "  scanner crypto                  -- Crypto scanner data\n"
+            "  scanner commodities             -- Commodities scanner data\n"
+            "  signals                         -- Top 5 active signals\n"
+            "  analyse <ticker>                -- Dalio All Weather analysis\n"
+            "  risk                            -- Portfolio risk assessment\n"
+            "  quadrant                        -- Current economic regime\n"
+            "  reset [<cash>]                  -- Reset paper portfolio\n"
+            "  set cash <amount>               -- Update starting cash\n"
+            "  help                            -- This list")}
 
-    if msg_lower in ("portfolio","portfolio summary","show portfolio","positions"):
+    # ── portfolio / positions ──────────────────────────────────────────────
+    if msg_lower in ("portfolio","portfolio summary","show portfolio"):
         tickers = list(PAPER.positions.keys())
         prices  = await _prices_for_positions(tickers) if tickers else {}
         total   = PAPER.total_value(prices)
         pnl     = total - PAPER_STARTING_CASH
-        pnl_pct = (pnl / PAPER_STARTING_CASH) * 100
-        pos_lines = [f"  {t}: {p['side']} {p['qty']} @ ${p['entry_price']:.2f}" for t,p in PAPER.positions.items()]
+        pnl_pct = (pnl / PAPER_STARTING_CASH) * 100 if PAPER_STARTING_CASH else 0
+        pos_lines = [
+            f"  {t}: {p['side']} {p['qty']} @ ${p['entry_price']:.4f}  |  "
+            f"now ${prices.get(t, p['entry_price']):.4f}  |  "
+            f"P&L {((prices.get(t,p['entry_price'])-p['entry_price'])/p['entry_price']*100):+.2f}%"
+            for t,p in PAPER.positions.items()
+        ]
         return {"type":"portfolio","message":(
-            f"Paper Portfolio\n  Cash: ${PAPER.cash:,.2f}\n  Total: ${total:,.2f}\n"
-            f"  P&L: ${pnl:+,.2f} ({pnl_pct:+.2f}%)\n"
-            f"  Positions ({len(PAPER.positions)}):\n" + ("\n".join(pos_lines) if pos_lines else "  None")),
-            "data":{"cash":round(PAPER.cash,2),"total_value":round(total,2),"pnl":round(pnl,2)}}
+            f"Paper Portfolio\n"
+            f"  Cash:        ${PAPER.cash:,.2f}\n"
+            f"  Total NAV:   ${total:,.2f}\n"
+            f"  P&L:         ${pnl:+,.2f} ({pnl_pct:+.2f}%)\n"
+            f"  Positions ({len(PAPER.positions)}):\n" +
+            ("\n".join(pos_lines) if pos_lines else "  None")),
+            "data":{"cash":round(PAPER.cash,2),"total_value":round(total,2),"pnl":round(pnl,2),
+                    "pnl_pct":round(pnl_pct,2),"positions":[
+                        {"ticker":t,"side":p["side"],"qty":p["qty"],
+                         "entry_price":p["entry_price"],"current_price":prices.get(t,p["entry_price"])}
+                        for t,p in PAPER.positions.items()]}}
 
+    if msg_lower == "positions":
+        tickers = list(PAPER.positions.keys())
+        if not tickers:
+            return {"type":"positions","message":"No open positions.","data":{"positions":[]}}
+        prices  = await _prices_for_positions(tickers)
+        rows = []
+        for t,p in PAPER.positions.items():
+            cur = prices.get(t, p["entry_price"])
+            pnl = (cur - p["entry_price"]) * p["qty"] * (1 if p["side"]=="BUY" else -1)
+            rows.append({"ticker":t,"side":p["side"],"qty":p["qty"],
+                         "entry_price":p["entry_price"],"current_price":cur,"pnl":round(pnl,2)})
+        lines = [f"  {r['ticker']}: {r['side']} {r['qty']} entry ${r['entry_price']:.4f} cur ${r['current_price']:.4f} P&L ${r['pnl']:+,.2f}" for r in rows]
+        return {"type":"positions","message":"Open Positions:\n"+"\n".join(lines),"data":{"positions":rows}}
+
+    # ── history [n] ───────────────────────────────────────────────────────
+    hist_m = _re.match(r"^history(?:\s+(\d+))?$", msg_lower)
+    if hist_m:
+        n    = int(hist_m.group(1) or 10)
+        recent = PAPER.history[-n:][::-1]
+        if not recent:
+            return {"type":"history","message":"No trade history yet.","data":{"trades":[]}}
+        lines = [f"  #{t['order_id']} {t['side']} {t['qty']} {t['ticker']} @ ${t['price']:.4f}" for t in recent]
+        return {"type":"history","message":f"Last {len(recent)} trades:\n"+"\n".join(lines),"data":{"trades":recent}}
+
+    # ── quote <ticker> ────────────────────────────────────────────────────
+    quote_m = _re.match(r"^quote\s+(\S+)$", msg_lower)
+    if quote_m:
+        tkr   = quote_m.group(1).upper()
+        price = await _live_price(tkr)
+        if price is None:
+            return {"type":"error","message":f"Cannot fetch price for {tkr}. Check the ticker symbol."}
+        return {"type":"quote","message":f"{tkr}: ${float(price):,.4f}","data":{"ticker":tkr,"price":float(price)}}
+
+    # ── close <ticker> ────────────────────────────────────────────────────
+    close_m = _re.match(r"^close\s+(\S+)$", msg_lower)
+    if close_m:
+        tkr = close_m.group(1).upper()
+        if tkr not in PAPER.positions:
+            return {"type":"error","message":f"No open position for {tkr}."}
+        price = await _live_price(tkr)
+        if price is None:
+            return {"type":"error","message":f"Cannot fetch price for {tkr} to close position."}
+        qty = PAPER.positions[tkr]["qty"]
+        result = PAPER.place_order(tkr, "SELL", qty, float(price))
+        _save_paper_state()
+        await WS_MANAGER.broadcast({"type":"PAPER_CLOSE","data":result})
+        pnl = result.get("pnl", PAPER.history[0]["pnl"] if PAPER.history else 0)
+        return {"type":"close","message":(
+            f"Closed {tkr}  {qty} @ ${float(price):.4f}\n  Cash: ${PAPER.cash:,.2f}"),
+            "data":result}
+
+    # ── watchlist ─────────────────────────────────────────────────────────
+    if msg_lower == "watchlist":
+        if not WATCHLIST:
+            return {"type":"watchlist","message":"Watchlist is empty.","data":{"tickers":[]}}
+        return {"type":"watchlist","message":"Watchlist:\n  "+"\n  ".join(WATCHLIST),"data":{"tickers":list(WATCHLIST)}}
+
+    wl_add_m = _re.match(r"^watchlist add\s+(\S+)$", msg_lower)
+    if wl_add_m:
+        tkr = wl_add_m.group(1).upper()
+        if tkr not in WATCHLIST:
+            WATCHLIST.append(tkr)
+            _save_watchlist()
+        return {"type":"watchlist","message":f"Added {tkr} to watchlist.","data":{"tickers":list(WATCHLIST)}}
+
+    wl_rem_m = _re.match(r"^watchlist remove\s+(\S+)$", msg_lower)
+    if wl_rem_m:
+        tkr = wl_rem_m.group(1).upper()
+        if tkr in WATCHLIST:
+            WATCHLIST.remove(tkr)
+            _save_watchlist()
+            return {"type":"watchlist","message":f"Removed {tkr} from watchlist.","data":{"tickers":list(WATCHLIST)}}
+        return {"type":"watchlist","message":f"{tkr} not in watchlist.","data":{"tickers":list(WATCHLIST)}}
+
+    # ── scanner <market> ──────────────────────────────────────────────────
+    scanner_m = _re.match(r"^scanner\s+(asx|crypto|commodities)$", msg_lower)
+    if scanner_m:
+        import time as _time
+        market = scanner_m.group(1)
+        ticker_map = {"asx": ASX_TICKERS, "crypto": CRYPTO_TICKERS, "commodities": COMMODITY_TICKERS}
+        cached = _scanner_cache.get(market)
+        if cached and (_time.time() - cached["ts"]) < _CACHE_TTL:
+            all_rows = cached["rows"]
+        else:
+            tickers = ticker_map[market]
+            if market == "crypto":
+                all_rows = await _scan_coingecko(tickers)
+            else:
+                all_rows = await _scan_yfinance(tickers, market)
+            good = [r for r in all_rows if r["price"] > 0]
+            if good: all_rows = good
+            _scanner_cache[market] = {"ts": _time.time(), "rows": all_rows}
+        top    = all_rows[:10]
+        gainers = sorted(top, key=lambda r: r.get("change_pct",0), reverse=True)[:5]
+        losers  = sorted(top, key=lambda r: r.get("change_pct",0))[:3]
+        def _fmt_row(r):
+            chg = r.get("change_pct",0)
+            sign = "+" if chg >= 0 else ""
+            return f"  {r['ticker']:<12} ${r.get('price',0):>10,.4f}  {sign}{chg:.2f}%"
+        lines = (["Top Gainers:"] + [_fmt_row(r) for r in gainers] +
+                 ["\nTop Losers:"]  + [_fmt_row(r) for r in losers])
+        return {"type":"scanner","market":market,"message":f"{market.upper()} Scanner (top 10):\n"+"\n".join(lines),"data":{"rows":top}}
+
+    # ── set cash <amount> ─────────────────────────────────────────────────
+    set_cash_m = _re.match(r"^set cash\s+([\d,]+(?:\.\d+)?)$", msg_lower)
+    if set_cash_m:
+        amount = float(set_cash_m.group(1).replace(",",""))
+        if amount < 1:
+            return {"type":"error","message":"Starting cash must be at least $1."}
+        PAPER_STARTING_CASH = amount
+        _save_paper_config()
+        return {"type":"config","message":f"Starting cash set to ${amount:,.2f}. Reset portfolio to apply.",
+                "data":{"starting_cash":amount}}
+
+    # ── reset [<cash>] ────────────────────────────────────────────────────
+    reset_m = _re.match(r"^reset(?:\s+([\d,]+(?:\.\d+)?))?$", msg_lower)
+    if reset_m:
+        if reset_m.group(1):
+            PAPER_STARTING_CASH = float(reset_m.group(1).replace(",",""))
+            _save_paper_config()
+        PAPER.cash       = PAPER_STARTING_CASH
+        PAPER.positions  = {}
+        PAPER.history    = []
+        PAPER.equity_history = []
+        PAPER.order_id   = 0
+        _save_paper_state()
+        STATE.add_alert("PAPER", f"Portfolio reset to ${PAPER_STARTING_CASH:,.2f} via CLI", "INFO")
+        await WS_MANAGER.broadcast({"type":"PAPER_RESET","data":{"starting_cash":PAPER_STARTING_CASH}})
+        return {"type":"reset","message":f"Portfolio reset to ${PAPER_STARTING_CASH:,.2f} starting cash.",
+                "data":{"starting_cash":PAPER_STARTING_CASH}}
+
+    # ── quadrant ──────────────────────────────────────────────────────────
     if msg_lower in ("quadrant","regime","macro","current quadrant"):
         qdata    = STATE.last_quadrant or _gen_quadrant_data()
         quadrant = qdata.get("quadrant","rising_growth")
@@ -1815,12 +1973,14 @@ async def ai_chat(payload: dict):
             f"  Avoid:  {', '.join(pb['avoid']).replace('_',' ')}"),
             "data": qdata}
 
+    # ── signals ───────────────────────────────────────────────────────────
     if msg_lower in ("signals","top signals","best signals"):
         sigs = await _gen_signals(12)
-        top3 = sigs[:3]
-        lines = [f"  {s['ticker']}: {s['action']} | conf {s['confidence']:.0%} | RSI {s['rsi']}" for s in top3]
-        return {"type":"signals","message":"Top 3 Signals:\n"+"\n".join(lines),"data":top3}
+        top5 = sigs[:5]
+        lines = [f"  {s['ticker']}: {s['action']} | conf {s['confidence']:.0%} | RSI {s['rsi']}" for s in top5]
+        return {"type":"signals","message":"Top 5 Signals:\n"+"\n".join(lines),"data":top5}
 
+    # ── risk ──────────────────────────────────────────────────────────────
     if msg_lower in ("risk","risk assessment","portfolio risk","how am i doing"):
         tickers = list(PAPER.positions.keys())
         prices  = await _prices_for_positions(tickers) if tickers else {}
@@ -1834,14 +1994,15 @@ async def ai_chat(payload: dict):
         aw  = max(0, min(100, int(100 - dev*50)))
         return {"type":"risk","message":(
             f"Dalio Risk Assessment\n"
-            f"  Positions:     {n_pos}/15 (Holy Grail target)\n"
-            f"  Asset classes: {len(set(exc))} ({', '.join(set(exc)).replace('_',' ')})\n"
-            f"  Cash reserve:  {cash_pct:.1f}%\n"
+            f"  Positions:         {n_pos}/15 (Holy Grail target)\n"
+            f"  Asset classes:     {len(set(exc))} ({', '.join(set(exc)).replace('_',' ')})\n"
+            f"  Cash reserve:      {cash_pct:.1f}%\n"
             f"  All Weather Score: {aw}/100\n"
-            f"  Holy Grail met: {'YES' if n_pos>=12 else 'NO -- add uncorrelated assets'}\n\n"
+            f"  Holy Grail met:    {'YES' if n_pos>=12 else 'NO -- add uncorrelated assets'}\n\n"
             f"Rule: 15 uncorrelated streams reduce risk without reducing return."),
             "data":{"n_positions":n_pos,"all_weather_score":aw,"cash_pct":round(cash_pct,1)}}
 
+    # ── analyse <ticker> ──────────────────────────────────────────────────
     analyse_m = _re.match(r"^(analyse|analyze|analysis)\s+(\S+)$", msg_lower)
     if analyse_m:
         tkr   = analyse_m.group(2).upper()
@@ -1853,8 +2014,9 @@ async def ai_chat(payload: dict):
             f"  All Weather: {res['all_weather_score']}/100\n"
             f"  {res['recommendation']}\n"
             f"  Risks: {', '.join(res['risk_flags']) if res['risk_flags'] else 'None'}\n"
-            f"\n" + "\n".join(f"  • {r}" for r in res["reasoning"])),"data":res}
+            f"\n" + "\n".join(f"  * {r}" for r in res["reasoning"])),"data":res}
 
+    # ── buy / sell ────────────────────────────────────────────────────────
     order_m = _re.match(r"^(buy|sell)\s+([\d.]+)\s+(\S+)", msg_lower)
     if order_m:
         side  = order_m.group(1).upper()
@@ -1877,18 +2039,44 @@ async def ai_chat(payload: dict):
         except ValueError as exc:
             return {"type":"error","message":f"Order failed: {exc}"}
 
-    # Free-form fallback
+    # ── free-form fallback ─────────────────────────────────────────────────
     qdata = STATE.last_quadrant or _gen_quadrant_data()
     pb    = QUADRANT_PLAYBOOK.get(qdata.get("quadrant","rising_growth"), QUADRANT_PLAYBOOK["rising_growth"])
     tks   = list(PAPER.positions.keys())
     prc   = await _prices_for_positions(tks) if tks else {}
     total = PAPER.total_value(prc)
     return {"type":"freeform","message":(
-        f"Dalios AI (/help for commands)\n\n"
-        f"You said: \"{message}\"\n\n"
+        f"Dalios AI (type 'help' for commands)\n\n"
+        f"You said: \"{message.strip()}\"\n\n"
         f"Current regime: {qdata.get('label','').upper()}\n"
         f"Portfolio: ${total:,.2f} | Cash: ${PAPER.cash:,.2f} | Positions: {len(PAPER.positions)}\n\n"
         f"Dalio says: {pb['narrative'][:160]}...")}
+
+
+@app.post("/api/ai/chat")
+async def ai_chat(payload: dict):
+    message = (payload.get("message") or "").strip()
+    if not message: raise HTTPException(400, "message required")
+    return await _run_cmd(message)
+
+
+@app.post("/api/cmd")
+async def api_cmd(payload: dict):
+    """AI-agent CLI endpoint — same as /api/ai/chat but always returns structured JSON.
+
+    POST /api/cmd
+    Body: {"cmd": "buy 10 BTC"}  or  {"message": "portfolio"}
+
+    Response always has:
+      type    -- command type (order, portfolio, positions, history, quote,
+                 close, watchlist, scanner, signals, analyse, risk, quadrant,
+                 config, reset, help, error, freeform)
+      message -- human-readable string
+      data    -- structured result (when available)
+    """
+    cmd = (payload.get("cmd") or payload.get("message") or "").strip()
+    if not cmd: raise HTTPException(400, "cmd or message required")
+    return await _run_cmd(cmd)
 
 
 @app.get("/api/paper/portfolio")

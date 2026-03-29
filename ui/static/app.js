@@ -2615,10 +2615,6 @@ function _applyCCPortfolio(d) {
     }
   }
 
-  // Push activity entry for a portfolio refresh
-  if (d.positions && d.positions.length) {
-    pushActivityItem('◈', `Portfolio live: ${d.open_count} open | ${fmt$(d.total_value)} NAV`, 'info');
-  }
 }
 
 function _applyCCHistory(d) {

@@ -1863,9 +1863,8 @@ canvas { display: block; max-width: 100%; }
   gap: 12px;
 }
 .panel--paper-order    { grid-column: 1;      grid-row: 1; }
-.panel--paper-summary  { grid-column: 2;      grid-row: 1 / span 2; }
-/* Signals spans full width as its own row */
-.panel--paper-signals  { grid-column: 1 / -1; grid-row: 2; min-height: 340px; }
+.panel--paper-summary  { grid-column: 2;      grid-row: 1; }   /* no span — signals owns row 2 */
+.panel--paper-signals  { grid-column: 1 / -1; grid-row: 2; min-height: 300px; }
 .panel--paper-history  { grid-column: 1 / -1; grid-row: 3; }
 
 /* ─── Order Form ─── */
