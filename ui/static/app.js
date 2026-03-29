@@ -373,15 +373,18 @@ async function initSignalOps() {
 }
 
 async function loadSignals() {
+  const grid = el('signalGrid');
+  if (!grid) return;
   setEl('signalCount', '⌛ SCANNING...');
-  el('signalGrid').innerHTML = `<div class="signal-loading"><div class="loading-spinner"></div><span>SCANNING UNIVERSE...</span></div>`;
+  grid.innerHTML = `<div class="signal-loading"><div class="loading-spinner"></div><span>SCANNING UNIVERSE...</span></div>`;
   try {
     const d = await fetchJSON('/api/signals');
     STATE.signals = d.signals || [];
     renderSignalGrid(STATE.signals);
     renderOpportunities(d.new_opportunities || []);
   } catch (e) {
-    el('signalGrid').innerHTML = `<div class="signal-loading"><span>SCAN ERROR</span></div>`;
+    grid.innerHTML = `<div class="signal-loading"><span>⚠ SCAN ERROR — ${e.message || 'server unreachable'}</span></div>`;
+    setEl('signalCount', '0 SIGNALS');
   }
 }
 
@@ -1428,7 +1431,7 @@ async function connectAlpaca() {
 // Actions
 // ═══════════════════════════════════════════════════════════
 
-// Single RUN CYCLE handler — lives next to SCAN NOW in Signal Ops
+// RUN CYCLE — triggers full agent cycle then refreshes signals
 async function triggerCycle() {
   const btn = el('runCycleBtn');
   if (btn) { btn.disabled = true; btn.textContent = '⌛ RUNNING...'; }
@@ -1438,14 +1441,11 @@ async function triggerCycle() {
     pushAlert('CYCLE', 'Manual cycle triggered', 'info');
     pushActivityItem('▶', 'Cycle triggered from Signal Ops', 'info');
   } catch (e) {
-    pushAlert('ERROR', `Cycle failed: ${e.message}`, 'warning');
+    pushAlert('ERROR', `Cycle failed: ${e.message || 'server unreachable'}`, 'warning');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '▶ RUN CYCLE'; }
   }
 }
-
-// Alias kept for any legacy references
-const triggerCycleSignal = triggerCycle;
 
 async function testNotification(channel) {
   try {

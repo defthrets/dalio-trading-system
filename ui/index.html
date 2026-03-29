@@ -452,7 +452,7 @@
               </select>
             </div>
             <button class="btn-primary" onclick="loadSignals()">⚡ SCAN NOW</button>
-            <button class="btn-primary btn--sm" onclick="triggerCycleSignal()" id="runCycleBtn" style="margin-left:6px">▶ RUN CYCLE</button>
+            <button class="btn-primary btn--sm" onclick="triggerCycle()" id="runCycleBtn" style="margin-left:6px">▶ RUN CYCLE</button>
           </div>
         </div>
 
@@ -1981,35 +1981,6 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════
-       CLI — AI INTERACTION BAR (fixed bottom)
-  ═══════════════════════════════════════════════ -->
-  <div class="cli-bar" id="cliBar">
-    <div class="cli-header" onclick="toggleCli()">
-      <span class="cli-title">
-        <span class="cli-icon">▶_</span>
-        DALIOS AI TERMINAL
-      </span>
-      <div class="cli-header-right">
-        <span class="cli-hint" id="cliHint">Type a command or question — try: <em>buy 10 BHP.AX</em>, <em>analyse TSLA</em>, <em>portfolio</em>, <em>risk</em></span>
-        <button class="cli-toggle-btn" id="cliToggleBtn" title="Expand / collapse terminal">▲</button>
-      </div>
-    </div>
-    <div class="cli-body" id="cliBody">
-      <div class="cli-output" id="cliOutput">
-        <div class="cli-msg cli-msg--system">DALIOS AI TERMINAL v2.0 — AI Agent &amp; Human CLI<br>
-        <span class="cli-cmd-hint">buy &lt;qty&gt; &lt;ticker&gt;</span> · <span class="cli-cmd-hint">sell &lt;qty&gt; &lt;ticker&gt;</span> · <span class="cli-cmd-hint">close &lt;ticker&gt;</span> · <span class="cli-cmd-hint">portfolio</span> · <span class="cli-cmd-hint">positions</span> · <span class="cli-cmd-hint">history [n]</span> · <span class="cli-cmd-hint">quote &lt;ticker&gt;</span><br>
-        <span class="cli-cmd-hint">watchlist</span> · <span class="cli-cmd-hint">watchlist add/remove &lt;ticker&gt;</span> · <span class="cli-cmd-hint">scanner asx/crypto/commodities</span> · <span class="cli-cmd-hint">suggest [n]</span> · <span class="cli-cmd-hint">signals</span> · <span class="cli-cmd-hint">analyse &lt;ticker&gt;</span> · <span class="cli-cmd-hint">risk</span> · <span class="cli-cmd-hint">quadrant</span> · <span class="cli-cmd-hint">reset</span> · <span class="cli-cmd-hint">set cash &lt;n&gt;</span> · <span class="cli-cmd-hint">help</span><br>
-        AI agent endpoint: <span class="cli-cmd-hint">POST /api/cmd  {"cmd": "..."}</span></div>
-      </div>
-      <div class="cli-input-row">
-        <span class="cli-prompt">DALIOS&gt;</span>
-        <input type="text" id="cliInput" class="cli-input" placeholder="Enter command or ask a question..." autocomplete="off" spellcheck="false"
-          onkeydown="onCliKey(event)"/>
-        <button class="cli-send-btn" onclick="sendCliCommand()">SEND ↵</button>
-      </div>
-    </div>
-  </div>
 
   <!-- Strong signal overlay banner (inside body, fixed) -->
   <div id="strongSignalBanner" class="strong-signal-banner hidden">
