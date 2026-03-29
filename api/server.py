@@ -981,16 +981,39 @@ def _gen_price_history_demo(price: float, trend: str, n_points: int = 30) -> lis
 
 
 async def _gen_signals(n: int = 12) -> list[dict]:
-    """Generate trade signals -- uses real yfinance prices only. Skips tickers with no live data."""
-    candidates = random.sample(ALL_TICKERS, min(n * 3, len(ALL_TICKERS)))
-    # Fetch real prices (capped to avoid very long API calls)
-    prices_map = await _get_prices(candidates[:30], "3mo")
+    """
+    Generate trade signals from real yfinance price data.
+    Pulls from scanner cache first (free), then fetches fresh for uncached tickers.
+    """
+    # ── Seed candidate pool from scanner cache (already fetched) ──────────
+    cached_tickers: list = []
+    for mkt in ("asx", "crypto", "commodities"):
+        cached = _scanner_cache.get(mkt)
+        if cached:
+            cached_tickers.extend(r["ticker"] for r in cached["rows"] if r.get("price", 0) > 0)
+
+    # Mix cached tickers with a fresh random sample
+    random_sample = random.sample(ALL_TICKERS, min(n * 2, len(ALL_TICKERS)))
+    candidates = list(dict.fromkeys(cached_tickers + random_sample))  # dedup, preserve order
+    candidates = candidates[:n * 4]
+
+    # ── Fetch 3-month price history ───────────────────────────────────────
+    prices_map = await _get_prices(candidates[:40], "3mo") or {}
+
+    # Also pull single-day prices from scanner cache for RSI seed
+    cache_prices: dict = {}
+    for mkt in ("asx", "crypto", "commodities"):
+        cached = _scanner_cache.get(mkt)
+        if cached:
+            for r in cached["rows"]:
+                if r.get("price", 0) > 0:
+                    cache_prices[r["ticker"]] = r["price"]
 
     signals = []
     for ticker in candidates:
-        closes = prices_map.get(ticker) if prices_map else None
-        # Skip tickers with no live data — no DEMO fallback
-        if not closes or len(closes) < 20:
+        closes = prices_map.get(ticker)
+        # Require at least 10 data points (was 20 — was too strict)
+        if not closes or len(closes) < 10:
             continue
 
         price  = round(closes[-1], 4 if "USD" in ticker else 2)
@@ -1359,59 +1382,218 @@ def _gen_quadrant_data() -> dict:
     }
 
 
-def _gen_sentiment_data() -> dict:
-    total = random.randint(55, 140)
-    conflict = random.randint(0, 9)
+# ─── Real Financial News RSS Feeds ─────────────────────────────────────────
+_NEWS_RSS_FEEDS = [
+    ("Reuters Business",   "https://feeds.reuters.com/reuters/businessNews"),
+    ("Reuters Markets",    "https://feeds.reuters.com/reuters/UKmarkets"),
+    ("Yahoo Finance",      "https://finance.yahoo.com/news/rssindex"),
+    ("MarketWatch",        "https://feeds.marketwatch.com/marketwatch/topstories/"),
+    ("CNBC Finance",       "https://www.cnbc.com/id/10000664/device/rss/rss.html"),
+    ("Investing.com",      "https://www.investing.com/rss/news_25.rss"),
+    ("Seeking Alpha",      "https://seekingalpha.com/market_currents.xml"),
+    ("AFR",                "https://www.afr.com/rss/feed/latest"),
+    ("ABC Finance AU",     "https://www.abc.net.au/news/feed/1399786/rss.xml"),
+    ("FT Markets",         "https://www.ft.com/rss/home/uk"),
+    ("Bloomberg Mkts",     "https://feeds.bloomberg.com/markets/news.rss"),
+    ("WSJ Markets",        "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"),
+]
+
+_BULLISH_WORDS  = {"rally","surge","gain","high","record","beat","growth","rise","up","profit",
+                   "positive","strong","outperform","buy","upgrade","bullish","recovery","soar"}
+_BEARISH_WORDS  = {"fall","drop","crash","low","miss","recession","down","loss","negative","weak",
+                   "risk","warning","downgrade","sell","bearish","slump","plunge","cut","concern"}
+_CONFLICT_WORDS = {"war","conflict","military","sanctions","attack","threat","crisis","invasion",
+                   "strike","bomb","weapons","troops","geopolit"}
+_INFLATION_KW   = {"inflation","cpi","pce","rates","fed","rba","boe","ecb","oil","energy",
+                   "commodit","gold","silver","copper","wheat","supply"}
+_GROWTH_KW      = {"gdp","jobs","employment","payroll","earnings","revenue","ism","pmi",
+                   "retail","consumer","spending","trade","export","import"}
+_DEFLAT_KW      = {"deflation","disinflation","rate cut","pivot","quantitative","qe","stimulus"}
+
+
+def _score_headline(title: str, body: str = "") -> dict:
+    """Classify a headline into Dalio quadrant + sentiment using keyword scoring."""
+    text = (title + " " + body).lower()
+    words = set(text.replace(",", " ").replace(".", " ").split())
+
+    bull  = len(words & _BULLISH_WORDS)
+    bear  = len(words & _BEARISH_WORDS)
+    conf  = len(words & _CONFLICT_WORDS)
+    infl  = len(words & _INFLATION_KW)
+    grow  = len(words & _GROWTH_KW)
+    defl  = len(words & _DEFLAT_KW)
+
+    # Sentiment
+    if bull > bear + 1:
+        sentiment = "positive"
+    elif bear > bull + 1:
+        sentiment = "negative"
+    else:
+        sentiment = "neutral"
+
+    # Quadrant
+    if infl >= grow and infl >= defl:
+        quadrant = "rising_inflation" if bull >= bear else "falling_inflation"
+    elif defl > infl:
+        quadrant = "falling_inflation"
+    elif grow > 0 and bull >= bear:
+        quadrant = "rising_growth"
+    else:
+        quadrant = "falling_growth"
+
     return {
-        "total_articles": total,
-        "conflict_risk_articles": conflict,
-        "conflict_risk_elevated": conflict >= 6,
-        "dominant_quadrant": random.choice(list(QUADRANT_META.keys())),
-        "quadrant_sentiment": {
-            q: {
-                "avg_score": round(random.uniform(-0.4, 0.6), 3),
-                "article_count": random.randint(5, 40),
-                "bullish_pct": round(random.uniform(20, 80), 1),
-            }
-            for q in QUADRANT_META
-        },
-        "top_headlines": _gen_headlines(),
-        "timestamp": datetime.utcnow().isoformat(),
+        "sentiment":     sentiment,
+        "quadrant":      quadrant,
+        "conflict_risk": conf > 0,
+        "bull_score":    bull,
+        "bear_score":    bear,
     }
 
 
-HEADLINE_POOL = [
-    ("Fed signals pause in rate hikes amid cooling inflation", "rising_growth", "positive"),
-    ("RBA holds rates as Australian GDP surprises to upside", "rising_growth", "positive"),
-    ("Oil surges 4% on Middle East supply disruption fears", "rising_inflation", "negative"),
-    ("BHP reports record iron ore shipments, ASX rallies", "rising_growth", "positive"),
-    ("China manufacturing PMI contracts for third straight month", "falling_growth", "negative"),
-    ("Gold hits 3-month high as USD weakens on jobs data miss", "rising_inflation", "positive"),
-    ("Military conflict escalates in Eastern Europe, safe havens bid", "rising_inflation", "negative"),
-    ("US CPI drops to 2.4%, markets price in rate cuts", "falling_inflation", "positive"),
-    ("Tech layoffs accelerate, NASDAQ futures lower", "falling_growth", "negative"),
-    ("OPEC+ announces surprise production cut of 500k bpd", "rising_inflation", "neutral"),
-    ("ASX 200 closes at 5-year high on earnings season beat", "rising_growth", "positive"),
-    ("Copper prices plunge on weak Chinese demand outlook", "falling_growth", "negative"),
-    ("Wheat prices spike amid Black Sea shipping disruptions", "rising_inflation", "negative"),
-    ("Australian dollar rallies as trade surplus widens", "rising_growth", "positive"),
-    ("Silver ETF inflows surge as inflation expectations rise", "rising_inflation", "positive"),
+async def _fetch_real_news() -> list[dict]:
+    """
+    Fetch ALL available articles from financial RSS feeds.
+    Returns headlines scored by Dalio quadrant + sentiment.
+    Falls back to HEADLINE_POOL if all feeds fail.
+    """
+    loop = asyncio.get_event_loop()
+    articles: list[dict] = []
+
+    def _parse_one_feed(feed_name: str, url: str) -> list[dict]:
+        try:
+            import feedparser
+            feed = feedparser.parse(url)
+            items = []
+            for entry in feed.entries:
+                title = (getattr(entry, "title", "") or "").strip()
+                if not title or len(title) < 15:
+                    continue
+                body  = (getattr(entry, "summary", "") or "")[:400]
+                score = _score_headline(title, body)
+                items.append({
+                    "title":        title,
+                    "source":       feed_name,
+                    "sentiment":    score["sentiment"],
+                    "quadrant":     score["quadrant"],
+                    "conflict_risk": score["conflict_risk"],
+                    "bull_score":   score["bull_score"],
+                    "bear_score":   score["bear_score"],
+                    "timestamp":    datetime.utcnow().isoformat(),
+                })
+            return items
+        except Exception as exc:
+            logger.debug(f"RSS [{feed_name}] failed: {exc}")
+            return []
+
+    futures = [
+        loop.run_in_executor(None, _parse_one_feed, name, url)
+        for name, url in _NEWS_RSS_FEEDS
+    ]
+    results = await asyncio.gather(*futures)
+    for batch in results:
+        articles.extend(batch)
+
+    if not articles:
+        logger.warning("All RSS feeds failed — using static headline pool")
+        articles = _gen_static_headlines()
+
+    # Deduplicate by title prefix
+    seen: set = set()
+    unique: list = []
+    for a in articles:
+        key = a["title"][:60].lower()
+        if key not in seen:
+            seen.add(key)
+            unique.append(a)
+
+    # Sort: conflict first, then by sentiment extremity
+    unique.sort(key=lambda h: (h["conflict_risk"], abs(h["bull_score"] - h["bear_score"])), reverse=True)
+    logger.info(f"News scan: {len(unique)} unique articles from {len(_NEWS_RSS_FEEDS)} feeds")
+    return unique
+
+
+# Fallback static headlines (used only when all RSS feeds fail)
+_STATIC_HEADLINE_POOL = [
+    ("Fed signals pause in rate hikes amid cooling inflation",       "rising_growth",    "positive"),
+    ("RBA holds rates as Australian GDP surprises to upside",        "rising_growth",    "positive"),
+    ("Oil surges 4% on Middle East supply disruption fears",         "rising_inflation", "negative"),
+    ("BHP reports record iron ore shipments, ASX rallies",           "rising_growth",    "positive"),
+    ("China manufacturing PMI contracts for third straight month",   "falling_growth",   "negative"),
+    ("Gold hits 3-month high as USD weakens on jobs data miss",      "rising_inflation", "positive"),
+    ("Military conflict escalates in Eastern Europe, safe havens bid","rising_inflation","negative"),
+    ("US CPI drops to 2.4%, markets price in rate cuts",             "falling_inflation","positive"),
+    ("Tech layoffs accelerate, NASDAQ futures lower",                "falling_growth",   "negative"),
+    ("OPEC+ announces surprise production cut of 500k bpd",          "rising_inflation", "neutral"),
+    ("ASX 200 closes at 5-year high on earnings season beat",        "rising_growth",    "positive"),
+    ("Copper prices plunge on weak Chinese demand outlook",          "falling_growth",   "negative"),
+    ("Wheat prices spike amid Black Sea shipping disruptions",       "rising_inflation", "negative"),
+    ("Australian dollar rallies as trade surplus widens",            "rising_growth",    "positive"),
+    ("Silver ETF inflows surge as inflation expectations rise",      "rising_inflation", "positive"),
+    ("US 10-year yield falls as economic data disappoints",          "falling_growth",   "negative"),
+    ("Amazon, Alphabet earnings beat; tech sector rallies",         "rising_growth",    "positive"),
+    ("Iron ore falls on Chinese property sector concerns",           "falling_growth",   "negative"),
+    ("TIPS inflows accelerate as breakeven inflation widens",        "rising_inflation", "neutral"),
+    ("S&P 500 hits fresh record as rate cut hopes persist",         "rising_growth",    "positive"),
 ]
 
 
-def _gen_headlines(n: int = 20) -> list[dict]:
-    selected = random.sample(HEADLINE_POOL, min(n, len(HEADLINE_POOL)))
+def _gen_static_headlines() -> list[dict]:
+    """Return ALL static headlines (no random sampling)."""
     return [
         {
-            "title": h[0],
-            "quadrant": h[1],
-            "sentiment": h[2],
-            "source": random.choice(["Reuters", "Bloomberg", "AFR", "WSJ", "FT"]),
-            "timestamp": datetime.utcnow().isoformat(),
+            "title":        h[0],
+            "quadrant":     h[1],
+            "sentiment":    h[2],
+            "source":       "Market Intelligence",
+            "timestamp":    datetime.utcnow().isoformat(),
             "conflict_risk": "military" in h[0].lower() or "conflict" in h[0].lower(),
+            "bull_score":   1 if h[2] == "positive" else 0,
+            "bear_score":   1 if h[2] == "negative" else 0,
         }
-        for h in selected
+        for h in _STATIC_HEADLINE_POOL
     ]
+
+
+async def _gen_sentiment_data() -> dict:
+    """Build sentiment data from real RSS news. All articles shown — no random sampling."""
+    from collections import defaultdict
+
+    articles = await _fetch_real_news()
+
+    total    = len(articles)
+    conflict = sum(1 for a in articles if a["conflict_risk"])
+
+    # Per-quadrant stats
+    q_counts: dict = defaultdict(lambda: {"count": 0, "bull": 0, "bear": 0})
+    for a in articles:
+        q = a["quadrant"]
+        q_counts[q]["count"] += 1
+        if a["sentiment"] == "positive":
+            q_counts[q]["bull"] += 1
+        elif a["sentiment"] == "negative":
+            q_counts[q]["bear"] += 1
+
+    quadrant_sentiment: dict = {}
+    for q in QUADRANT_META:
+        s = q_counts[q]
+        c = max(s["count"], 1)
+        quadrant_sentiment[q] = {
+            "avg_score":    round((s["bull"] - s["bear"]) / c, 3),
+            "article_count": s["count"],
+            "bullish_pct":  round(s["bull"] / c * 100, 1),
+        }
+
+    dominant = max(quadrant_sentiment, key=lambda q: quadrant_sentiment[q]["article_count"])
+
+    return {
+        "total_articles":          total,
+        "conflict_risk_articles":  conflict,
+        "conflict_risk_elevated":  conflict >= max(3, int(total * 0.08)),
+        "dominant_quadrant":       dominant,
+        "quadrant_sentiment":      quadrant_sentiment,
+        "top_headlines":           articles,   # ALL articles, no cap
+        "timestamp":               datetime.utcnow().isoformat(),
+    }
 
 
 def _gen_correlation_matrix_demo() -> dict:
@@ -1613,7 +1795,7 @@ async def get_sentiment():
     cached = _SENTIMENT_CACHE.get("data")
     if cached and (_t.time() - _SENTIMENT_CACHE.get("ts", 0)) < _SENTIMENT_TTL:
         return cached
-    data = _gen_sentiment_data()
+    data = await _gen_sentiment_data()
     STATE.last_sentiment = data
     _SENTIMENT_CACHE["data"] = data
     _SENTIMENT_CACHE["ts"] = _t.time()
@@ -2568,59 +2750,103 @@ def _fmt_vol(v) -> str:
 
 
 async def _scan_yfinance(tickers: list, market: str) -> list:
-    """Bulk-download 2-day OHLCV via yfinance for non-crypto markets."""
+    """
+    Fetch OHLCV for non-crypto markets.
+    Strategy: bulk yf.download first (fast), then individual Ticker.history() fallback
+    for any ticker that bulk missed — handles new yfinance multi-index DataFrame format.
+    """
     import yfinance as yf
     loop = asyncio.get_event_loop()
+    results: dict = {}   # ticker -> (price, change_pct, volume)
 
-    def _download():
-        # download 5 days (covers weekends/holidays) for all tickers at once
-        raw = yf.download(
-            tickers,
-            period="5d",
-            interval="1d",
-            group_by="ticker",
-            auto_adjust=True,
-            progress=False,
-            threads=True,
-        )
-        return raw
-
-    try:
-        raw = await loop.run_in_executor(None, _download)
-    except Exception as e:
-        logger.warning(f"yfinance bulk download failed: {e}")
-        return []
-
-    rows = []
-    # raw can be multi-level (ticker/col) or single-level when only 1 ticker
-    multi = len(tickers) > 1
-
-    for ticker in tickers:
-        meta = _ASSET_META.get(ticker, {"name": ticker, "cat": "--", "sector": "--"})
+    # ── 1. Bulk download attempt ──────────────────────────────────────────
+    def _bulk():
         try:
-            df = raw[ticker] if multi else raw
-            df = df.dropna(subset=["Close"])
-            if len(df) < 2:
-                raise ValueError("insufficient rows")
-            price = float(df["Close"].iloc[-1])
-            prev  = float(df["Close"].iloc[-2])
-            chg   = price - prev
-            chg_pct = (chg / prev * 100) if prev else 0
-            vol   = float(df["Volume"].iloc[-1]) if "Volume" in df.columns else 0
-        except Exception:
-            price, chg, chg_pct, vol = 0.0, 0.0, 0.0, 0.0
+            raw = yf.download(
+                tickers, period="5d", interval="1d",
+                group_by="ticker", auto_adjust=True,
+                progress=False, threads=True,
+            )
+            return raw
+        except Exception as exc:
+            logger.warning(f"yfinance bulk failed [{market}]: {exc}")
+            return None
 
+    raw = await loop.run_in_executor(None, _bulk)
+
+    if raw is not None and not raw.empty:
+        multi = len(tickers) > 1
+        for ticker in tickers:
+            try:
+                if multi:
+                    # yfinance ≥0.2 uses MultiIndex columns: (field, ticker)
+                    if hasattr(raw.columns, "levels"):
+                        if ticker in raw.columns.get_level_values(1):
+                            df = raw.xs(ticker, axis=1, level=1).dropna(subset=["Close"])
+                        elif ticker in raw.columns.get_level_values(0):
+                            df = raw[ticker].dropna(subset=["Close"])
+                        else:
+                            continue
+                    else:
+                        df = raw[ticker].dropna(subset=["Close"])
+                else:
+                    df = raw.dropna(subset=["Close"])
+
+                if len(df) < 2:
+                    continue
+                price   = float(df["Close"].iloc[-1])
+                prev    = float(df["Close"].iloc[-2])
+                chg_pct = (price - prev) / prev * 100 if prev else 0
+                vol     = float(df["Volume"].iloc[-1]) if "Volume" in df.columns else 0
+                results[ticker] = (price, chg_pct, vol)
+            except Exception as exc:
+                logger.debug(f"Bulk parse [{ticker}]: {exc}")
+
+    # ── 2. Individual fallback for tickers bulk missed ────────────────────
+    missing = [t for t in tickers if t not in results]
+    if missing:
+        logger.info(f"[{market}] individual fallback for {len(missing)} tickers")
+
+        def _fetch_one(tkr):
+            try:
+                hist = yf.Ticker(tkr).history(period="5d", interval="1d", auto_adjust=True)
+                hist = hist.dropna(subset=["Close"])
+                if len(hist) < 2:
+                    return None
+                price   = float(hist["Close"].iloc[-1])
+                prev    = float(hist["Close"].iloc[-2])
+                chg_pct = (price - prev) / prev * 100 if prev else 0
+                vol     = float(hist["Volume"].iloc[-1]) if "Volume" in hist.columns else 0
+                return (price, chg_pct, vol)
+            except Exception:
+                return None
+
+        futures = [loop.run_in_executor(None, _fetch_one, t) for t in missing]
+        ind_results = await asyncio.gather(*futures)
+        for ticker, val in zip(missing, ind_results):
+            if val is not None:
+                results[ticker] = val
+
+    # ── 3. Build rows ─────────────────────────────────────────────────────
+    rows = []
+    for ticker in tickers:
+        meta = _ASSET_META.get(ticker, {"name": ticker, "sector": "--"})
+        if ticker not in results:
+            continue   # skip tickers with no data at all
+        price, chg_pct, vol = results[ticker]
         rows.append({
-            "ticker":     ticker,
-            "name":       meta.get("name", ticker),
-            "sector":     meta.get("sector", "--"),
-            "price":      round(price, 4),
-            "change":     round(chg, 4),
-            "change_pct": round(chg_pct, 2),
-            "volume_fmt": _fmt_vol(vol),
-            "volume":     int(vol),
+            "ticker":       ticker,
+            "name":         meta.get("name", ticker),
+            "sector":       meta.get("sector", "--"),
+            "price":        round(price, 4),
+            "change":       round(price * chg_pct / 100, 4),
+            "change_pct":   round(chg_pct, 2),
+            "volume_fmt":   _fmt_vol(vol),
+            "volume":       int(vol),
             "in_watchlist": ticker in WATCHLIST,
         })
+
+    logger.info(f"yfinance [{market}]: {len(rows)}/{len(tickers)} tickers")
     return rows
 
 
@@ -2670,11 +2896,13 @@ _CG_SYMBOL_MAP: dict = {
 
 
 async def _scan_coingecko(tickers: list) -> list:
-    """Fetch crypto prices from CoinGecko free API (no key required)."""
-    import urllib.request, json as _json
+    """
+    Fetch crypto prices: CoinGecko free API first, yfinance fallback for missed tickers.
+    Uses aiohttp for proper async HTTP (no blocking urllib on the event loop).
+    """
+    import aiohttp
 
-    # Build id list from our symbol map
-    cg_ids  = []
+    cg_ids: list = []
     id_to_ticker: dict = {}
     for t in tickers:
         cg_id = _CG_SYMBOL_MAP.get(t)
@@ -2682,67 +2910,77 @@ async def _scan_coingecko(tickers: list) -> list:
             cg_ids.append(cg_id)
             id_to_ticker[cg_id] = t
 
-    if not cg_ids:
-        return []
+    all_coin_data: dict = {}
 
-    # Fetch in pages of 250
-    all_data: dict = {}
-    loop = asyncio.get_event_loop()
-
-    def _fetch_page(ids_chunk):
-        url = (
-            "https://api.coingecko.com/api/v3/coins/markets"
-            f"?vs_currency=usd&ids={','.join(ids_chunk)}"
-            "&order=market_cap_desc&per_page=250&page=1"
-            "&price_change_percentage=24h&sparkline=false"
-        )
+    # ── CoinGecko API (async aiohttp) ─────────────────────────────────────
+    if cg_ids:
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "DALIOS/1.0"})
-            with urllib.request.urlopen(req, timeout=15) as r:
-                return _json.loads(r.read().decode())
-        except Exception as e:
-            logger.warning(f"CoinGecko fetch failed: {e}")
-            return []
+            connector = aiohttp.TCPConnector(ssl=False, limit=5)
+            timeout   = aiohttp.ClientTimeout(total=20)
+            headers   = {"User-Agent": "DALIOS/1.0", "Accept": "application/json"}
+            async with aiohttp.ClientSession(connector=connector, timeout=timeout, headers=headers) as session:
+                chunk_size = 100
+                for i in range(0, len(cg_ids), chunk_size):
+                    chunk = cg_ids[i:i + chunk_size]
+                    url = (
+                        "https://api.coingecko.com/api/v3/coins/markets"
+                        f"?vs_currency=usd&ids={','.join(chunk)}"
+                        "&order=market_cap_desc&per_page=250&page=1"
+                        "&price_change_percentage=24h&sparkline=false"
+                    )
+                    try:
+                        async with session.get(url) as resp:
+                            if resp.status == 200:
+                                data = await resp.json(content_type=None)
+                                for coin in data:
+                                    all_coin_data[coin["id"]] = coin
+                            elif resp.status == 429:
+                                logger.warning("CoinGecko rate-limited (429) — using yfinance fallback")
+                                break
+                            else:
+                                logger.warning(f"CoinGecko HTTP {resp.status}")
+                    except Exception as exc:
+                        logger.warning(f"CoinGecko chunk error: {exc}")
+        except Exception as exc:
+            logger.warning(f"CoinGecko session error: {exc}")
 
-    chunk_size = 100
-    for i in range(0, len(cg_ids), chunk_size):
-        chunk = cg_ids[i:i+chunk_size]
-        data  = await loop.run_in_executor(None, _fetch_page, chunk)
-        for coin in data:
-            all_data[coin["id"]] = coin
-
+    # ── Build rows from CoinGecko ─────────────────────────────────────────
     rows = []
-    for cg_id in cg_ids:
-        ticker = id_to_ticker[cg_id]
-        coin   = all_data.get(cg_id, {})
-        price     = float(coin.get("current_price") or 0)
-        chg_pct   = float(coin.get("price_change_percentage_24h") or 0)
-        chg       = price * chg_pct / 100 if price else 0
-        vol       = float(coin.get("total_volume") or 0)
-        mkt_cap   = float(coin.get("market_cap") or 0)
-        name      = coin.get("name", ticker.replace("-USD",""))
+    found_tickers: set = set()
+
+    for cg_id, ticker in id_to_ticker.items():
+        coin = all_coin_data.get(cg_id, {})
+        price = float(coin.get("current_price") or 0)
+        if price <= 0:
+            continue
+        found_tickers.add(ticker)
+        chg_pct  = float(coin.get("price_change_percentage_24h") or 0)
+        vol      = float(coin.get("total_volume") or 0)
+        mkt_cap  = float(coin.get("market_cap") or 0)
         rows.append({
-            "ticker":     ticker,
-            "name":       name,
-            "sector":     "Crypto",
-            "price":      round(price, 6) if price < 1 else round(price, 2),
-            "change":     round(chg, 6),
-            "change_pct": round(chg_pct, 2),
-            "volume_fmt": _fmt_vol(vol),
-            "volume":     int(vol),
-            "market_cap_fmt": _fmt_vol(mkt_cap),
-            "in_watchlist": ticker in WATCHLIST,
+            "ticker":          ticker,
+            "name":            coin.get("name", ticker.replace("-USD", "")),
+            "sector":          "Crypto",
+            "price":           round(price, 6) if price < 1 else round(price, 2),
+            "change":          round(price * chg_pct / 100, 6),
+            "change_pct":      round(chg_pct, 2),
+            "volume_fmt":      _fmt_vol(vol),
+            "volume":          int(vol),
+            "market_cap_fmt":  _fmt_vol(mkt_cap),
+            "in_watchlist":    ticker in WATCHLIST,
         })
-    # Tickers not found in CoinGecko -- return zeroed rows
-    found = {r["ticker"] for r in rows}
-    for t in tickers:
-        if t not in found:
-            rows.append({
-                "ticker": t, "name": t.replace("-USD",""), "sector": "Crypto",
-                "price": 0, "change": 0, "change_pct": 0,
-                "volume_fmt": "--", "volume": 0, "market_cap_fmt": "--",
-                "in_watchlist": t in WATCHLIST,
-            })
+
+    # ── yfinance fallback for tickers CoinGecko missed ────────────────────
+    missing = [t for t in tickers if t not in found_tickers]
+    if missing:
+        logger.info(f"CoinGecko missed {len(missing)} tickers — yfinance fallback")
+        yf_rows = await _scan_yfinance(missing, "crypto")
+        for r in yf_rows:
+            r.setdefault("market_cap_fmt", "--")
+            r["sector"] = "Crypto"
+            rows.append(r)
+
+    logger.info(f"Crypto scan: {len(found_tickers)} CoinGecko + {len(missing)} yfinance = {len(rows)} rows")
     return rows
 
 
