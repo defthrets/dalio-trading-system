@@ -73,7 +73,7 @@ function initTabs() {
       btn.classList.add('active');
       document.getElementById(`tab-${id}`).classList.add('active');
       // Lazy-load tab data
-      if (id === 'signal-ops')           loadSignals();
+      if (id === 'signal-ops')           initSignalOps();
       if (id === 'intel-center')         loadSentiment();
       if (id === 'holy-grail')           loadCorrelation();
       if (id === 'risk-matrix')          loadHealth();
@@ -352,6 +352,26 @@ function applyQuadrant(d) {
 }
 
 // ─── Signals ──────────────────────────────────────────────
+async function initSignalOps() {
+  // Run signals scan + seed scanner cache in parallel so opportunities populate
+  const oppList = el('opportunityList');
+  if (oppList) oppList.innerHTML = '<div style="padding:14px;color:var(--text-muted);font-size:10px;line-height:1.8">⟳ WARMING UP SCANNERS…<br><span style="opacity:.6">Fetching ASX, Crypto &amp; Commodities data for opportunity engine…</span></div>';
+
+  // Fire all three market scans in background to seed the cache
+  const seedCache = async () => {
+    await Promise.allSettled([
+      fetchJSON('/api/markets/asx').catch(() => {}),
+      fetchJSON('/api/markets/crypto').catch(() => {}),
+      fetchJSON('/api/markets/commodities').catch(() => {}),
+    ]);
+    // Once cache is warm, load opportunities
+    loadSuggestOpportunities(10);
+  };
+
+  // Run signals and cache seeding in parallel
+  await Promise.all([loadSignals(), seedCache()]);
+}
+
 async function loadSignals() {
   setEl('signalCount', '⌛ SCANNING...');
   el('signalGrid').innerHTML = `<div class="signal-loading"><div class="loading-spinner"></div><span>SCANNING UNIVERSE...</span></div>`;
