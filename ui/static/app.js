@@ -284,11 +284,29 @@ function applyHealth(d) {
   setWidth('cbDailyBar',    Math.min(Math.abs(dailyPct) / 2 * 100, 100));
   setWidth('cbDrawdownBar', Math.min(ddPct / 10 * 100, 100));
 
-  // Risk matrix metrics
-  setEl('rm-sharpe',   d.sharpe_ratio?.toFixed(2) ?? '--');
-  setEl('rm-nav',      fmt$(d.equity));
-  setEl('rm-totalret', (d.total_return_pct >= 0 ? '+' : '') + d.total_return_pct?.toFixed(2) + '%');
-  setEl('rm-maxdd',    `-${ddPct.toFixed(2)}%`);
+  // Risk matrix metrics with plain-English descriptions
+  const sh2   = d.sharpe_ratio ?? 0;
+  const ret2  = d.total_return_pct ?? 0;
+  setEl('rm-sharpe',      sh2.toFixed(2));
+  setEl('rm-sharpe-desc', sh2 >= 2 ? '✓ Excellent — great risk-adj. return' : sh2 >= 1 ? '✓ Good — solid performance' : sh2 >= 0 ? '⚠ Average — room to improve' : '✗ Below average');
+  setEl('rm-nav',         fmt$(d.equity));
+  setEl('rm-totalret',    (ret2 >= 0 ? '+' : '') + ret2.toFixed(2) + '%');
+  setEl('rm-maxdd',       ddPct.toFixed(2) + '%');
+  setEl('rm-maxdd-desc',  ddPct > 9 ? '✗ CRITICAL — near circuit breaker limit' : ddPct > 5 ? '⚠ Warning — significant drawdown' : '✓ Within safe limits (<10%)');
+
+  // Overall risk score badge (0-100)
+  const riskScore = Math.max(0, Math.min(100, Math.round(
+    (sh2 >= 1 ? 30 : sh2 >= 0 ? 15 : 0) +
+    (ddPct < 5 ? 30 : ddPct < 10 ? 15 : 0) +
+    (ret2 > 0 ? 25 : ret2 > -5 ? 10 : 0) +
+    (d.dalio_diversification_met ? 15 : 0)
+  )));
+  const riskLabel = riskScore >= 75 ? 'LOW RISK' : riskScore >= 50 ? 'MODERATE' : riskScore >= 25 ? 'ELEVATED' : 'HIGH RISK';
+  const riskBadge = el('riskScoreBadge');
+  if (riskBadge) {
+    riskBadge.textContent = `SCORE: ${riskScore}/100 ${riskLabel}`;
+    riskBadge.style.color = riskScore >= 75 ? 'var(--green)' : riskScore >= 50 ? 'var(--amber)' : 'var(--red)';
+  }
 
   // Positions table
   if (d.positions) renderPositionTable(d.positions);
@@ -658,7 +676,10 @@ function applySentiment(d) {
   }
 
   // News feed
-  renderNewsFeed(d.top_headlines || []);
+  // Store all articles for filtering
+  STATE._allArticles = d.top_headlines || [];
+  setEl('newsArticleCount', `${STATE._allArticles.length} ARTICLES`);
+  filterNewsArticles();
 
   // Dominant quadrant
   const dom = d.dominant_quadrant;
@@ -680,18 +701,48 @@ function applySentiment(d) {
   setEl('bearishPct',  domStats.bullish_pct !== undefined ? (100 - domStats.bullish_pct).toFixed(1) + '%' : '--');
 }
 
+function filterNewsArticles() {
+  const articles = STATE._allArticles || [];
+  const hours    = parseInt(el('newsTimeFilter')?.value || '0', 10);
+  const sentFil  = el('newsSentFilter')?.value || 'ALL';
+  const cutoff   = hours > 0 ? Date.now() - hours * 3600 * 1000 : 0;
+
+  const filtered = articles.filter(a => {
+    if (sentFil !== 'ALL' && a.sentiment !== sentFil) return false;
+    if (cutoff && a.timestamp) {
+      const ts = new Date(a.timestamp).getTime();
+      if (!isNaN(ts) && ts < cutoff) return false;
+    }
+    return true;
+  });
+
+  setEl('newsArticleCount', `${filtered.length} / ${articles.length} ARTICLES`);
+  renderNewsFeed(filtered);
+}
+
 function renderNewsFeed(headlines) {
-  if (!headlines.length) { el('newsFeed').innerHTML = '<div style="padding:14px;color:var(--text-muted);font-size:10px">NO HEADLINES</div>'; return; }
-  el('newsFeed').innerHTML = headlines.map(h => `
-    <div class="news-item ${h.sentiment} ${h.conflict_risk ? 'conflict' : ''}">
-      <div class="news-headline">${h.conflict_risk ? '⚠ ' : ''}${h.title}</div>
+  const feed = el('newsFeed');
+  if (!feed) return;
+  if (!headlines.length) {
+    feed.innerHTML = '<div style="padding:14px;color:var(--text-muted);font-size:10px;text-align:center">NO ARTICLES MATCH FILTERS</div>';
+    return;
+  }
+  feed.innerHTML = headlines.map(h => {
+    const sentCls  = h.sentiment === 'positive' ? 'pos' : h.sentiment === 'negative' ? 'neg' : '';
+    const sentIcon = h.sentiment === 'positive' ? '▲' : h.sentiment === 'negative' ? '▼' : '■';
+    const timeStr  = h.timestamp ? new Date(h.timestamp).toLocaleTimeString('en-AU', {hour:'2-digit',minute:'2-digit',hour12:false}) : '--:--';
+    const qMeta    = QUADRANT_META[h.quadrant] || {};
+    return `<div class="news-item ${h.conflict_risk ? 'conflict' : ''}">
+      <div class="news-headline">${h.conflict_risk ? '<span class="news-warn">⚠</span> ' : ''}${h.title}</div>
       <div class="news-meta">
-        <span class="news-sentiment ${h.sentiment}">${h.sentiment.toUpperCase()}</span>
-        <span>${h.source}</span>
-        <span>${QUADRANT_META[h.quadrant]?.label ?? h.quadrant}</span>
-        ${h.conflict_risk ? '<span class="news-conflict-flag">⚠ CONFLICT RISK</span>' : ''}
+        <span class="news-sentiment ${sentCls}">${sentIcon} ${(h.sentiment||'neutral').toUpperCase()}</span>
+        <span class="news-source">${h.source || '--'}</span>
+        <span class="news-quadrant" style="color:${qMeta.color||'var(--text-2)'}">${(qMeta.label||h.quadrant||'--').replace(/_/g,' ')}</span>
+        <span class="news-time">${timeStr}</span>
+        ${h.conflict_risk ? '<span class="news-conflict-flag">⚠ CONFLICT</span>' : ''}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // ─── Correlation ──────────────────────────────────────────
@@ -817,9 +868,13 @@ function applyBacktest(d) {
   setEl('bt-periods',  d.periods ?? '--');
   setEl('bt-annRet',   (d.annualised_return_pct >= 0 ? '+' : '') + d.annualised_return_pct?.toFixed(1) + '%');
 
-  setEl('rm-sortino',  d.sortino_ratio?.toFixed(2) ?? '--');
-  setEl('rm-winrate',  d.win_rate_pct?.toFixed(1) + '%' ?? '--');
-  setEl('rm-maxdd',    d.max_drawdown_pct?.toFixed(2) + '%' ?? '--');
+  const sortino = d.sortino_ratio ?? 0;
+  const winRate = d.win_rate_pct ?? 0;
+  setEl('rm-sortino',       sortino.toFixed(2));
+  setEl('rm-sortino-desc',  sortino >= 2 ? '✓ Excellent downside protection' : sortino >= 1 ? '✓ Good' : '⚠ Below target (aim >1)');
+  setEl('rm-winrate',       winRate.toFixed(1) + '%');
+  setEl('rm-winrate-desc',  winRate >= 60 ? '✓ Strong edge' : winRate >= 50 ? '✓ Positive edge' : '⚠ Below 50% — review strategy');
+  setEl('rm-maxdd',         (d.max_drawdown_pct ?? 0).toFixed(2) + '%');
 
   updateWFChart(d.period_results || []);
   renderPeriodTable(d.period_results || []);
@@ -1365,6 +1420,21 @@ async function triggerCycle() {
   } finally {
     btn.classList.remove('loading');
     btn.textContent = '▶ RUN CYCLE';
+  }
+}
+
+// Signal Ops tab version of run cycle
+async function triggerCycleSignal() {
+  const btn = el('signalCycleBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⌛ RUNNING...'; }
+  try {
+    await postJSON('/api/agent/cycle');
+    await loadSignals();
+    pushActivityItem('▶', 'Cycle triggered from Signal Ops', 'info');
+  } catch (e) {
+    pushAlert('ERROR', `Cycle failed: ${e.message}`, 'warning');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '▶ RUN CYCLE'; }
   }
 }
 
@@ -3070,6 +3140,137 @@ function _ccSetPnl(id, val) {
   const pos = val >= 0;
   e.textContent  = `${pos ? '+' : ''}${fmt$(val)}`;
   e.style.color  = pos ? 'var(--green)' : 'var(--red)';
+}
+
+// ─── Tutorial System ────────────────────────────────────────
+const TUTORIAL_PAGES = [
+  {
+    icon: '⌘', title: 'COMMAND CENTRE',
+    body: `<p>Your <strong>main trading hub</strong>. Shows everything at a glance:</p>
+      <ul>
+        <li>📊 <strong>Equity Curve</strong> — your portfolio value over time with per-asset lines</li>
+        <li>🌐 <strong>Economic Quadrant</strong> — current Dalio All-Weather regime (rising growth / inflation etc.)</li>
+        <li>⚡ <strong>AI Trade Recommendations</strong> — top trades scored by regime fit, RSI &amp; diversification</li>
+        <li>💼 <strong>Live Positions</strong> — open positions with real-time P&amp;L and close buttons</li>
+        <li>📋 <strong>Recent Trades</strong> — closed trade history with P&amp;L per trade</li>
+      </ul>
+      <p>Use the Quick Trade panel to place paper trades instantly.</p>`
+  },
+  {
+    icon: '⚡', title: 'SIGNAL OPS',
+    body: `<p>The <strong>signal scanner</strong>. Scans every ticker in the universe for actionable setups:</p>
+      <ul>
+        <li>🔍 <strong>Scan Now</strong> — fetches live prices and runs RSI + trend signals</li>
+        <li>▶ <strong>Run Cycle</strong> — triggers a full agent cycle (signals + quadrant update)</li>
+        <li>📈 <strong>Confidence</strong> — how strong the signal is (50–95%). Higher = more extreme RSI</li>
+        <li>🏷 <strong>Quadrant Fit</strong> — does this asset suit the current economic regime?</li>
+        <li>🎯 <strong>Stop / Target</strong> — calculated using ATR-based risk/reward</li>
+      </ul>
+      <p>Adjust <em>Min Confidence</em> and <em>Signal Type</em> to filter signals.</p>`
+  },
+  {
+    icon: '🇦🇺', title: 'ASX SCANNER',
+    body: `<p>Live scanner for <strong>Australian Securities Exchange</strong> stocks:</p>
+      <ul>
+        <li>93 ASX stocks across banking, mining, healthcare, tech, REITs and more</li>
+        <li>Refreshes every 90 seconds from Yahoo Finance (yfinance)</li>
+        <li>Sort by % change, volume or sector</li>
+        <li>Click any row to pre-fill the paper trading order form</li>
+        <li>Star ★ to add to your watchlist</li>
+      </ul>
+      <p>Data sourced from Yahoo Finance — prices are end-of-day or 15-min delayed.</p>`
+  },
+  {
+    icon: '₿', title: 'CRYPTO SCANNER',
+    body: `<p>Live scanner for <strong>99 cryptocurrencies</strong>:</p>
+      <ul>
+        <li>Prices from CoinGecko free API (falls back to yfinance)</li>
+        <li>Shows 24h % change, volume and market cap</li>
+        <li>Sorted by trading volume (most liquid first)</li>
+        <li>Covers Layer 1, DeFi, Gaming, Meme coins, AI tokens and more</li>
+      </ul>
+      <p>CoinGecko free tier may rate-limit — yfinance fallback kicks in automatically.</p>`
+  },
+  {
+    icon: '🛢', title: 'COMMODITIES SCANNER',
+    body: `<p>Live scanner for <strong>commodities and real assets</strong>:</p>
+      <ul>
+        <li>Precious metals: Gold (GLD), Silver (SLV), Platinum</li>
+        <li>Energy: Crude oil (USO), Natural gas (UNG), futures ETFs</li>
+        <li>Agriculture: Wheat (WEAT), Corn (CORN), Soybeans</li>
+        <li>Base metals: Copper, Aluminium via ETFs</li>
+        <li>TIPS, Carbon credits, Timber ETFs</li>
+      </ul>
+      <p>Commodities are key Dalio All-Weather assets — rising inflation favours real assets.</p>`
+  },
+  {
+    icon: '🧠', title: 'INTEL CENTER',
+    body: `<p>The <strong>FinBERT news scanner</strong> — real-time sentiment from financial RSS feeds:</p>
+      <ul>
+        <li>Pulls live articles from Reuters, Yahoo Finance, CNBC, AFR, FT, MarketWatch and more</li>
+        <li>Each article scored <em>bullish / bearish / neutral</em> by keyword analysis</li>
+        <li>Mapped to a Dalio quadrant (rising growth / inflation etc.)</li>
+        <li>⚠ Red articles = geopolitical conflict risk detected</li>
+        <li>Refreshes every 30 minutes — cached for consistency</li>
+      </ul>
+      <p>The dominant quadrant from news is used to cross-check the economic quadrant signal.</p>`
+  },
+  {
+    icon: '⚠', title: 'RISK MATRIX',
+    body: `<p>Your <strong>portfolio risk dashboard</strong>:</p>
+      <ul>
+        <li>🔴 <strong>Circuit Breaker</strong> — auto-stops trading if daily loss &gt;2% or drawdown &gt;10%</li>
+        <li>📉 <strong>Sharpe Ratio</strong> — return per unit of risk (&gt;1 = good, &gt;2 = excellent)</li>
+        <li>📉 <strong>Max Drawdown</strong> — biggest loss from a peak (stay under 10%)</li>
+        <li>🎯 <strong>Win Rate</strong> — % of closed trades that made money</li>
+        <li>📋 <strong>Position Risk Table</strong> — each open position sized as % of portfolio</li>
+      </ul>
+      <p>Green = safe zone | Amber = watch | Red = action required.</p>`
+  },
+  {
+    icon: '🔬', title: 'BACKTEST LAB',
+    body: `<p>The <strong>walk-forward backtesting engine</strong>:</p>
+      <ul>
+        <li>Tests the Dalio All-Weather strategy against 2+ years of historical data</li>
+        <li><strong>Walk-forward</strong> = train on 12 months, test on next 3 months (prevents overfitting)</li>
+        <li>8 periods tested — each is independent, no look-ahead bias</li>
+        <li>Key metrics: Total Return, Sharpe, Max Drawdown, Win Rate</li>
+        <li>Compare periods to find regime-specific performance patterns</li>
+      </ul>
+      <p>A strategy with Sharpe &gt;1.5 and drawdown &lt;10% across all periods is considered robust.</p>`
+  },
+];
+
+let _tutIdx = 0;
+
+function openTutorial(startIdx = 0) {
+  _tutIdx = startIdx;
+  _renderTutorial();
+  el('tutorialOverlay')?.classList.remove('hidden');
+}
+
+function closeTutorial() {
+  el('tutorialOverlay')?.classList.add('hidden');
+}
+
+function nextTutorial() {
+  _tutIdx = (_tutIdx + 1) % TUTORIAL_PAGES.length;
+  _renderTutorial();
+}
+
+function prevTutorial() {
+  _tutIdx = (_tutIdx - 1 + TUTORIAL_PAGES.length) % TUTORIAL_PAGES.length;
+  _renderTutorial();
+}
+
+function _renderTutorial() {
+  const p = TUTORIAL_PAGES[_tutIdx];
+  if (!p) return;
+  setEl('tutIcon', p.icon);
+  setEl('tutTitle', p.title);
+  const body = el('tutBody');
+  if (body) body.innerHTML = p.body;
+  setEl('tutStep', `${_tutIdx + 1} / ${TUTORIAL_PAGES.length}`);
 }
 
 // Keyboard: Ctrl+K to open search, Escape to close

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260329e" />
+  <link rel="stylesheet" href="/static/style.css?v=20260329f" />
 </head>
 <body>
   <!-- Scanline overlay -->
@@ -451,6 +451,7 @@
               </select>
             </div>
             <button class="btn-primary" onclick="loadSignals()">⚡ SCAN NOW</button>
+            <button class="btn-secondary" onclick="triggerCycleSignal()" id="signalCycleBtn" style="margin-left:6px">▶ RUN CYCLE</button>
           </div>
         </div>
 
@@ -540,8 +541,25 @@
         <!-- FinBERT News Feed -->
         <div class="panel panel--newsfeed">
           <div class="panel-header">
-            <span class="panel-title">FINBERT NEWS SCANNER</span>
-            <button class="btn-ghost btn--sm" onclick="loadSentiment()">↻ REFRESH</button>
+            <span class="panel-title">LIVE NEWS SCANNER</span>
+            <span class="panel-tag" id="newsArticleCount">-- ARTICLES</span>
+            <button class="btn-ghost btn--sm" onclick="loadSentiment()" style="margin-left:auto">↻ REFRESH</button>
+          </div>
+          <div class="news-filter-bar">
+            <label class="news-filter-label">SHOW:</label>
+            <select class="ctrl-select" id="newsTimeFilter" onchange="filterNewsArticles()" style="font-size:9px;padding:2px 6px">
+              <option value="24">Last 24 hours</option>
+              <option value="48">Last 48 hours</option>
+              <option value="168">Last 7 days</option>
+              <option value="0">All available</option>
+            </select>
+            <label class="news-filter-label" style="margin-left:8px">SENTIMENT:</label>
+            <select class="ctrl-select" id="newsSentFilter" onchange="filterNewsArticles()" style="font-size:9px;padding:2px 6px">
+              <option value="ALL">ALL</option>
+              <option value="positive">BULLISH</option>
+              <option value="negative">BEARISH</option>
+              <option value="neutral">NEUTRAL</option>
+            </select>
           </div>
           <div class="news-feed" id="newsFeed">
             <div class="news-loading">
@@ -736,29 +754,33 @@
         <!-- Risk Metrics -->
         <div class="panel panel--risk-metrics">
           <div class="panel-header">
-            <span class="panel-title">RISK METRICS</span>
+            <span class="panel-title">◈ RISK METRICS</span>
+            <span class="panel-tag" id="riskScoreBadge">SCORE: --</span>
           </div>
           <div class="metrics-grid">
             <div class="metric-item">
-              <div class="metric-label">SHARPE RATIO</div>
+              <div class="metric-label">SHARPE RATIO <span class="metric-tip" title="Return per unit of risk. &gt;1 = good, &gt;2 = excellent. Higher = better risk-adjusted performance.">?</span></div>
               <div class="metric-val accent" id="rm-sharpe">--</div>
+              <div class="metric-desc" id="rm-sharpe-desc">—</div>
             </div>
             <div class="metric-item">
-              <div class="metric-label">SORTINO RATIO</div>
+              <div class="metric-label">SORTINO RATIO <span class="metric-tip" title="Like Sharpe but only penalises downside volatility. &gt;1 = good.">?</span></div>
               <div class="metric-val accent" id="rm-sortino">--</div>
+              <div class="metric-desc" id="rm-sortino-desc">—</div>
             </div>
             <div class="metric-item">
-              <div class="metric-label">MAX DRAWDOWN</div>
+              <div class="metric-label">MAX DRAWDOWN <span class="metric-tip" title="Largest peak-to-trough loss. Circuit breaker triggers at -10%.">?</span></div>
               <div class="metric-val danger" id="rm-maxdd">--</div>
+              <div class="metric-desc" id="rm-maxdd-desc">—</div>
             </div>
             <div class="metric-item">
-              <div class="metric-label">WIN RATE</div>
+              <div class="metric-label">WIN RATE <span class="metric-tip" title="% of closed trades that were profitable. &gt;50% = positive edge.">?</span></div>
               <div class="metric-val" id="rm-winrate">--</div>
+              <div class="metric-desc" id="rm-winrate-desc">—</div>
             </div>
             <div class="metric-item">
-              <div class="metric-label">TOTAL RETURN</div>
+              <div class="metric-label">TOTAL RETURN <span class="metric-tip" title="Total portfolio gain/loss since starting cash.">?</span></div>
               <div class="metric-val" id="rm-totalret">--</div>
-            </div>
             <div class="metric-item">
               <div class="metric-label">PORTFOLIO VALUE</div>
               <div class="metric-val" id="rm-nav">--</div>
@@ -818,8 +840,8 @@
             </div>
             <div class="bt-method-note">
               <span class="method-icon">◈</span>
-              Walk-forward prevents overfitting and look-ahead bias.
-              Model trained on 12 months, validated on 3-month out-of-sample windows.
+              <strong>Walk-Forward Backtesting:</strong> The strategy is trained on 12 months of data, then tested on the following 3 months it has never seen. This repeats across 8 windows to prevent overfitting.<br><br>
+              <strong>Sharpe &gt;1.5</strong> = acceptable | <strong>Max DD &lt;10%</strong> = within circuit breaker | <strong>Win Rate &gt;55%</strong> = statistical edge
             </div>
           </div>
         </div>
@@ -1916,7 +1938,7 @@
     <span class="sb-version">DALIOS v1.0.0 — RAY DALIO ALL WEATHER FRAMEWORK</span>
   </footer>
 
-  <script src="/static/app.js?v=20260329e"></script>
+  <script src="/static/app.js?v=20260329f"></script>
 
   <!-- ═══════════════════════════════════════════════
        SPEECH BUBBLE SPOTLIGHT TOOLTIP
@@ -2000,5 +2022,23 @@
       <button class="ssb-close" onclick="dismissStrongSignal()">✕</button>
     </div>
   </div>
+
+    <!-- ─── Tutorial Bubbles ─── -->
+    <div class="tutorial-overlay hidden" id="tutorialOverlay" onclick="closeTutorial()">
+      <div class="tutorial-box" id="tutorialBox" onclick="event.stopPropagation()">
+        <div class="tut-header">
+          <span class="tut-icon" id="tutIcon">◈</span>
+          <span class="tut-title" id="tutTitle">COMMAND CENTRE</span>
+          <button class="tut-close" onclick="closeTutorial()">✕</button>
+        </div>
+        <div class="tut-body" id="tutBody"></div>
+        <div class="tut-nav">
+          <button class="btn-ghost btn--sm" onclick="prevTutorial()">← PREV</button>
+          <span class="tut-step" id="tutStep">1 / 7</span>
+          <button class="btn-ghost btn--sm" onclick="nextTutorial()">NEXT →</button>
+        </div>
+      </div>
+    </div>
+    <button class="tut-launch-btn" onclick="openTutorial()" title="Help — what does each tab do?">?</button>
 </body>
 </html>

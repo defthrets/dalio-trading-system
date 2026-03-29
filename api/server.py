@@ -1654,34 +1654,64 @@ async def _real_correlation_matrix() -> Optional[dict]:
 
 
 def _gen_portfolio_health() -> dict:
-    equity = STATE.equity_history[-1]["v"] if STATE.equity_history else STATE.initial_equity
-    daily_pnl = round(random.gauss(0.0008, 0.008) * equity, 2)
-    drawdown = round(random.uniform(0, 6.5), 2)
+    """Real portfolio health from PAPER state — no fake data."""
+    initial = PAPER_STARTING_CASH
+    equity  = PAPER.cash
+    if PAPER.equity_history:
+        equity = PAPER.equity_history[-1]["v"]
+
+    # Daily P&L from equity history
+    daily_pnl = 0.0
+    if len(PAPER.equity_history) >= 2:
+        daily_pnl = round(PAPER.equity_history[-1]["v"] - PAPER.equity_history[-2]["v"], 2)
+
+    # Drawdown
+    drawdown = 0.0
+    if PAPER.equity_history:
+        peak = max(e["v"] for e in PAPER.equity_history)
+        drawdown = round((peak - equity) / peak * 100, 2) if peak > 0 else 0.0
+
+    # Sharpe
+    sharpe = 0.0
+    if len(PAPER.equity_history) >= 10:
+        try:
+            eq_arr = np.array([e["v"] for e in PAPER.equity_history], dtype=float)
+            rets   = np.diff(eq_arr) / eq_arr[:-1]
+            if rets.std() > 0:
+                sharpe = round(float((rets.mean() / rets.std()) * (252 ** 0.5)), 2)
+        except Exception:
+            pass
+
+    open_count = len(PAPER.positions)
+
+    # Real positions list
+    positions_list = [
+        {
+            "ticker": t,
+            "side": pos.get("side", "LONG"),
+            "size_pct": round(pos["qty"] * pos["entry_price"] / max(equity, 1) * 100, 1),
+            "unrealised_pnl_pct": 0.0,  # live P&L computed in /api/paper/portfolio
+        }
+        for t, pos in PAPER.positions.items()
+    ]
+
     return {
-        "timestamp": datetime.utcnow().isoformat(),
-        "equity": round(equity + daily_pnl, 2),
-        "initial_equity": STATE.initial_equity,
-        "total_return_pct": round((equity / STATE.initial_equity - 1) * 100, 2),
-        "daily_pnl": daily_pnl,
-        "daily_pnl_pct": round(daily_pnl / equity * 100, 3),
-        "drawdown_pct": drawdown,
-        "open_positions": random.randint(12, 18),
-        "dalio_diversification_met": True,
-        "selected_portfolio_size": 15,
+        "timestamp":             datetime.utcnow().isoformat(),
+        "equity":                round(equity, 2),
+        "initial_equity":        initial,
+        "cash":                  round(PAPER.cash, 2),
+        "total_return_pct":      round((equity / initial - 1) * 100, 2) if initial else 0.0,
+        "daily_pnl":             daily_pnl,
+        "daily_pnl_pct":         round(daily_pnl / equity * 100, 3) if equity else 0.0,
+        "drawdown_pct":          drawdown,
+        "open_positions":        open_count,
+        "dalio_diversification_met": open_count >= 3,
+        "selected_portfolio_size": open_count,
         "circuit_breaker_active": drawdown > 9.5,
-        "daily_limit_pct": 2.0,
-        "max_drawdown_pct": 10.0,
-        "sharpe_ratio": round(random.uniform(1.3, 2.6), 2),
-        "risk_weights": {t: round(1 / 15, 4) + round(random.uniform(-0.01, 0.01), 4) for t in ALL_TICKERS[:15]},
-        "positions": [
-            {
-                "ticker": t,
-                "side": random.choice(["LONG", "SHORT"]),
-                "size_pct": round(random.uniform(3, 9), 1),
-                "unrealised_pnl_pct": round(random.gauss(1.2, 4.5), 2),
-            }
-            for t in random.sample(ALL_TICKERS, 12)
-        ],
+        "daily_limit_pct":       2.0,
+        "max_drawdown_pct":      10.0,
+        "sharpe_ratio":          sharpe,
+        "positions":             positions_list,
     }
 
 
