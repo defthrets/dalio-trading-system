@@ -1060,6 +1060,9 @@ async def _gen_signals(n: int = 12) -> list[dict]:
         # Estimate days to reach target based on ~0.8% avg daily move
         predicted_days = max(3, min(60, int(tp_offset / max(price * 0.008, 0.01))))
 
+        # Position size suggestion: 1–5% of portfolio based on confidence
+        pos_size_pct = round(min(5.0, max(1.0, (conf - 50) / 9)), 1)
+
         signals.append({
             "ticker": ticker,
             "action": action,
@@ -1069,20 +1072,23 @@ async def _gen_signals(n: int = 12) -> list[dict]:
             "quadrant_fit": q_fit,
             "rsi": rsi,
             "trend": trend,
-            "stop_loss": round(price - sl_offset, 2),
-            "take_profit": round(price + tp_offset, 2),
+            "stop_loss":  round(price - sl_offset, 2) if action in ("SELL","SHORT") else round(price - sl_offset, 2),
+            "take_profit": round(price + tp_offset, 2) if action in ("BUY","LONG")  else round(price - tp_offset, 2),
             "rr_ratio": round(tp_offset / sl_offset, 2),
+            "position_size_pct": pos_size_pct,
             "dalio_justification": _gen_justification(ticker, action),
             "price_history": price_history,
             "predicted_days": predicted_days,
             "timestamp": datetime.utcnow().isoformat(),
         })
 
-    # Best signals first: exclude HOLDs unless everything is HOLD, sort by confidence
+    # Return active signals only (no HOLDs — they're noise), sorted by confidence
     active = [s for s in signals if s["action"] != "HOLD"]
-    holds  = [s for s in signals if s["action"] == "HOLD"]
     active.sort(key=lambda s: s["confidence"], reverse=True)
-    return (active + holds)[:n]
+    # If truly nothing actionable, fall back to showing highest-confidence HOLDs
+    if not active:
+        active = sorted(signals, key=lambda s: s["confidence"], reverse=True)
+    return active[:n]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -2034,6 +2040,25 @@ async def get_assets():
 # Paper Trading Endpoints
 # ─────────────────────────────────────────────
 
+def _normalize_ticker(ticker: str) -> str:
+    """Normalise user-entered tickers to yfinance format.
+    BTC → BTC-USD, ETH → ETH-USD, bhp → BHP.AX (if known), etc.
+    """
+    t = ticker.upper().strip()
+    # Already correct format — pass through
+    if t.endswith("-USD") or t.endswith(".AX") or "-" in t or "." in t:
+        return t
+    # Known crypto base symbols → append -USD
+    _crypto_bases = {c.replace("-USD", "") for c in CRYPTO_TICKERS}
+    if t in _crypto_bases:
+        return f"{t}-USD"
+    # Check if it matches an ASX ticker without suffix
+    _asx_bases = {c.replace(".AX", "") for c in ASX_TICKERS}
+    if t in _asx_bases:
+        return f"{t}.AX"
+    return t
+
+
 async def _live_price(ticker: str) -> Optional[float]:
     """Get the most recent closing price for a ticker (real or demo)."""
     # Try cache from market_summary first
@@ -2670,7 +2695,7 @@ async def get_paper_live_pnl():
 @app.post("/api/paper/order")
 async def place_paper_order(payload: dict):
     """Place a paper trade. payload: {ticker, side, qty, price (optional)}."""
-    ticker = payload.get("ticker", "").upper().strip()
+    ticker = _normalize_ticker(payload.get("ticker", "").strip())
     side   = payload.get("side", "BUY").upper()
     try:
         qty = float(payload.get("qty", 1))
@@ -2715,7 +2740,7 @@ async def get_paper_history():
 @app.post("/api/paper/close")
 async def close_paper_position(payload: dict):
     """Close entire position in a ticker at market price."""
-    ticker = payload.get("ticker", "").upper().strip()
+    ticker = _normalize_ticker(payload.get("ticker", "").strip())
     if ticker not in PAPER.positions:
         raise HTTPException(404, f"No open position in {ticker}")
     qty   = PAPER.positions[ticker]["qty"]
@@ -3173,7 +3198,7 @@ async def market_scanner(market: str):
 @app.get("/api/paper/quote")
 async def get_quote(ticker: str):
     """Get current price + metadata for a ticker."""
-    ticker = ticker.upper().strip()
+    ticker = _normalize_ticker(ticker.strip())
     price  = await _live_price(ticker)
     meta   = _ASSET_META.get(ticker, {"name": ticker, "cat": "Unknown", "sector": "--"})
     return {

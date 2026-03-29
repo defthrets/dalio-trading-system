@@ -1260,6 +1260,118 @@ canvas { display: block; max-width: 100%; }
 }
 
 /* ─── Tutorial System ─── */
+/* ── Quick Positions / Sell Panel ───────────────────────── */
+.quick-pos-btn {
+  position: fixed;
+  bottom: 60px; right: 18px;
+  width: 38px; height: 38px;
+  background: var(--bg-panel);
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  font-size: 16px;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 6000;
+  display: flex; align-items: center; justify-content: center;
+  transition: all var(--transition);
+  box-shadow: 0 0 10px rgba(255,170,0,.25);
+}
+.quick-pos-btn:hover { background: var(--amber); color: #000; transform: scale(1.08); }
+.quick-pos-badge {
+  position: absolute;
+  top: -4px; right: -4px;
+  width: 16px; height: 16px;
+  background: var(--red);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 8px;
+  font-family: var(--font-hud);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900;
+}
+.quick-pos-panel {
+  position: fixed;
+  bottom: 104px; right: 18px;
+  width: 400px;
+  max-height: 420px;
+  background: var(--bg-panel);
+  border: 1px solid var(--amber);
+  border-radius: 4px;
+  z-index: 6001;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0,0,0,.7), 0 0 20px rgba(255,170,0,.1);
+  overflow: hidden;
+}
+.quick-pos-panel.hidden { display: none; }
+.quick-pos-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-hud);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--amber);
+  background: rgba(255,170,0,.05);
+  flex-shrink: 0;
+}
+.quick-pos-close-x {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; font-size: 12px; padding: 0 2px;
+  transition: color var(--transition);
+}
+.quick-pos-close-x:hover { color: var(--red); }
+.quick-pos-total {
+  font-family: var(--font-hud);
+  font-size: 10px;
+  font-weight: 700;
+}
+.quick-pos-body {
+  overflow-y: auto;
+  flex: 1;
+}
+.quick-pos-row {
+  display: grid;
+  grid-template-columns: 1fr 52px 1fr 90px 70px;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  font-family: var(--font-hud);
+  transition: background var(--transition);
+}
+.quick-pos-row:hover { background: var(--bg-row-hover); }
+.quick-pos-row:last-child { border-bottom: none; }
+.qp-ticker { font-weight: 700; color: var(--cyan); font-size: 11px; }
+.qp-side-long  { color: var(--green); font-weight: 700; }
+.qp-side-short { color: var(--red);   font-weight: 700; }
+.qp-pnl-pos { color: var(--green); font-weight: 700; }
+.qp-pnl-neg { color: var(--red);   font-weight: 700; }
+.qp-close-btn {
+  padding: 3px 8px;
+  background: rgba(255,68,68,.12);
+  border: 1px solid var(--red);
+  color: var(--red);
+  border-radius: 2px;
+  font-family: var(--font-hud);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.qp-close-btn:hover { background: var(--red); color: #fff; }
+.quick-pos-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--font-hud);
+  letter-spacing: 1px;
+}
+
 .tut-launch-btn {
   position: fixed;
   bottom: 100px; right: 18px;

@@ -430,7 +430,7 @@
           <div class="controls-row">
             <div class="control-group">
               <label class="ctrl-label">MIN CONFIDENCE</label>
-              <input type="range" class="ctrl-slider" id="minConfidence" min="50" max="95" value="60"
+              <input type="range" class="ctrl-slider" id="minConfidence" min="50" max="95" value="50"
                      oninput="document.getElementById('minConfVal').textContent=this.value+'%'" />
               <span class="ctrl-val" id="minConfVal">60%</span>
             </div>
@@ -2011,6 +2011,26 @@
         </div>
       </div>
     </div>
-    <button class="tut-launch-btn" onclick="openTutorial()" title="Help — what does each tab do?">?</button>
+  
+  <!-- ── Quick Positions / Sell Panel ─────────────────────── -->
+  <button class="quick-pos-btn" id="quickPosBtn" onclick="toggleQuickPos()" title="Open Positions — click to close any trade">
+    <span id="quickPosBadge" class="quick-pos-badge hidden">0</span>
+    📊
+  </button>
+
+  <div class="quick-pos-panel hidden" id="quickPosPanel">
+    <div class="quick-pos-header">
+      <span>OPEN POSITIONS</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="quick-pos-total" id="quickPosTotal"></span>
+        <button class="quick-pos-close-x" onclick="toggleQuickPos()">✕</button>
+      </div>
+    </div>
+    <div class="quick-pos-body" id="quickPosBody">
+      <div style="padding:14px;color:var(--text-muted);font-size:10px">Loading positions…</div>
+    </div>
+  </div>
+
+  <button class="tut-launch-btn" onclick="openTutorial()" title="Help — what does each tab do?">?</button>
 </body>
 </html>

@@ -395,6 +395,7 @@ function renderSignalGrid(signals) {
   const filterMkt  = el('marketFilter')?.value ?? 'ALL';
 
   const filtered = signals.filter(s => {
+    if (s.action === 'HOLD') return false;          // never show HOLDs — not actionable
     if (s.confidence < minConf) return false;
     if (filterType !== 'ALL') {
       if (filterType === 'BUY'  && !['BUY','LONG'].includes(s.action))  return false;
@@ -402,8 +403,9 @@ function renderSignalGrid(signals) {
       if (filterType === 'OPTIONS' && !s.options_strategy) return false;
     }
     if (filterMkt !== 'ALL') {
-      if (filterMkt === 'ASX' && !s.ticker.endsWith('.AX')) return false;
-      if (filterMkt === 'COMMODITIES' && s.ticker.endsWith('.AX')) return false;
+      if (filterMkt === 'ASX'          && !s.ticker.endsWith('.AX'))                        return false;
+      if (filterMkt === 'CRYPTO'       && !s.ticker.endsWith('-USD'))                       return false;
+      if (filterMkt === 'COMMODITIES'  && (s.ticker.endsWith('.AX') || s.ticker.endsWith('-USD'))) return false;
     }
     return true;
   });
@@ -1866,15 +1868,21 @@ async function fetchPoQuote(ticker) {
   if (res) res.textContent = '⌛ fetching price...';
   try {
     const d = await fetchJSON(`/api/paper/quote?ticker=${encodeURIComponent(ticker)}`);
-    _poPrice = d.price;
+    _poPrice  = d.price;
+    // Update the input field if the server normalised the ticker (e.g. BTC → BTC-USD)
+    if (d.ticker && d.ticker !== ticker) {
+      _poTicker = d.ticker;
+      const inp = el('poTicker');
+      if (inp) inp.value = d.ticker;
+    }
     if (res) {
       res.innerHTML = d.price != null
         ? `<span style="color:var(--green)">✓</span> <strong>${d.name}</strong> · ${d.cat} · <span style="color:var(--primary)">${fmt$(d.price)}</span>`
-        : `<span style="color:var(--amber)">⚠ price unavailable</span>`;
+        : `<span style="color:var(--amber)">⚠ price unavailable — try adding .AX (ASX) or -USD (crypto)</span>`;
     }
     updatePoEstimate();
   } catch {
-    if (res) res.innerHTML = `<span style="color:var(--red)">✗ not found</span>`;
+    if (res) res.innerHTML = `<span style="color:var(--red)">✗ not found — try BTC-USD, BHP.AX, GLD</span>`;
   }
 }
 
@@ -2887,6 +2895,86 @@ function renderCcLivePositions(positions) {
   }).join('');
 }
 
+// ─── Quick Positions / Sell Panel ────────────────────────────────────────────
+
+function toggleQuickPos() {
+  const panel = el('quickPosPanel');
+  if (!panel) return;
+  const isHidden = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden');
+  if (isHidden) _refreshQuickPos();
+}
+
+async function _refreshQuickPos() {
+  const body = el('quickPosBody');
+  if (!body) return;
+  try {
+    const d = await fetchJSON('/api/paper/live-pnl');
+    const positions = d.positions || [];
+
+    // Update badge count
+    const badge = el('quickPosBadge');
+    if (badge) {
+      badge.textContent = positions.length;
+      badge.classList.toggle('hidden', positions.length === 0);
+    }
+
+    // Update total P&L header
+    const totalEl = el('quickPosTotal');
+    if (totalEl && positions.length) {
+      const tot = d.total_unrealised_pnl;
+      const sign = tot >= 0 ? '+' : '';
+      totalEl.textContent = `UNREALISED: ${sign}${fmt$(tot)}`;
+      totalEl.style.color = tot >= 0 ? 'var(--green)' : 'var(--red)';
+    }
+
+    if (!positions.length) {
+      body.innerHTML = `<div class="quick-pos-empty">NO OPEN POSITIONS<br><span style="opacity:.5">Place a trade to see it here</span></div>`;
+      return;
+    }
+
+    body.innerHTML = positions.map(p => {
+      const pnlPos  = p.pnl >= 0;
+      const sign    = pnlPos ? '+' : '';
+      const pnlCls  = pnlPos ? 'qp-pnl-pos' : 'qp-pnl-neg';
+      const sideCls = p.side === 'LONG' ? 'qp-side-long' : 'qp-side-short';
+      const ticker  = p.ticker.replace('-USD','');
+      const qty     = p.qty % 1 === 0 ? p.qty : p.qty.toFixed(4);
+      return `<div class="quick-pos-row">
+        <span class="qp-ticker">${ticker}</span>
+        <span class="${sideCls}">${p.side}</span>
+        <span style="color:var(--text-muted)">×${qty} @ ${fmt$(p.entry_price)}</span>
+        <span class="${pnlCls}">${sign}${fmt$(p.pnl)}<br><span style="font-size:8px;opacity:.8">${sign}${p.pnl_pct.toFixed(2)}%</span></span>
+        <button class="qp-close-btn" onclick="quickClosePosition('${p.ticker}')">✕ CLOSE</button>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    body.innerHTML = `<div class="quick-pos-empty">Could not load positions</div>`;
+  }
+}
+
+async function quickClosePosition(ticker) {
+  try {
+    await postJSON('/api/paper/close', { ticker });
+    pushAlert('PAPER', `Closed ${ticker.replace('-USD','')}`, 'info');
+    pushActivityItem('✕', `Closed position: ${ticker.replace('-USD','')}`, 'sell');
+    // Refresh the panel + main portfolio views
+    _refreshQuickPos();
+    loadPaperPortfolio();
+    loadPaperHistory();
+  } catch (e) {
+    pushAlert('PAPER', `Close failed: ${e.message}`, 'warning');
+  }
+}
+
+// Update badge count whenever pollLivePnl runs
+function _updateQuickPosBadge(count) {
+  const badge = el('quickPosBadge');
+  if (!badge) return;
+  badge.textContent = count;
+  badge.classList.toggle('hidden', count === 0);
+}
+
 // ─── Live P&L Poll (global, every 15s) ───────────────────────────────────────
 // Tracks previous P&L values so we can detect direction changes and flash cells.
 const _prevPnl = {};   // { ticker: lastPnlValue }
@@ -2905,6 +2993,11 @@ async function pollLivePnl() {
 
     // 2. In-place update paper trading table rows (avoids re-render flicker)
     _updatePaperTableInPlace(d.positions);
+
+    // 3. Update quick-pos badge
+    _updateQuickPosBadge(d.open_count || 0);
+    // If panel is open, refresh its content too
+    if (!el('quickPosPanel')?.classList.contains('hidden')) _refreshQuickPos();
 
     // 3. Update total unrealised P&L summary row if present
     const totalEl = el('paperUnrealisedTotal');
