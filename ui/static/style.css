@@ -441,8 +441,66 @@ a:hover { color: var(--primary); text-decoration: underline; }
   gap: 12px;
 }
 .panel-grid--command {
-  grid-template-columns: 1fr 2fr;
-  grid-template-rows: auto auto auto auto auto auto;
+  display: none; /* legacy — replaced by panel-grid--cc-hub */
+}
+.panel-grid--cc-hub {
+  grid-template-columns: 280px 1fr 340px;
+  grid-template-rows: auto minmax(300px,380px) auto auto auto;
+  gap: 12px;
+}
+/* Row 1: stats bar full width */
+.panel--cc-statsbar   { grid-column: 1 / -1; grid-row: 1; }
+/* Row 2 */
+.panel--cc-quicktrade { grid-column: 1;      grid-row: 2; overflow: hidden; }
+.panel--cc-chart      { grid-column: 2;      grid-row: 2; overflow: hidden; }
+.panel--cc-quadrant   { grid-column: 3;      grid-row: 2; overflow: hidden; }
+/* Row 3 */
+.panel--cc-positions  { grid-column: 1 / 3;  grid-row: 3; overflow: hidden; max-height: 300px; }
+.panel--cc-vitals     { grid-column: 3;      grid-row: 3; overflow: hidden; }
+/* Row 4 */
+.panel--cc-opps       { grid-column: 1;      grid-row: 4; overflow: hidden; max-height: 500px; }
+.panel--cc-history    { grid-column: 2 / -1; grid-row: 4; overflow: hidden; max-height: 500px; }
+/* Row 5 */
+.panel--cc-perf       { grid-column: 1;      grid-row: 5; }
+.panel--cc-feed       { grid-column: 2 / -1; grid-row: 5; overflow: hidden; max-height: 240px; }
+
+/* ─── CC Hub Stats Bar ─── */
+.cc-statsbar-inner {
+  display: flex;
+  align-items: center;
+  padding: 8px 14px;
+  gap: 0;
+  overflow-x: auto;
+}
+.cc-sb-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 16px;
+  min-width: 90px;
+}
+.cc-sb-label {
+  font-size: 8px;
+  color: var(--text-muted);
+  font-family: var(--font-hud);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.cc-sb-val {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-1);
+  white-space: nowrap;
+}
+.cc-sb-divider {
+  width: 1px;
+  height: 30px;
+  background: var(--border-hi);
+  flex-shrink: 0;
+}
+/* Quick trade form inside CC */
+.cc-qt-form {
+  padding: 10px 12px;
 }
 .panel-grid--signals {
   grid-template-columns: 1fr 2fr;
@@ -1107,6 +1165,14 @@ canvas { display: block; max-width: 100%; }
 
 /* ─── Responsive ─── */
 @media (max-width: 1200px) {
+  .panel-grid--cc-hub {
+    grid-template-columns: 1fr;
+  }
+  .panel--cc-statsbar, .panel--cc-quicktrade, .panel--cc-chart,
+  .panel--cc-quadrant, .panel--cc-positions, .panel--cc-vitals,
+  .panel--cc-opps, .panel--cc-history, .panel--cc-perf, .panel--cc-feed {
+    grid-column: 1; grid-row: auto;
+  }
   .panel-grid--command,
   .panel-grid--grail,
   .panel-grid--risk { grid-template-columns: 1fr; }
@@ -1915,13 +1981,13 @@ canvas { display: block; max-width: 100%; }
 
 .panel-grid--paper {
   grid-template-columns: 340px 1fr;
-  grid-template-rows: auto auto auto;
+  grid-template-rows: minmax(360px, auto) auto auto;
   gap: 12px;
 }
-.panel--paper-order    { grid-column: 1;      grid-row: 1; }
-.panel--paper-summary  { grid-column: 2;      grid-row: 1; }   /* no span — signals owns row 2 */
-.panel--paper-signals  { grid-column: 1 / -1; grid-row: 2; min-height: 300px; }
-.panel--paper-history  { grid-column: 1 / -1; grid-row: 3; }
+.panel--paper-order    { grid-column: 1;      grid-row: 1; overflow: hidden; }
+.panel--paper-summary  { grid-column: 2;      grid-row: 1; overflow: hidden; max-height: 600px; }
+.panel--paper-signals  { grid-column: 1 / -1; grid-row: 2; min-height: 260px; max-height: 360px; overflow: hidden; }
+.panel--paper-history  { grid-column: 1 / -1; grid-row: 3; max-height: 400px; overflow: hidden; }
 
 /* ─── Order Form ─── */
 .paper-order-form {
@@ -2111,7 +2177,7 @@ canvas { display: block; max-width: 100%; }
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 10px;
   padding: 12px;
-  max-height: 290px;
+  max-height: 280px;
   overflow-y: auto;
 }
 

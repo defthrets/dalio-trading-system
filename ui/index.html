@@ -135,10 +135,115 @@
          TAB 1: COMMAND CENTER
     ───────────────────────────────────── -->
     <section id="tab-command-center" class="tab-panel active">
-      <div class="panel-grid panel-grid--command">
+      <div class="panel-grid panel-grid--cc-hub">
 
-        <!-- Quadrant Display -->
-        <div class="panel panel--quadrant" id="quadrantPanel">
+        <!-- ROW 1: Full-width portfolio stats bar -->
+        <div class="panel panel--cc-statsbar">
+          <div class="cc-statsbar-inner">
+            <div class="cc-sb-stat">
+              <div class="cc-sb-label">TOTAL NAV</div>
+              <div class="cc-sb-val acc" id="ccTotalVal">$1,000.00</div>
+            </div>
+            <div class="cc-sb-divider"></div>
+            <div class="cc-sb-stat">
+              <div class="cc-sb-label">CASH</div>
+              <div class="cc-sb-val" id="ccCash">$1,000.00</div>
+            </div>
+            <div class="cc-sb-divider"></div>
+            <div class="cc-sb-stat">
+              <div class="cc-sb-label">INVESTED</div>
+              <div class="cc-sb-val" id="ccInvested">$0.00</div>
+            </div>
+            <div class="cc-sb-divider"></div>
+            <div class="cc-sb-stat">
+              <div class="cc-sb-label">UNREALISED P&amp;L</div>
+              <div class="cc-sb-val" id="ccUnrealPnl">$0.00</div>
+            </div>
+            <div class="cc-sb-divider"></div>
+            <div class="cc-sb-stat">
+              <div class="cc-sb-label">TOTAL RETURN</div>
+              <div class="cc-sb-val" id="ccReturn">0.00%</div>
+            </div>
+            <div class="cc-sb-divider"></div>
+            <div class="cc-sb-stat">
+              <div class="cc-sb-label">POSITIONS</div>
+              <div class="cc-sb-val acc" id="ccOpenCount">0</div>
+            </div>
+            <div class="cc-sb-divider"></div>
+            <div class="cc-sb-stat">
+              <div class="cc-sb-label">WIN RATE</div>
+              <div class="cc-sb-val" id="ccWinRate">--%</div>
+            </div>
+            <div class="cc-sb-divider"></div>
+            <div class="cc-sb-stat">
+              <div class="cc-sb-label">TOTAL TRADES</div>
+              <div class="cc-sb-val" id="ccTotalTrades">0</div>
+            </div>
+            <div class="cc-sb-divider"></div>
+            <div class="cc-sb-stat">
+              <div class="cc-sb-label">REALISED P&amp;L</div>
+              <div class="cc-sb-val" id="ccRealisedPnl">$0.00</div>
+            </div>
+            <div class="cc-sb-divider"></div>
+            <div class="cc-sb-stat">
+              <div class="cc-sb-label">REGIME</div>
+              <div class="cc-sb-val acc" id="ccRegimeBadge" style="font-size:8px">--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ROW 2 COL 1: Quick Trade -->
+        <div class="panel panel--cc-quicktrade">
+          <div class="panel-header">
+            <span class="panel-title">⚡ QUICK TRADE</span>
+            <span class="panel-tag" style="color:var(--amber)">PAPER</span>
+          </div>
+          <div class="cc-qt-form">
+            <div class="po-row">
+              <label class="po-label">ASSET</label>
+              <input type="text" id="ccQtTicker" class="po-input po-ticker-input" placeholder="BTC, CBA.AX, GLD…" autocomplete="off" oninput="ccQtLookup(this.value)"/>
+            </div>
+            <div id="ccQtQuote" class="po-quote-result" style="margin-bottom:6px"></div>
+            <div class="po-row">
+              <label class="po-label">SIDE</label>
+              <div class="po-side-btns">
+                <button class="po-side-btn po-buy active" id="ccQtBuyBtn" onclick="setCcQtSide('BUY',this)">▲ BUY</button>
+                <button class="po-side-btn po-sell" id="ccQtSellBtn" onclick="setCcQtSide('SELL',this)">▼ SELL</button>
+              </div>
+            </div>
+            <div class="po-row">
+              <label class="po-label">QTY</label>
+              <input type="number" id="ccQtQty" class="po-input" value="1" min="0.0001" step="any" oninput="ccQtEstimate()"/>
+            </div>
+            <div class="po-estimate" id="ccQtEstimate">
+              <span class="po-est-label">EST. COST</span>
+              <span class="po-est-val" id="ccQtEstVal">—</span>
+            </div>
+            <div class="po-cash-row">
+              <span class="po-cash-label">AVAILABLE CASH</span>
+              <span class="po-cash-val" id="ccQtCash">$--</span>
+            </div>
+            <button class="btn-primary btn--full" onclick="ccQtSubmit()" style="margin-top:8px">▶ EXECUTE TRADE</button>
+            <div id="ccQtResult" style="margin-top:6px;font-size:9px"></div>
+          </div>
+        </div>
+
+        <!-- ROW 2 COL 2: Equity Chart -->
+        <div class="panel panel--cc-chart">
+          <div class="panel-header">
+            <span class="panel-title">EQUITY CURVE</span>
+            <div class="panel-stats">
+              <span class="stat-item">NAV: <strong id="navValue">$--</strong></span>
+              <span class="stat-item" id="totalReturnBadge">ROI: <strong>--</strong></span>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="equityChart"></canvas>
+          </div>
+        </div>
+
+        <!-- ROW 2 COL 3: Quadrant -->
+        <div class="panel panel--cc-quadrant" id="quadrantPanel">
           <div class="panel-header">
             <span class="panel-title">ECONOMIC QUADRANT</span>
             <span class="panel-tag">DALIO MACHINE</span>
@@ -179,40 +284,44 @@
           </div>
         </div>
 
-        <!-- Equity Curve -->
-        <div class="panel panel--chart" id="equityPanel">
+        <!-- ROW 3 COL 1-2: Open Positions -->
+        <div class="panel panel--cc-positions">
           <div class="panel-header">
-            <span class="panel-title">EQUITY CURVE</span>
-            <div class="panel-stats">
-              <span class="stat-item">NAV: <strong id="navValue">$--</strong></span>
-              <span class="stat-item" id="totalReturnBadge">ROI: <strong>--</strong></span>
-            </div>
+            <span class="panel-title">◈ OPEN POSITIONS</span>
+            <span class="panel-tag" id="ccPosCount">0 OPEN</span>
           </div>
-          <div class="chart-container">
-            <canvas id="equityChart"></canvas>
+          <div class="cc-table-wrap">
+            <table class="data-table" id="ccPositionsTable">
+              <thead>
+                <tr>
+                  <th>TICKER</th><th>SIDE</th><th>QTY</th>
+                  <th>ENTRY</th><th>CURRENT</th><th>MKT VAL</th>
+                  <th>P&amp;L</th><th>P&amp;L %</th><th>CLOSE</th>
+                </tr>
+              </thead>
+              <tbody id="ccPositionsBody">
+                <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:14px">No open positions</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <!-- Portfolio Health Gauges -->
-        <div class="panel panel--gauges">
+        <!-- ROW 3 COL 3: Vitals + Alerts -->
+        <div class="panel panel--cc-vitals">
           <div class="panel-header">
             <span class="panel-title">PORTFOLIO VITALS</span>
             <span class="panel-tag" id="circuitBreakerBadge">CB: ARMED</span>
           </div>
           <div class="vitals-grid">
             <div class="vital-item">
-              <div class="vital-label">DAILY P&L</div>
+              <div class="vital-label">DAILY P&amp;L</div>
               <div class="vital-value" id="dailyPnl">--</div>
-              <div class="vital-bar-wrap">
-                <div class="vital-bar" id="dailyPnlBar" style="width:0%"></div>
-              </div>
+              <div class="vital-bar-wrap"><div class="vital-bar" id="dailyPnlBar" style="width:0%"></div></div>
             </div>
             <div class="vital-item">
               <div class="vital-label">DRAWDOWN</div>
               <div class="vital-value danger" id="drawdownVal">--</div>
-              <div class="vital-bar-wrap">
-                <div class="vital-bar vital-bar--danger" id="drawdownBar" style="width:0%"></div>
-              </div>
+              <div class="vital-bar-wrap"><div class="vital-bar vital-bar--danger" id="drawdownBar" style="width:0%"></div></div>
             </div>
             <div class="vital-item">
               <div class="vital-label">SHARPE RATIO</div>
@@ -231,11 +340,7 @@
               <div class="vital-value" id="cycleCount">--</div>
             </div>
           </div>
-        </div>
-
-        <!-- Alert Feed -->
-        <div class="panel panel--alerts">
-          <div class="panel-header">
+          <div class="panel-header" style="margin-top:8px;border-top:1px solid var(--border)">
             <span class="panel-title">ALERT FEED</span>
             <span class="pulse-dot"></span>
           </div>
@@ -247,111 +352,18 @@
           </div>
         </div>
 
-        <!-- ── CC PORTFOLIO STATS STRIP (full width) ── -->
-        <div class="panel panel--cc-strip">
+        <!-- ROW 4 COL 1: Trade Opportunities -->
+        <div class="panel panel--cc-opps">
           <div class="panel-header">
-            <span class="panel-title">◈ PAPER PORTFOLIO OVERVIEW</span>
-            <span class="panel-tag" id="ccPnlBadge" style="color:var(--text-muted)">P&amp;L: --</span>
+            <span class="panel-title">◈ TOP OPPORTUNITIES</span>
+            <button class="btn-ghost btn--sm" onclick="loadCcOpportunities(8)" style="margin-left:auto">↻ SCAN</button>
           </div>
-          <div class="cc-stats-strip">
-            <div class="cc-stat-box">
-              <div class="cc-stat-label">TOTAL VALUE</div>
-              <div class="cc-stat-value acc" id="ccTotalVal">$--</div>
-            </div>
-            <div class="cc-stat-box">
-              <div class="cc-stat-label">CASH</div>
-              <div class="cc-stat-value" id="ccCash">$--</div>
-            </div>
-            <div class="cc-stat-box">
-              <div class="cc-stat-label">INVESTED</div>
-              <div class="cc-stat-value" id="ccInvested">$--</div>
-            </div>
-            <div class="cc-stat-box">
-              <div class="cc-stat-label">UNREALISED P&amp;L</div>
-              <div class="cc-stat-value" id="ccUnrealPnl">$--</div>
-            </div>
-            <div class="cc-stat-box">
-              <div class="cc-stat-label">RETURN</div>
-              <div class="cc-stat-value" id="ccReturn">--%</div>
-            </div>
-            <div class="cc-stat-box">
-              <div class="cc-stat-label">OPEN POSITIONS</div>
-              <div class="cc-stat-value acc" id="ccOpenCount">--</div>
-            </div>
+          <div class="opportunity-list" id="ccOpportunityList">
+            <div style="padding:14px;color:var(--text-muted);font-size:10px">Click SCAN to analyse all markets…</div>
           </div>
         </div>
 
-        <!-- ── CC PERFORMANCE METRICS ── -->
-        <div class="panel panel--cc-perf">
-          <div class="panel-header">
-            <span class="panel-title">◈ PERFORMANCE METRICS</span>
-          </div>
-          <div class="cc-perf-grid">
-            <div class="cc-perf-item">
-              <div class="cc-perf-label">TOTAL TRADES</div>
-              <div class="cc-perf-value acc" id="ccTotalTrades">0</div>
-            </div>
-            <div class="cc-perf-item">
-              <div class="cc-perf-label">WIN RATE</div>
-              <div class="cc-perf-value" id="ccWinRate">--%</div>
-            </div>
-            <div class="cc-perf-item">
-              <div class="cc-perf-label">AVG P&amp;L / TRADE</div>
-              <div class="cc-perf-value" id="ccAvgPnl">$--</div>
-            </div>
-            <div class="cc-perf-item">
-              <div class="cc-perf-label">REALISED P&amp;L</div>
-              <div class="cc-perf-value" id="ccRealisedPnl">$--</div>
-            </div>
-            <div class="cc-perf-item">
-              <div class="cc-perf-label">BEST TRADE</div>
-              <div class="cc-perf-value pos" id="ccBestTrade">$--</div>
-            </div>
-            <div class="cc-perf-item">
-              <div class="cc-perf-label">WORST TRADE</div>
-              <div class="cc-perf-value neg" id="ccWorstTrade">$--</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── CC OPEN POSITIONS ── -->
-        <div class="panel panel--cc-positions">
-          <div class="panel-header">
-            <span class="panel-title">◈ OPEN POSITIONS</span>
-            <span class="panel-tag" id="ccPosCount">0 OPEN</span>
-          </div>
-          <div class="cc-table-wrap">
-            <table class="data-table" id="ccPositionsTable">
-              <thead>
-                <tr>
-                  <th>TICKER</th><th>SIDE</th><th>QTY</th>
-                  <th>ENTRY</th><th>CURRENT</th><th>MKT VAL</th>
-                  <th>P&amp;L</th><th>P&amp;L %</th>
-                </tr>
-              </thead>
-              <tbody id="ccPositionsBody">
-                <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:14px">No open positions</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- ── CC ACTIVITY FEED ── -->
-        <div class="panel panel--cc-feed">
-          <div class="panel-header">
-            <span class="panel-title">◈ LIVE ACTIVITY</span>
-            <span class="pulse-dot"></span>
-          </div>
-          <div class="cc-activity-feed" id="ccActivityFeed">
-            <div class="cc-activity-item info">
-              <span class="cc-act-icon">◎</span>
-              <span class="cc-act-text">Waiting for activity...</span>
-              <span class="cc-act-time">--:--</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── CC TRADE HISTORY ── -->
+        <!-- ROW 4 COL 2-3: Trade History -->
         <div class="panel panel--cc-history">
           <div class="panel-header">
             <span class="panel-title">◈ RECENT TRADES</span>
@@ -369,6 +381,46 @@
                 <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:14px">No closed trades yet</td></tr>
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <!-- ROW 5 COL 1: Performance Metrics -->
+        <div class="panel panel--cc-perf">
+          <div class="panel-header">
+            <span class="panel-title">◈ PERFORMANCE</span>
+          </div>
+          <div class="cc-perf-grid">
+            <div class="cc-perf-item">
+              <div class="cc-perf-label">AVG P&amp;L / TRADE</div>
+              <div class="cc-perf-value" id="ccAvgPnl">$--</div>
+            </div>
+            <div class="cc-perf-item">
+              <div class="cc-perf-label">BEST TRADE</div>
+              <div class="cc-perf-value pos" id="ccBestTrade">$--</div>
+            </div>
+            <div class="cc-perf-item">
+              <div class="cc-perf-label">WORST TRADE</div>
+              <div class="cc-perf-value neg" id="ccWorstTrade">$--</div>
+            </div>
+            <div class="cc-perf-item">
+              <div class="cc-perf-label">ALL WEATHER SCORE</div>
+              <div class="cc-perf-value acc" id="ccAWScore">--/100</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ROW 5 COL 2-3: Activity Feed -->
+        <div class="panel panel--cc-feed">
+          <div class="panel-header">
+            <span class="panel-title">◈ LIVE ACTIVITY</span>
+            <span class="pulse-dot"></span>
+          </div>
+          <div class="cc-activity-feed" id="ccActivityFeed">
+            <div class="cc-activity-item info">
+              <span class="cc-act-icon">◎</span>
+              <span class="cc-act-text">Waiting for activity...</span>
+              <span class="cc-act-time">--:--</span>
+            </div>
           </div>
         </div>
 

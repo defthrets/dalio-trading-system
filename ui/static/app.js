@@ -83,7 +83,7 @@ function initTabs() {
       if (id === 'asx-scanner')         loadScanner('asx');
       if (id === 'crypto-scanner')      loadScanner('crypto');
       if (id === 'commodities-scanner') loadScanner('commodities');
-      if (id === 'command-center')      loadSuggestOpportunities();
+      if (id === 'command-center')      initCommandCentre();
       if (id === 'comms-config')        initSettingsTab();
       // Show tutorial on first visit
       showTutorial(id);
@@ -2640,6 +2640,10 @@ function _applyCCPortfolio(d) {
     badge.style.color  = pnlCol;
   }
 
+  // Update quick-trade cash display
+  const cashEl = el('ccQtCash');
+  if (cashEl) cashEl.textContent = fmt$(d.cash);
+
   // Open positions table mirror
   const posCount = el('ccPosCount');
   if (posCount) posCount.textContent = `${d.open_count} OPEN`;
@@ -2647,7 +2651,7 @@ function _applyCCPortfolio(d) {
   const body = el('ccPositionsBody');
   if (body) {
     if (!d.positions || !d.positions.length) {
-      body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:14px">No open positions</td></tr>`;
+      body.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:14px">No open positions</td></tr>`;
     } else {
       body.innerHTML = d.positions.map(p => {
         const pnlCls = p.pnl >= 0 ? 'td-green' : 'td-red';
@@ -2662,6 +2666,7 @@ function _applyCCPortfolio(d) {
           <td>${fmt$(p.market_value)}</td>
           <td class="${pnlCls}">${pnlTxt}</td>
           <td class="${pnlCls}">${pctTxt}</td>
+          <td><button class="btn-ghost btn--sm" style="font-size:9px;padding:2px 6px" onclick="closePaperPosition('${p.ticker}')">✕</button></td>
         </tr>`;
       }).join('');
     }
@@ -2725,6 +2730,101 @@ function _applyCCHistory(d) {
         </tr>`;
       }).join('');
     }
+  }
+}
+
+// ─── Command Centre Init ────────────────────────────────────
+function initCommandCentre() {
+  loadPaperPortfolio();
+  loadPaperHistory();
+  loadCcOpportunities(8);
+  loadQuadrant();
+}
+
+// ─── CC Opportunities (uses dedicated list element) ─────────
+async function loadCcOpportunities(n = 8) {
+  const list = el('ccOpportunityList');
+  if (!list) return;
+  list.innerHTML = '<div style="padding:14px;color:var(--text-muted);font-size:10px;animation:blink 1s infinite">⟳ SCANNING ALL MARKETS…</div>';
+  try {
+    const d = await fetchJSON(`/api/suggest?n=${n}`);
+    const opps = d.opportunities || [];
+    if (!opps.length) {
+      list.innerHTML = '<div style="padding:14px;color:var(--text-muted);font-size:10px">NO OPPORTUNITIES — LOAD SCANNER TABS FIRST TO POPULATE DATA</div>';
+      return;
+    }
+    const meta = d;
+    const regime = (meta.regime_label || '').toUpperCase();
+    const fitColour = { strong:'var(--green)', moderate:'var(--primary)', neutral:'var(--text-2)', avoid:'var(--red)' };
+    const actionColour = { BUY:'var(--green)', LONG:'var(--green)', SELL:'var(--red)', SHORT:'var(--red)', WATCH:'var(--amber)' };
+    list.innerHTML = opps.map((o, i) => {
+      const ac = actionColour[o.action] || 'var(--text-1)';
+      const fc = fitColour[o.regime_fit] || 'var(--text-2)';
+      return `<div class="opp-card" style="border-left:2px solid ${ac}">
+        <div class="opp-rank">#${i+1}</div>
+        <div class="opp-body">
+          <div class="opp-top">
+            <span class="opp-ticker">${o.ticker}</span>
+            <span class="opp-action" style="color:${ac}">${o.action}</span>
+            <span class="opp-conf">${o.confidence}%</span>
+          </div>
+          <div class="opp-reason">${o.reason || ''}</div>
+          ${regime ? `<div class="opp-fit" style="color:${fc}">${o.regime_fit?.toUpperCase() || ''} FIT · ${regime}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+    // Update regime badge in stats bar
+    const regimeBadge = el('ccRegimeBadge');
+    if (regimeBadge && regime) regimeBadge.textContent = regime;
+  } catch(e) {
+    list.innerHTML = `<div style="padding:14px;color:var(--red);font-size:10px">SCAN FAILED: ${e.message}</div>`;
+  }
+}
+
+// ─── CC Quick Trade ─────────────────────────────────────────
+let _ccQtSide = 'BUY';
+let _ccQtPrice = null;
+
+function setCcQtSide(side, btn) {
+  _ccQtSide = side;
+  el('ccQtBuyBtn').classList.toggle('active', side === 'BUY');
+  el('ccQtSellBtn').classList.toggle('active', side === 'SELL');
+  ccQtEstimate();
+}
+
+async function ccQtLookup(ticker) {
+  ticker = ticker.toUpperCase().trim();
+  if (!ticker || ticker.length < 2) { _ccQtPrice = null; el('ccQtQuote').innerHTML = ''; ccQtEstimate(); return; }
+  try {
+    const d = await fetchJSON(`/api/paper/quote?ticker=${encodeURIComponent(ticker)}`);
+    _ccQtPrice = d.price;
+    el('ccQtQuote').innerHTML = `<span style="color:var(--green)">${ticker}</span> <span style="color:var(--text-1)">${fmt$(d.price)}</span> <span style="color:var(--text-2);font-size:9px">${d.source||''}</span>`;
+    ccQtEstimate();
+  } catch { _ccQtPrice = null; el('ccQtQuote').innerHTML = `<span style="color:var(--red)">Not found</span>`; }
+}
+
+function ccQtEstimate() {
+  const qty = parseFloat(el('ccQtQty')?.value) || 0;
+  if (_ccQtPrice && qty > 0) {
+    el('ccQtEstVal').textContent = fmt$(_ccQtPrice * qty);
+  } else {
+    el('ccQtEstVal').textContent = '—';
+  }
+}
+
+async function ccQtSubmit() {
+  const ticker = (el('ccQtTicker')?.value || '').toUpperCase().trim();
+  const qty    = parseFloat(el('ccQtQty')?.value);
+  const res    = el('ccQtResult');
+  if (!ticker || !qty || qty <= 0) { if (res) res.innerHTML = '<span style="color:var(--red)">Enter ticker and quantity</span>'; return; }
+  try {
+    const d = await postJSON('/api/paper/order', { ticker, side: _ccQtSide, qty });
+    if (res) res.innerHTML = `<span style="color:var(--green)">✓ ${d.side} ${qty} ${ticker} @ ${fmt$(d.price)}</span>`;
+    pushActivityItem(_ccQtSide === 'BUY' ? '▲' : '▼', `ORDER — ${_ccQtSide} ${qty}× ${ticker} @ ${fmt$(d.price)}`, _ccQtSide === 'BUY' ? 'buy' : 'sell');
+    loadPaperPortfolio();
+    loadPaperHistory();
+  } catch(e) {
+    if (res) res.innerHTML = `<span style="color:var(--red)">✗ ${e.message}</span>`;
   }
 }
 

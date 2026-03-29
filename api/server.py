@@ -361,14 +361,20 @@ def _load_paper_config() -> dict:
             pass
     return {"starting_cash": 1_000.0}
 
-def _save_paper_config(cfg: dict) -> None:
+def _save_paper_config() -> None:
     try:
-        PAPER_CONFIG_FILE.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+        PAPER_CONFIG_FILE.write_text(json.dumps({"starting_cash": PAPER_STARTING_CASH}, indent=2), encoding="utf-8")
     except Exception as exc:
         logger.warning(f"Failed to save paper config: {exc}")
 
 _paper_cfg         = _load_paper_config()
 PAPER_STARTING_CASH: float = float(_paper_cfg.get("starting_cash", 1_000.0))
+# Persist config file on first startup if it doesn't exist
+if not PAPER_CONFIG_FILE.exists():
+    try:
+        PAPER_CONFIG_FILE.write_text(json.dumps({"starting_cash": PAPER_STARTING_CASH}, indent=2), encoding="utf-8")
+    except Exception:
+        pass
 
 # ─── Watchlist ────────────────────────────────
 def _load_watchlist() -> list:
@@ -2469,7 +2475,7 @@ async def set_paper_config(payload: dict):
     if cash < 1:
         raise HTTPException(400, "starting_cash must be >= 1")
     PAPER_STARTING_CASH = cash
-    _save_paper_config({"starting_cash": cash})
+    _save_paper_config()
     # If no open positions, apply new cash immediately and persist
     applied = False
     if not PAPER.positions:
