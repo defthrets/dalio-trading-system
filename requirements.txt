@@ -1,72 +1,9 @@
-# ─── Web UI Server ───────────────────────────────────────
+# ─── Dalios Trading System — Runtime Dependencies ───────────────────
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 python-multipart>=0.0.9
-
-# Core Data & Computation
-pandas>=2.1.0
 numpy>=1.25.0
-scipy>=1.11.0
-
-# Risk Parity & Portfolio Optimization
-Riskfolio-Lib>=4.4.0
-cvxpy>=1.4.0
-
-# Machine Learning & Sentiment Analysis (FinBERT)
-transformers>=4.35.0
-torch>=2.1.0
-scikit-learn>=1.3.0
-
-# API Clients - Market Data
-alpha-vantage>=2.3.1
 yfinance>=0.2.31
 requests>=2.31.0
 aiohttp>=3.9.0
-websockets>=12.0
-
-# API Clients - Macro Data (EODHD, Trading Economics)
-eod>=0.4.0
-
-# API Clients - News
-finnhub-python>=2.4.19
-newsapi-python>=0.2.7
-
-# Backtesting & Technical Analysis
-ta>=0.11.0
-ta-lib>=0.4.28
-empyrical>=0.5.5
-
-# Database & Storage
-sqlalchemy>=2.0.0
-sqlite3-api>=2.0.0
-
-# Scheduling & Async
-apscheduler>=3.10.4
-asyncio>=3.4.3
-celery>=5.3.0
-
-# Notifications
-discord-webhook>=1.3.0
-python-telegram-bot>=20.7
-
-# Visualization & Reporting
-matplotlib>=3.8.0
-plotly>=5.18.0
-
-# Configuration & Environment
-python-dotenv>=1.0.0
-pyyaml>=6.0.1
-pydantic>=2.5.0
-pydantic-settings>=2.1.0
-
-# Logging & Monitoring
 loguru>=0.7.2
-rich>=13.7.0
-
-# Testing
-pytest>=7.4.0
-pytest-asyncio>=0.23.0
-pytest-cov>=4.1.0
-
-# Type Checking
-mypy>=1.7.0

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css?v=20260329b" />
 </head>
 <body>
   <!-- Scanline overlay -->
@@ -352,14 +352,14 @@
           </div>
         </div>
 
-        <!-- ROW 4 COL 1: Trade Opportunities -->
-        <div class="panel panel--cc-opps">
+        <!-- ROW 4 COL 1: AI Trade Recommendations -->
+        <div class="panel panel--cc-recs">
           <div class="panel-header">
-            <span class="panel-title">◈ TOP OPPORTUNITIES</span>
-            <button class="btn-ghost btn--sm" onclick="loadCcOpportunities(8)" style="margin-left:auto">↻ SCAN</button>
+            <span class="panel-title">◈ AI TRADE RECOMMENDATIONS</span>
+            <button class="btn-ghost btn--sm" onclick="loadCcRecommendations()" style="margin-left:auto">↻ ANALYSE</button>
           </div>
-          <div class="opportunity-list" id="ccOpportunityList">
-            <div style="padding:14px;color:var(--text-muted);font-size:10px">Click SCAN to analyse all markets…</div>
+          <div class="cc-recs-list" id="ccRecsList">
+            <div style="padding:14px;color:var(--text-muted);font-size:10px">Click ANALYSE to generate AI trade recommendations…</div>
           </div>
         </div>
 
@@ -1937,7 +1937,7 @@
     <span class="sb-version">DALIOS v1.0.0 — RAY DALIO ALL WEATHER FRAMEWORK</span>
   </footer>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=20260329b"></script>
 
   <!-- ═══════════════════════════════════════════════
        SPEECH BUBBLE SPOTLIGHT TOOLTIP

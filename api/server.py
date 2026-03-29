@@ -981,47 +981,59 @@ def _gen_price_history_demo(price: float, trend: str, n_points: int = 30) -> lis
 
 
 async def _gen_signals(n: int = 12) -> list[dict]:
-    """Generate trade signals -- uses real yfinance prices when available."""
-    candidates = random.sample(ALL_TICKERS, min(n + 6, len(ALL_TICKERS)))
+    """Generate trade signals -- uses real yfinance prices only. Skips tickers with no live data."""
+    candidates = random.sample(ALL_TICKERS, min(n * 3, len(ALL_TICKERS)))
     # Fetch real prices (capped to avoid very long API calls)
-    prices_map = await _get_prices(candidates[:24], "3mo")
+    prices_map = await _get_prices(candidates[:30], "3mo")
 
     signals = []
     for ticker in candidates:
         closes = prices_map.get(ticker) if prices_map else None
-        if closes and len(closes) >= 20:
-            price  = round(closes[-1], 4 if "USD" in ticker else 2)
-            rsi    = _calc_rsi(closes)
-            trend  = _calc_trend(closes)
-            atr    = _calc_atr(closes)
-            # Rule-based action from real RSI + trend
-            if rsi < 32 and trend != "downtrend":
-                action = "BUY"
-            elif rsi > 68 and trend != "uptrend":
-                action = "SELL"
-            elif trend == "uptrend" and rsi < 58:
-                action = "LONG"
-            elif trend == "downtrend" and rsi > 42:
-                action = "SHORT"
-            else:
-                action = "HOLD"
-            source = "LIVE"
-            price_history = [round(c, 4 if "USD" in ticker else 2) for c in closes[-30:]]
+        # Skip tickers with no live data — no DEMO fallback
+        if not closes or len(closes) < 20:
+            continue
+
+        price  = round(closes[-1], 4 if "USD" in ticker else 2)
+        rsi    = _calc_rsi(closes)
+        trend  = _calc_trend(closes)
+        atr    = _calc_atr(closes)
+        # Rule-based action from real RSI + trend
+        if rsi < 32 and trend != "downtrend":
+            action = "BUY"
+        elif rsi > 68 and trend != "uptrend":
+            action = "SELL"
+        elif trend == "uptrend" and rsi < 58:
+            action = "LONG"
+        elif trend == "downtrend" and rsi > 42:
+            action = "SHORT"
         else:
-            price  = round(random.uniform(8, 250), 2)
-            rsi    = round(random.uniform(22, 78), 1)
-            trend  = random.choice(["uptrend", "downtrend", "sideways"])
-            atr    = price * random.uniform(0.018, 0.04)
-            action = random.choices(
-                ["BUY", "SELL", "SHORT", "LONG", "HOLD"],
-                weights=[30, 15, 15, 25, 15]
-            )[0]
-            source = "DEMO"
-            price_history = _gen_price_history_demo(price, trend, 30)
+            action = "HOLD"
+
+        price_history = [round(c, 4 if "USD" in ticker else 2) for c in closes[-30:]]
 
         sl_offset = max(atr * 1.5, price * 0.025)
-        tp_offset = sl_offset * random.uniform(1.8, 3.2)
-        conf = round(random.uniform(52, 96), 1)
+        tp_offset = atr * 2.5
+
+        # Real confidence: RSI extremes = high confidence, middle = lower
+        if action == "BUY":
+            conf = round(min(95, max(50, 100 - rsi)), 1)   # oversold RSI → high confidence
+        elif action == "SELL":
+            conf = round(min(95, max(50, rsi)), 1)           # overbought RSI → high confidence
+        elif action in ("LONG", "SHORT"):
+            conf = round(min(85, max(50, abs(rsi - 50) + 50)), 1)
+        else:
+            conf = 50.0
+
+        # quadrant_fit computed from ASSET_CLASS_MAP + current quadrant
+        qdata = STATE.last_quadrant or {}
+        quadrant = qdata.get("quadrant", "rising_growth")
+        pb = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
+        ac = ASSET_CLASS_MAP.get(ticker, "equities")
+        if ac in pb["strong_buy"]:   q_fit = "strong"
+        elif ac in pb["buy"]:         q_fit = "moderate"
+        elif ac in pb["avoid"]:       q_fit = "avoid"
+        else:                          q_fit = "neutral"
+
         # Estimate days to reach target based on ~0.8% avg daily move
         predicted_days = max(3, min(60, int(tp_offset / max(price * 0.008, 0.01))))
 
@@ -1030,25 +1042,13 @@ async def _gen_signals(n: int = 12) -> list[dict]:
             "action": action,
             "confidence": conf,
             "price": price,
-            "data_source": source,
-            "quadrant_fit": random.choices(
-                ["strong", "moderate", "weak", "avoid"],
-                weights=[40, 35, 15, 10]
-            )[0],
-            "sentiment": random.choices(
-                ["positive", "neutral", "negative"],
-                weights=[50, 30, 20]
-            )[0],
+            "data_source": "LIVE",
+            "quadrant_fit": q_fit,
             "rsi": rsi,
             "trend": trend,
             "stop_loss": round(price - sl_offset, 2),
             "take_profit": round(price + tp_offset, 2),
             "rr_ratio": round(tp_offset / sl_offset, 2),
-            "position_size_pct": round(random.uniform(2.5, 8.0), 1),
-            "options_strategy": random.choice([
-                None, "Bull Call Spread", "Bear Put Spread",
-                "Covered Call", "Cash-Secured Put",
-            ]),
             "dalio_justification": _gen_justification(ticker, action),
             "price_history": price_history,
             "predicted_days": predicted_days,
@@ -2745,6 +2745,48 @@ async def suggest_trades(n: int = 8):
             mkt: bool(_scanner_cache.get(mkt))
             for mkt in ("asx", "crypto", "commodities")
         },
+    }
+
+
+@app.get("/api/recommendations")
+async def get_recommendations(n: int = 6):
+    """
+    Top N trade recommendations with full Dalio AI analysis.
+    Each recommendation includes:
+      - opportunity data (from _gen_opportunities)
+      - full dalio_analyse_trade() analysis
+      - per-trade reasoning bullets
+    """
+    n = min(max(1, n), 12)
+    opps = await _gen_opportunities(n * 2)
+    qdata = STATE.last_quadrant or _gen_quadrant_data()
+    quadrant = qdata.get("quadrant", "rising_growth")
+    sigs = await _gen_signals(12)
+
+    recs = []
+    for opp in opps[:n]:
+        ticker = opp["ticker"]
+        analysis = dalio_analyse_trade(
+            ticker, opp["action"] if opp["action"] not in ("SELL", "SHORT") else "SELL",
+            quadrant, PAPER.cash, PAPER.positions, sigs
+        )
+        rec = dict(opp)
+        rec["analysis"] = {
+            "fit_score":         analysis["fit_score"],
+            "fit_label":         analysis["fit_label"],
+            "all_weather_score": analysis["all_weather_score"],
+            "recommendation":    analysis["recommendation"],
+            "risk_flags":        analysis["risk_flags"],
+            "reasoning":         analysis["reasoning"],
+            "asset_class":       analysis["asset_class"],
+        }
+        recs.append(rec)
+
+    return {
+        "recommendations": recs,
+        "count": len(recs),
+        "quadrant": quadrant,
+        "regime_label": qdata.get("label", ""),
     }
 
 

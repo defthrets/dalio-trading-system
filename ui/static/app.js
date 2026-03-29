@@ -2739,6 +2739,86 @@ function initCommandCentre() {
   loadPaperHistory();
   loadCcOpportunities(8);
   loadQuadrant();
+  loadCcRecommendations();
+}
+
+// ─── AI Recommendations ─────────────────────────────────────
+async function loadCcRecommendations() {
+  const list = el('ccRecsList');
+  if (!list) return;
+  list.innerHTML = '<div style="padding:14px;color:var(--text-muted);font-size:10px;animation:blink 1s infinite">⟳ RUNNING AI ANALYSIS…</div>';
+  try {
+    const d = await fetchJSON('/api/recommendations?n=6');
+    renderCcRecommendations(d.recommendations || [], d.regime_label || '');
+    // Update regime badge in stats bar
+    const rb = el('ccRegimeBadge');
+    if (rb && d.regime_label) rb.textContent = d.regime_label.toUpperCase();
+  } catch(e) {
+    list.innerHTML = `<div style="padding:14px;color:var(--red);font-size:10px">ANALYSIS FAILED: ${e.message}</div>`;
+  }
+}
+
+function renderCcRecommendations(recs, regimeLabel) {
+  const list = el('ccRecsList');
+  if (!list) return;
+  if (!recs || !recs.length) {
+    list.innerHTML = '<div style="padding:14px;color:var(--text-muted);font-size:10px">No recommendations — load scanner tabs first</div>';
+    return;
+  }
+  const fitCol = { strong:'var(--green)', moderate:'var(--primary)', neutral:'var(--text-2)', avoid:'var(--red)' };
+  const actCol = { BUY:'var(--green)', LONG:'var(--green)', SELL:'var(--red)', SHORT:'var(--red)', WATCH:'var(--amber)' };
+  list.innerHTML = recs.map((r, i) => {
+    const a    = r.analysis || {};
+    const fc   = fitCol[r.quadrant_fit] || 'var(--text-2)';
+    const ac   = actCol[r.action] || 'var(--text-1)';
+    const chgSign = r.change_pct >= 0 ? '+' : '';
+    const chgCol  = r.change_pct >= 0 ? 'var(--green)' : 'var(--red)';
+    const scoreBar = Math.min(Math.round(r.score || 0), 100);
+    const fitClass = r.quadrant_fit === 'strong' ? 'fit-strong' : r.quadrant_fit === 'avoid' ? 'fit-avoid' : 'fit-moderate';
+    const riskHtml = (a.risk_flags || []).length
+      ? `<div class="cc-rec-risk-flags">⚠ ${a.risk_flags.slice(0,2).join(' · ')}</div>` : '';
+    const reasonHtml = (a.reasoning || []).slice(0, 3)
+      .map(l => `<div class="cc-rec-analysis-line">▸ ${l}</div>`).join('');
+    return `
+    <div class="cc-rec-card ${fitClass}" onclick="this.classList.toggle('cc-rec-expanded')">
+      <div class="cc-rec-header">
+        <span style="color:var(--text-muted);font-size:9px">#${i+1}</span>
+        <span class="cc-rec-ticker" style="color:${ac}">${r.ticker}</span>
+        <span class="cc-rec-action" style="color:${ac};border-color:${ac}">${r.action}</span>
+        <span style="color:${chgCol};font-size:8px">${chgSign}${r.change_pct.toFixed(2)}%</span>
+        <span class="cc-rec-fit" style="color:${fc};border-color:${fc}">${(r.quadrant_fit||'').toUpperCase()}</span>
+      </div>
+      <div class="cc-rec-score-wrap">
+        <div class="cc-rec-score-bar"><div class="cc-rec-score-fill" style="width:${scoreBar}%;background:${fc}"></div></div>
+        <span style="font-size:8px;color:var(--text-2)">Score ${(r.score||0).toFixed(0)}</span>
+        <span style="font-size:8px;color:var(--text-2);margin-left:4px">FitScore ${a.fit_score||'--'}</span>
+      </div>
+      <div class="cc-rec-metrics">
+        <span>$${r.price?.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}</span>
+        <span>RSI <b style="color:${r.rsi<35?'var(--green)':r.rsi>65?'var(--red)':'var(--amber)'}">${r.rsi?.toFixed(0)}</b></span>
+        <span>R:R <b style="color:var(--primary)">${r.rr_ratio?.toFixed(1)}x</b></span>
+        <span>SL $${r.stop_loss?.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}</span>
+        <span>TP $${r.take_profit?.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}</span>
+      </div>
+      <div class="cc-rec-analysis">
+        <div style="color:var(--text-1);margin-bottom:3px;font-size:8px">${a.recommendation||''}</div>
+        ${reasonHtml}
+        ${riskHtml}
+      </div>
+      <div class="cc-rec-actions" style="display:none">
+        <button class="scan-trade-btn" onclick="event.stopPropagation();scannerOpenTrade('${r.ticker}',${r.price})">▲ TRADE</button>
+        <button class="scan-wl-btn"    onclick="event.stopPropagation();toggleWatchlist('${r.ticker}',this)">☆ WATCH</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Show actions on expanded cards
+  list.querySelectorAll('.cc-rec-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const acts = card.querySelector('.cc-rec-actions');
+      if (acts) acts.style.display = card.classList.contains('cc-rec-expanded') ? 'flex' : 'none';
+    });
+  });
 }
 
 // ─── CC Opportunities (uses dedicated list element) ─────────
