@@ -2215,52 +2215,115 @@ async function toggleTradingMode() {
 let _paperEquityChart = null;
 let _liveEquityChart  = null;
 
-function initEquityChart(canvasId, chartRef) {
+function initEquityChart(canvasId, chartRef, multiAsset = false) {
   const canvas = el(canvasId);
   if (!canvas) return null;
   if (chartRef) { chartRef.destroy(); }
-  // responsive:false prevents ResizeObserver loop when inside fixed-height grid panels
   const isPaper = canvasId === 'paperEquityChart';
+  const datasets = [{
+    label: 'Portfolio', data: [], borderColor: '#00d4ff',
+    backgroundColor: 'rgba(0,212,255,0.06)', borderWidth: 2,
+    pointRadius: 0, tension: 0.3, fill: !multiAsset, yAxisID: 'y',
+  }];
   return new Chart(canvas, {
     type: 'line',
-    data: { labels: [], datasets: [{ data: [], borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.06)', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: true }] },
+    data: { labels: [], datasets },
     options: {
       responsive: !isPaper, maintainAspectRatio: false,
-      animation: { duration: 400 },
-      plugins: { legend: { display: false }, tooltip: {
-        callbacks: { label: ctx => `$${ctx.raw.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
-        backgroundColor: '#070c14', borderColor: '#00d4ff', borderWidth: 1,
-        titleColor: '#3a6882', bodyColor: '#b8dcf0',
-      }},
+      animation: { duration: 300 },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: multiAsset, labels: { color: '#3a6882', font: { size: 9 }, boxWidth: 8 } },
+        tooltip: {
+          backgroundColor: '#070c14', borderColor: '#00d4ff', borderWidth: 1,
+          titleColor: '#3a6882', bodyColor: '#b8dcf0',
+          callbacks: {
+            label: ctx => {
+              const v = ctx.raw;
+              if (ctx.dataset.label === 'Portfolio') return ` NAV: $${v.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+              return ` ${ctx.dataset.label}: ${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
+            }
+          }
+        }
+      },
       scales: {
         x: { display: false },
-        y: { display: true, grid: { color: 'rgba(10,28,46,0.8)' }, ticks: { color: '#32607e', font: { size: 9 }, callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(1)+'k' : v.toFixed(0)) } }
+        y: {
+          display: true, position: 'left',
+          grid: { color: 'rgba(10,28,46,0.8)' },
+          ticks: { color: '#32607e', font: { size: 9 }, callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(1)+'k' : v.toFixed(0)) }
+        },
+        y2: {
+          display: multiAsset, position: 'right',
+          grid: { drawOnChartArea: false },
+          ticks: { color: '#32607e', font: { size: 8 }, callback: v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%' }
+        }
       }
     }
   });
 }
 
+const _ASSET_LINE_COLOURS = ['#ffaa00','#ff6b6b','#51cf66','#cc5de8','#ff922b','#74c0fc','#f06595','#a9e34b'];
+
 async function loadPaperEquityCurve() {
   try {
     const d = await fetchJSON('/api/paper/equity_curve');
-    const pts = d.equity_curve || [];
+    const pts  = d.equity_curve || [];
+    const perf = d.position_performance || {};
+    const startCash = d.starting_cash || 1000;
     const hint = el('paperEquityHint');
+
+    // Destroy and recreate chart with multi-asset mode if positions exist
+    const hasAssets = Object.keys(perf).length > 0;
+    if (!_paperEquityChart || (_paperEquityChart._multiAsset !== hasAssets)) {
+      if (_paperEquityChart) _paperEquityChart.destroy();
+      _paperEquityChart = initEquityChart('paperEquityChart', null, hasAssets);
+      if (_paperEquityChart) _paperEquityChart._multiAsset = hasAssets;
+    }
+    if (!_paperEquityChart) return;
+
     if (!pts.length) {
       if (hint) hint.textContent = '— place a trade to start tracking —';
+      _paperEquityChart.data.labels = [];
+      _paperEquityChart.data.datasets = [_paperEquityChart.data.datasets[0]];
+      _paperEquityChart.data.datasets[0].data = [];
+      _paperEquityChart.update('none');
       return;
     }
-    if (hint) hint.textContent = `${pts.length} data points`;
-    _paperEquityChart = _paperEquityChart || initEquityChart('paperEquityChart', null);
-    if (!_paperEquityChart) return;
-    _paperEquityChart.data.labels   = pts.map(p => p.t.slice(11, 16));
-    _paperEquityChart.data.datasets[0].data = pts.map(p => p.v);
-    // Colour red if below starting value (use server's starting_cash)
-    const last = pts[pts.length - 1].v;
-    let _startCash = parseFloat(el('startingCashInput')?.value) || parseFloat(el('settStartCash')?.value) || 1000;
-    _paperEquityChart.data.datasets[0].borderColor     = last >= _startCash ? '#00d4ff' : '#ff3355';
-    _paperEquityChart.data.datasets[0].backgroundColor = last >= _startCash ? 'rgba(0,212,255,0.06)' : 'rgba(255,51,85,0.05)';
+    if (hint) hint.textContent = `${pts.length} pts`;
+
+    const labels = pts.map(p => p.t.slice(11, 16));
+    const last   = pts[pts.length - 1].v;
+    _paperEquityChart.data.labels = labels;
+
+    // Portfolio equity line (absolute $)
+    const ds0 = _paperEquityChart.data.datasets[0];
+    ds0.data            = pts.map(p => p.v);
+    ds0.borderColor     = last >= startCash ? '#00d4ff' : '#ff3355';
+    ds0.backgroundColor = last >= startCash ? 'rgba(0,212,255,0.06)' : 'rgba(255,51,85,0.05)';
+    ds0.yAxisID         = 'y';
+
+    // Per-position % return lines
+    const newDatasets = [ds0];
+    let ci = 0;
+    for (const [ticker, returns] of Object.entries(perf)) {
+      const col = _ASSET_LINE_COLOURS[ci++ % _ASSET_LINE_COLOURS.length];
+      // Pad or trim returns to match label count
+      const padded = returns.length >= labels.length
+        ? returns.slice(-labels.length)
+        : Array(labels.length - returns.length).fill(null).concat(returns);
+      newDatasets.push({
+        label: ticker.replace('-USD',''), data: padded,
+        borderColor: col, backgroundColor: 'transparent',
+        borderWidth: 1.5, borderDash: [3,3],
+        pointRadius: 0, tension: 0.3, fill: false, yAxisID: 'y2',
+      });
+    }
+    _paperEquityChart.data.datasets = newDatasets;
     _paperEquityChart.update('none');
-  } catch {}
+  } catch (e) {
+    console.warn('Equity curve load error:', e);
+  }
 }
 
 async function loadRealEquityCurve() {
@@ -2788,6 +2851,7 @@ function _applyCCHistory(d) {
 function initCommandCentre() {
   loadPaperPortfolio();
   loadPaperHistory();
+  loadPaperEquityCurve();
   loadCcOpportunities(8);
   loadQuadrant();
   loadCcRecommendations();

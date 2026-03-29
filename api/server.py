@@ -1399,7 +1399,7 @@ HEADLINE_POOL = [
 ]
 
 
-def _gen_headlines(n: int = 8) -> list[dict]:
+def _gen_headlines(n: int = 20) -> list[dict]:
     selected = random.sample(HEADLINE_POOL, min(n, len(HEADLINE_POOL)))
     return [
         {
@@ -1604,10 +1604,19 @@ async def get_quadrant():
     return data
 
 
+_SENTIMENT_CACHE: dict = {}
+_SENTIMENT_TTL = 1800  # 30 minutes
+
 @app.get("/api/sentiment")
 async def get_sentiment():
+    import time as _t
+    cached = _SENTIMENT_CACHE.get("data")
+    if cached and (_t.time() - _SENTIMENT_CACHE.get("ts", 0)) < _SENTIMENT_TTL:
+        return cached
     data = _gen_sentiment_data()
     STATE.last_sentiment = data
+    _SENTIMENT_CACHE["data"] = data
+    _SENTIMENT_CACHE["ts"] = _t.time()
     return data
 
 
@@ -2381,7 +2390,7 @@ async def get_paper_portfolio():
         drawdown_val = 0.0
 
     # Compute annualised Sharpe from equity history daily returns
-    sharpe_val: float | None = None
+    sharpe_val = None  # Optional[float]
     if len(eq_vals) >= 10:
         try:
             import numpy as np
@@ -2871,7 +2880,24 @@ async def get_quote(ticker: str):
 
 @app.get("/api/paper/equity_curve")
 async def get_paper_equity_curve():
-    return {"equity_curve": PAPER.equity_history, "count": len(PAPER.equity_history)}
+    # Per-position price performance (last 60 bars, normalized to % return from entry)
+    pos_perf: dict = {}
+    if PAPER.positions:
+        tickers = list(PAPER.positions.keys())
+        prices_map = await _get_prices(tickers, "3mo") or {}
+        for tkr, pos in PAPER.positions.items():
+            closes = prices_map.get(tkr, [])
+            if closes and len(closes) >= 2:
+                entry = pos["entry_price"]
+                last60 = closes[-60:]
+                pos_perf[tkr] = [round((p / entry - 1) * 100, 2) for p in last60]
+
+    return {
+        "equity_curve": PAPER.equity_history,
+        "count": len(PAPER.equity_history),
+        "position_performance": pos_perf,
+        "starting_cash": PAPER_STARTING_CASH,
+    }
 
 
 # ─────────────────────────────────────────────

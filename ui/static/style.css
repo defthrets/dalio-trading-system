@@ -1365,18 +1365,18 @@ canvas { display: block; max-width: 100%; }
   transition: outline 0.2s, box-shadow 0.2s;
 }
 
-/* ─── Strong Signal Banner (fixed, top of viewport) ─── */
+/* ─── Strong Signal Banner (fixed, bottom of viewport, above CLI bar) ─── */
 .strong-signal-banner {
   position: fixed;
-  top: 0; left: 0; right: 0;
+  bottom: 56px; left: 0; right: 0;
   z-index: 7000;
   padding: 0;
   animation: ssb-slide-in 0.35s ease;
 }
 .strong-signal-banner.hidden { display: none; }
 @keyframes ssb-slide-in {
-  from { transform: translateY(-100%); opacity: 0; }
-  to   { transform: translateY(0);     opacity: 1; }
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
 }
 .ssb-inner {
   display: flex;
@@ -1384,13 +1384,13 @@ canvas { display: block; max-width: 100%; }
   gap: 14px;
   padding: 10px 20px;
   background: linear-gradient(90deg, #001622 0%, #002233 50%, #001622 100%);
-  border-bottom: 2px solid var(--primary);
-  box-shadow: 0 4px 20px var(--primary-glow);
+  border-top: 2px solid var(--primary);
+  box-shadow: 0 -4px 20px var(--primary-glow);
 }
 .strong-signal-banner.sell .ssb-inner {
   background: linear-gradient(90deg, #160008 0%, #280010 50%, #160008 100%);
-  border-bottom-color: var(--red);
-  box-shadow: 0 4px 20px rgba(255,34,34,0.25);
+  border-top-color: var(--red);
+  box-shadow: 0 -4px 20px rgba(255,34,34,0.25);
 }
 .ssb-icon {
   font-size: 20px;
