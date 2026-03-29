@@ -50,7 +50,13 @@
       <div class="header-divider"></div>
       <div class="system-badges">
         <span class="badge badge--green" id="statusBadge">● OPERATIONAL</span>
-        <span class="badge badge--amber" id="modeBadge">MODE: PAPER</span>
+        <div class="mode-dropdown" id="modeDropdown">
+          <span class="badge badge--amber" id="modeBadge" onclick="toggleModeDropdown()" title="Switch trading mode">MODE: PAPER ▾</span>
+          <div class="mode-dropdown-menu hidden" id="modeDropdownMenu">
+            <button class="mode-drop-opt" id="modeOptPaper" onclick="selectMode('paper')">📄 PAPER</button>
+            <button class="mode-drop-opt" id="modeOptLive"  onclick="selectMode('live')">🔴 LIVE</button>
+          </div>
+        </div>
         <span class="badge badge--cyan" id="uptimeBadge">UPTIME: --</span>
       </div>
     </div>

@@ -199,7 +199,7 @@ a:hover { color: var(--primary); text-decoration: underline; }
   gap: 10px;
 }
 .logo-icon {
-  font-size: 24px;
+  font-size: 32px;
   color: var(--primary);
   text-shadow: 0 0 12px var(--primary), 0 0 30px var(--primary);
   animation: iconPulse 2s ease-in-out infinite;
@@ -211,11 +211,11 @@ a:hover { color: var(--primary); text-decoration: underline; }
 .logo-text { display: flex; flex-direction: column; line-height: 1.1; }
 .logo-main {
   font-family: var(--font-hud);
-  font-size: 20px;
+  font-size: 28px;
   font-weight: 900;
   color: var(--primary);
-  letter-spacing: 6px;
-  text-shadow: 0 0 12px var(--primary);
+  letter-spacing: 8px;
+  text-shadow: 0 0 14px var(--primary);
   animation: logoGlitch 8s ease-in-out infinite;
 }
 @keyframes logoGlitch {
@@ -237,9 +237,9 @@ a:hover { color: var(--primary); text-decoration: underline; }
   }
 }
 .logo-sub {
-  font-size: 8px;
+  font-size: 10px;
   color: var(--text-2);
-  letter-spacing: 3px;
+  letter-spacing: 3.5px;
   text-transform: uppercase;
 }
 
@@ -264,6 +264,50 @@ a:hover { color: var(--primary); text-decoration: underline; }
 .badge--amber  { color: var(--amber);  border-color: var(--amber);  background: var(--amber-glow); }
 .badge--red    { color: var(--red);    border-color: var(--red);    background: var(--red-glow); }
 .badge--cyan   { color: var(--cyan);   border-color: var(--cyan);   background: var(--cyan-glow); }
+
+/* ── Mode dropdown ─────────────────────────────────── */
+.mode-dropdown {
+  position: relative;
+  display: inline-block;
+}
+#modeBadge {
+  cursor: pointer;
+  user-select: none;
+  transition: opacity .15s;
+}
+#modeBadge:hover { opacity: .8; }
+.mode-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 9999;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  min-width: 130px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.6);
+  overflow: hidden;
+}
+.mode-dropdown-menu.hidden { display: none; }
+.mode-drop-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-hud);
+  font-size: 10px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+  text-align: left;
+}
+.mode-drop-opt:hover          { background: var(--bg-row-hover); color: var(--text-primary); }
+.mode-drop-opt.active         { color: var(--amber); background: rgba(255,170,0,.07); }
+.mode-drop-opt.active-live    { color: var(--red);   background: rgba(255,68,68,.07); }
 
 .live-clock {
   font-family: var(--font-hud);

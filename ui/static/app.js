@@ -2243,19 +2243,38 @@ async function initTradingMode() {
 
 function updateModeUI(mode, brokerConnected = false) {
   _tradingMode = mode;
+  // Badge text + colour
   const badge = el('modeBadge');
-  if (badge) { badge.textContent = mode === 'live' ? 'MODE: LIVE' : 'MODE: PAPER'; badge.className = mode === 'live' ? 'badge badge--red' : 'badge badge--amber'; }
-  // Update mode switcher pill
-  const paperBtn = el('modePaperBtn');
-  const liveBtn  = el('modeLiveBtn');
-  if (paperBtn) paperBtn.classList.toggle('active', mode === 'paper');
-  if (liveBtn)  liveBtn.classList.toggle('active',  mode === 'live');
-  // Update live tab warning
+  if (badge) {
+    badge.textContent = mode === 'live' ? 'MODE: LIVE ▾' : 'MODE: PAPER ▾';
+    badge.className   = mode === 'live' ? 'badge badge--red' : 'badge badge--amber';
+  }
+  // Dropdown option highlight
+  const optPaper = el('modeOptPaper');
+  const optLive  = el('modeOptLive');
+  if (optPaper) { optPaper.classList.toggle('active',      mode === 'paper'); optPaper.classList.remove('active-live'); }
+  if (optLive)  { optLive.classList.toggle('active-live',  mode === 'live');  optLive.classList.remove('active'); }
+  // Live tab warning
   const warn = el('liveModeWarning');
   const tag  = el('liveModeTag');
   if (warn) warn.classList.toggle('hidden', mode === 'live' && brokerConnected);
   if (tag)  { tag.textContent = mode === 'live' ? 'LIVE MODE' : 'PAPER MODE'; tag.className = `panel-tag live-mode-tag${mode === 'live' ? ' live' : ''}`; }
 }
+
+function toggleModeDropdown() {
+  el('modeDropdownMenu')?.classList.toggle('hidden');
+}
+
+async function selectMode(mode) {
+  el('modeDropdownMenu')?.classList.add('hidden');
+  await setTradingMode(mode);
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', e => {
+  const dd = el('modeDropdown');
+  if (dd && !dd.contains(e.target)) el('modeDropdownMenu')?.classList.add('hidden');
+});
 
 // Called by the new mode switcher pill buttons
 async function setTradingMode(newMode) {
