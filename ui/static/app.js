@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(updateClock, 1000);
   setInterval(loadHealth, 10_000);        // Health every 10s
   setInterval(loadMarketSummary, 60_000); // Ticker strip every 60s
+  setInterval(pollLivePnl, 15_000);       // Live P&L every 15s (global)
 });
 
 // ─── Tab Navigation ───────────────────────────────────────
@@ -1803,15 +1804,15 @@ function applyPaperPortfolio(d) {
     const pnlCls = p.pnl >= 0 ? 'td-green' : 'td-red';
     const pnlTxt = (p.pnl >= 0 ? '+' : '') + fmt$(p.pnl);
     const pctTxt = (p.pnl_pct >= 0 ? '+' : '') + p.pnl_pct.toFixed(2) + '%';
-    return `<tr>
+    return `<tr data-ticker="${p.ticker}">
       <td class="td-cyan" style="font-weight:700">${p.ticker.replace('-USD','')}</td>
       <td class="${p.side === 'LONG' ? 'td-green' : 'td-red'}">${p.side}</td>
       <td>${p.qty % 1 === 0 ? p.qty : p.qty.toFixed(4)}</td>
       <td>${fmt$(p.entry_price)}</td>
-      <td style="color:var(--text-1)">${fmt$(p.current_price)}</td>
-      <td>${fmt$(p.market_value)}</td>
-      <td class="${pnlCls}">${pnlTxt}</td>
-      <td class="${pnlCls}">${pctTxt}</td>
+      <td data-live="current_price" style="color:var(--text-1)">${fmt$(p.current_price)}</td>
+      <td data-live="market_value">${fmt$(p.market_value)}</td>
+      <td data-live="pnl" class="${pnlCls}">${pnlTxt}</td>
+      <td data-live="pnl_pct" class="${pnlCls}">${pctTxt}</td>
       <td><button class="po-close-btn" onclick="closePaperPosition('${p.ticker}')">✕ CLOSE</button></td>
     </tr>`;
   }).join('');
@@ -2884,6 +2885,70 @@ function renderCcLivePositions(positions) {
       </div>
     </div>`;
   }).join('');
+}
+
+// ─── Live P&L Poll (global, every 15s) ───────────────────────────────────────
+// Tracks previous P&L values so we can detect direction changes and flash cells.
+const _prevPnl = {};   // { ticker: lastPnlValue }
+
+async function pollLivePnl() {
+  // Skip if no positions known yet
+  if (!STATE.signals && !document.querySelector('#paperPositionsBody tr[data-ticker]') &&
+      !document.querySelector('#ccLivePosList .cc-pos-tile')) return;
+
+  try {
+    const d = await fetchJSON('/api/paper/live-pnl');
+    if (!d || !d.positions) return;
+
+    // 1. Update CC live position tiles (always visible on Command Centre)
+    renderCcLivePositions(d.positions);
+
+    // 2. In-place update paper trading table rows (avoids re-render flicker)
+    _updatePaperTableInPlace(d.positions);
+
+    // 3. Update total unrealised P&L summary row if present
+    const totalEl = el('paperUnrealisedTotal');
+    if (totalEl) {
+      const sign = d.total_unrealised_pnl >= 0 ? '+' : '';
+      totalEl.textContent = sign + fmt$(d.total_unrealised_pnl);
+      totalEl.style.color = d.total_unrealised_pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    }
+  } catch { /* silent — don't spam console every 15s */ }
+}
+
+function _updatePaperTableInPlace(positions) {
+  const body = el('paperPositionsBody');
+  if (!body) return;
+
+  positions.forEach(p => {
+    const row = body.querySelector(`tr[data-ticker="${p.ticker}"]`);
+    if (!row) return;   // row not rendered yet — will appear on next full refresh
+
+    const prevPnl = _prevPnl[p.ticker];
+    const changed  = prevPnl !== undefined && prevPnl !== p.pnl;
+    const improved = changed && p.pnl > prevPnl;
+    _prevPnl[p.ticker] = p.pnl;
+
+    const pnlCls  = p.pnl >= 0 ? 'td-green' : 'td-red';
+    const sign    = p.pnl >= 0 ? '+' : '';
+    const arrow   = !changed ? '' : (improved ? ' ▲' : ' ▼');
+
+    const _setCell = (attr, text, cls) => {
+      const cell = row.querySelector(`[data-live="${attr}"]`);
+      if (!cell) return;
+      cell.textContent = text;
+      if (cls) cell.className = cls;
+      if (changed) {
+        cell.classList.add(improved ? 'pnl-flash-up' : 'pnl-flash-down');
+        setTimeout(() => cell.classList.remove('pnl-flash-up', 'pnl-flash-down'), 700);
+      }
+    };
+
+    _setCell('current_price', fmt$(p.current_price));
+    _setCell('market_value',  fmt$(p.market_value));
+    _setCell('pnl',     sign + fmt$(p.pnl) + arrow, pnlCls);
+    _setCell('pnl_pct', sign + p.pnl_pct.toFixed(2) + '%', pnlCls);
+  });
 }
 
 function _applyCCHistory(d) {

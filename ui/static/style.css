@@ -113,6 +113,18 @@
 }
 .ticker-item.flashed { animation: tickerFlash 0.8s ease; }
 
+/* Live P&L in-place cell flash */
+@keyframes pnlFlashUp {
+  0%   { background: rgba(0,255,136,.22); color: var(--green); text-shadow: 0 0 8px var(--green); }
+  100% { background: transparent; color: inherit; text-shadow: none; }
+}
+@keyframes pnlFlashDown {
+  0%   { background: rgba(255,68,68,.22); color: var(--red); text-shadow: 0 0 8px var(--red); }
+  100% { background: transparent; color: inherit; text-shadow: none; }
+}
+.pnl-flash-up   { animation: pnlFlashUp   0.7s ease; }
+.pnl-flash-down { animation: pnlFlashDown 0.7s ease; }
+
 /* Input focus glow */
 @keyframes inputGlow {
   from { box-shadow: 0 0 0 0 var(--primary-glow); }

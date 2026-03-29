@@ -2628,6 +2628,45 @@ async def get_paper_portfolio():
     }
 
 
+@app.get("/api/paper/live-pnl")
+async def get_paper_live_pnl():
+    """Lightweight live P&L endpoint — only fetches current prices and computes
+    unrealised P&L per position. No heavy Sharpe/drawdown calculations."""
+    tickers = list(PAPER.positions.keys())
+    prices  = await _prices_for_positions(tickers) if tickers else {}
+
+    positions_out = []
+    for t, pos in PAPER.positions.items():
+        cur = prices.get(t, pos["entry_price"])
+        if pos["side"] == "LONG":
+            pnl     = (cur - pos["entry_price"]) * pos["qty"]
+            pnl_pct = (cur / pos["entry_price"] - 1) * 100 if pos["entry_price"] else 0
+        else:
+            pnl     = (pos["entry_price"] - cur) * pos["qty"]
+            pnl_pct = (pos["entry_price"] / cur - 1) * 100 if cur else 0
+        market_val = cur * pos["qty"]
+        positions_out.append({
+            "ticker":        t,
+            "side":          pos["side"],
+            "qty":           pos["qty"],
+            "entry_price":   pos["entry_price"],
+            "current_price": round(cur, 4),
+            "market_value":  round(market_val, 2),
+            "cost_basis":    pos.get("cost_basis", round(pos["entry_price"] * pos["qty"], 2)),
+            "pnl":           round(pnl, 2),
+            "pnl_pct":       round(pnl_pct, 2),
+            "name":          _ASSET_META.get(t, {}).get("name", t),
+        })
+
+    total_unrealised = round(sum(p["pnl"] for p in positions_out), 2)
+    return {
+        "positions":          positions_out,
+        "total_unrealised_pnl": total_unrealised,
+        "open_count":         len(positions_out),
+        "timestamp":          datetime.utcnow().isoformat(),
+    }
+
+
 @app.post("/api/paper/order")
 async def place_paper_order(payload: dict):
     """Place a paper trade. payload: {ticker, side, qty, price (optional)}."""
