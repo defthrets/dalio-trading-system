@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260329b" />
+  <link rel="stylesheet" href="/static/style.css?v=20260329c" />
 </head>
 <body>
   <!-- Scanline overlay -->
@@ -284,75 +284,7 @@
           </div>
         </div>
 
-        <!-- ROW 3 COL 1-2: Open Positions -->
-        <div class="panel panel--cc-positions">
-          <div class="panel-header">
-            <span class="panel-title">◈ OPEN POSITIONS</span>
-            <span class="panel-tag" id="ccPosCount">0 OPEN</span>
-          </div>
-          <div class="cc-table-wrap">
-            <table class="data-table" id="ccPositionsTable">
-              <thead>
-                <tr>
-                  <th>TICKER</th><th>SIDE</th><th>QTY</th>
-                  <th>ENTRY</th><th>CURRENT</th><th>MKT VAL</th>
-                  <th>P&amp;L</th><th>P&amp;L %</th><th>CLOSE</th>
-                </tr>
-              </thead>
-              <tbody id="ccPositionsBody">
-                <tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:14px">No open positions</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- ROW 3 COL 3: Vitals + Alerts -->
-        <div class="panel panel--cc-vitals">
-          <div class="panel-header">
-            <span class="panel-title">PORTFOLIO VITALS</span>
-            <span class="panel-tag" id="circuitBreakerBadge">CB: ARMED</span>
-          </div>
-          <div class="vitals-grid">
-            <div class="vital-item">
-              <div class="vital-label">DAILY P&amp;L</div>
-              <div class="vital-value" id="dailyPnl">--</div>
-              <div class="vital-bar-wrap"><div class="vital-bar" id="dailyPnlBar" style="width:0%"></div></div>
-            </div>
-            <div class="vital-item">
-              <div class="vital-label">DRAWDOWN</div>
-              <div class="vital-value danger" id="drawdownVal">--</div>
-              <div class="vital-bar-wrap"><div class="vital-bar vital-bar--danger" id="drawdownBar" style="width:0%"></div></div>
-            </div>
-            <div class="vital-item">
-              <div class="vital-label">SHARPE RATIO</div>
-              <div class="vital-value accent" id="sharpeVal">--</div>
-            </div>
-            <div class="vital-item">
-              <div class="vital-label">OPEN POSITIONS</div>
-              <div class="vital-value" id="openPositions">--</div>
-            </div>
-            <div class="vital-item">
-              <div class="vital-label">DIVERSIFICATION</div>
-              <div class="vital-value" id="divStatus">--</div>
-            </div>
-            <div class="vital-item">
-              <div class="vital-label">CYCLE COUNT</div>
-              <div class="vital-value" id="cycleCount">--</div>
-            </div>
-          </div>
-          <div class="panel-header" style="margin-top:8px;border-top:1px solid var(--border)">
-            <span class="panel-title">ALERT FEED</span>
-            <span class="pulse-dot"></span>
-          </div>
-          <div class="alert-feed" id="alertFeed">
-            <div class="alert-item alert--info">
-              <span class="alert-time">--:--:--</span>
-              <span class="alert-msg">SYSTEM INITIALISING...</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- ROW 4 COL 1: AI Trade Recommendations -->
+        <!-- ROW 3 COL 1-2: AI Trade Recommendations (MAIN HUB) -->
         <div class="panel panel--cc-recs">
           <div class="panel-header">
             <span class="panel-title">◈ AI TRADE RECOMMENDATIONS</span>
@@ -363,7 +295,31 @@
           </div>
         </div>
 
-        <!-- ROW 4 COL 2-3: Trade History -->
+        <!-- ROW 3 COL 3: Live Open Positions (P&L tiles) -->
+        <div class="panel panel--cc-livepos">
+          <div class="panel-header">
+            <span class="panel-title">◈ LIVE POSITIONS</span>
+            <span class="panel-tag" id="ccPosCount">0 OPEN</span>
+          </div>
+          <!-- Hidden compat elements for legacy JS references -->
+          <span id="circuitBreakerBadge" style="display:none">CB: ARMED</span>
+          <span id="dailyPnl" style="display:none">--</span>
+          <span id="drawdownVal" style="display:none">--</span>
+          <span id="sharpeVal" style="display:none">--</span>
+          <span id="openPositions" style="display:none">--</span>
+          <span id="divStatus" style="display:none">--</span>
+          <span id="cycleCount" style="display:none">--</span>
+          <div id="dailyPnlBar" style="display:none"></div>
+          <div id="drawdownBar" style="display:none"></div>
+          <!-- Position tiles -->
+          <div class="cc-livepos-list" id="ccLivePosList">
+            <div class="cc-pos-empty">NO OPEN POSITIONS<br>Execute a trade to see live P&amp;L here</div>
+          </div>
+          <!-- Hidden compat table for old JS references -->
+          <table style="display:none"><tbody id="ccPositionsBody"></tbody></table>
+        </div>
+
+        <!-- ROW 4 COL 1-2: Trade History -->
         <div class="panel panel--cc-history">
           <div class="panel-header">
             <span class="panel-title">◈ RECENT TRADES</span>
@@ -384,10 +340,32 @@
           </div>
         </div>
 
-        <!-- ROW 5 COL 1: Performance Metrics -->
+        <!-- ROW 4 COL 3: Alert + Activity Feed -->
+        <div class="panel panel--cc-feed">
+          <div class="panel-header">
+            <span class="panel-title">◈ LIVE ACTIVITY</span>
+            <span class="pulse-dot"></span>
+          </div>
+          <!-- alertFeed kept for compat with existing JS -->
+          <div class="alert-feed" id="alertFeed" style="display:none">
+            <div class="alert-item alert--info">
+              <span class="alert-time">--:--:--</span>
+              <span class="alert-msg">SYSTEM INITIALISING...</span>
+            </div>
+          </div>
+          <div class="cc-activity-feed" id="ccActivityFeed">
+            <div class="cc-activity-item info">
+              <span class="cc-act-icon">◎</span>
+              <span class="cc-act-text">Waiting for activity...</span>
+              <span class="cc-act-time">--:--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ROW 5 FULL WIDTH: Performance Metrics -->
         <div class="panel panel--cc-perf">
           <div class="panel-header">
-            <span class="panel-title">◈ PERFORMANCE</span>
+            <span class="panel-title">◈ PERFORMANCE METRICS</span>
           </div>
           <div class="cc-perf-grid">
             <div class="cc-perf-item">
@@ -406,20 +384,21 @@
               <div class="cc-perf-label">ALL WEATHER SCORE</div>
               <div class="cc-perf-value acc" id="ccAWScore">--/100</div>
             </div>
-          </div>
-        </div>
-
-        <!-- ROW 5 COL 2-3: Activity Feed -->
-        <div class="panel panel--cc-feed">
-          <div class="panel-header">
-            <span class="panel-title">◈ LIVE ACTIVITY</span>
-            <span class="pulse-dot"></span>
-          </div>
-          <div class="cc-activity-feed" id="ccActivityFeed">
-            <div class="cc-activity-item info">
-              <span class="cc-act-icon">◎</span>
-              <span class="cc-act-text">Waiting for activity...</span>
-              <span class="cc-act-time">--:--</span>
+            <div class="cc-perf-item">
+              <div class="cc-perf-label">DAILY P&amp;L</div>
+              <div class="cc-perf-value" id="ccDailyPnl">$--</div>
+            </div>
+            <div class="cc-perf-item">
+              <div class="cc-perf-label">MAX DRAWDOWN</div>
+              <div class="cc-perf-value neg" id="ccDrawdown">--</div>
+            </div>
+            <div class="cc-perf-item">
+              <div class="cc-perf-label">SHARPE RATIO</div>
+              <div class="cc-perf-value acc" id="ccSharpe">--</div>
+            </div>
+            <div class="cc-perf-item">
+              <div class="cc-perf-label">CYCLE COUNT</div>
+              <div class="cc-perf-value" id="ccCycles">--</div>
             </div>
           </div>
         </div>
@@ -1937,7 +1916,7 @@
     <span class="sb-version">DALIOS v1.0.0 — RAY DALIO ALL WEATHER FRAMEWORK</span>
   </footer>
 
-  <script src="/static/app.js?v=20260329b"></script>
+  <script src="/static/app.js?v=20260329c"></script>
 
   <!-- ═══════════════════════════════════════════════
        SPEECH BUBBLE SPOTLIGHT TOOLTIP

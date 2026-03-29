@@ -2372,6 +2372,26 @@ async def get_paper_portfolio():
     total_pnl_pct = (total_pnl / PAPER_STARTING_CASH) * 100
     invested   = sum(p["market_value"] for p in positions_out)
 
+    # Compute drawdown from equity history
+    eq_vals = [e["v"] for e in PAPER.equity_history] if PAPER.equity_history else []
+    if len(eq_vals) >= 2:
+        peak = max(eq_vals)
+        drawdown_val = round((peak - eq_vals[-1]) / peak, 4) if peak > 0 else 0.0
+    else:
+        drawdown_val = 0.0
+
+    # Compute annualised Sharpe from equity history daily returns
+    sharpe_val: float | None = None
+    if len(eq_vals) >= 10:
+        try:
+            import numpy as np
+            eq_arr = np.array(eq_vals, dtype=float)
+            rets   = np.diff(eq_arr) / eq_arr[:-1]
+            if rets.std() > 0:
+                sharpe_val = round(float((rets.mean() / rets.std()) * (252 ** 0.5)), 2)
+        except Exception:
+            pass
+
     return {
         "cash":           round(PAPER.cash, 2),
         "invested":       round(invested, 2),
@@ -2381,6 +2401,9 @@ async def get_paper_portfolio():
         "starting_cash":  PAPER_STARTING_CASH,
         "positions":      positions_out,
         "open_count":     len(positions_out),
+        "drawdown":       drawdown_val,
+        "sharpe":         sharpe_val,
+        "cycles":         PAPER.order_id,
     }
 
 

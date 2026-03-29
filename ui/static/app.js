@@ -2219,11 +2219,13 @@ function initEquityChart(canvasId, chartRef) {
   const canvas = el(canvasId);
   if (!canvas) return null;
   if (chartRef) { chartRef.destroy(); }
+  // responsive:false prevents ResizeObserver loop when inside fixed-height grid panels
+  const isPaper = canvasId === 'paperEquityChart';
   return new Chart(canvas, {
     type: 'line',
     data: { labels: [], datasets: [{ data: [], borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.06)', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: true }] },
     options: {
-      responsive: true, maintainAspectRatio: false,
+      responsive: !isPaper, maintainAspectRatio: false,
       animation: { duration: 400 },
       plugins: { legend: { display: false }, tooltip: {
         callbacks: { label: ctx => `$${ctx.raw.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
@@ -2644,6 +2646,15 @@ function _applyCCPortfolio(d) {
   const cashEl = el('ccQtCash');
   if (cashEl) cashEl.textContent = fmt$(d.cash);
 
+  // Performance row — duplicate refs for new full-width perf panel
+  _ccSetPnl('ccDailyPnl', d.total_pnl);
+  const ddEl = el('ccDrawdown');
+  if (ddEl) { ddEl.textContent = d.drawdown != null ? (d.drawdown * 100).toFixed(1) + '%' : '--'; }
+  const shEl = el('ccSharpe');
+  if (shEl) { shEl.textContent = d.sharpe != null ? d.sharpe.toFixed(2) : '--'; }
+  const cyEl = el('ccCycles');
+  if (cyEl) { cyEl.textContent = d.cycles != null ? d.cycles : '--'; }
+
   // Open positions table mirror
   const posCount = el('ccPosCount');
   if (posCount) posCount.textContent = `${d.open_count} OPEN`;
@@ -2672,6 +2683,46 @@ function _applyCCPortfolio(d) {
     }
   }
 
+  // Render live position P&L tiles
+  renderCcLivePositions(d.positions || []);
+}
+
+/**
+ * Render open-position P&L tiles in the CC Live Positions panel.
+ * Shows one tile per open position with live P&L, % change, and a close button.
+ */
+function renderCcLivePositions(positions) {
+  const list = el('ccLivePosList');
+  if (!list) return;
+
+  if (!positions || !positions.length) {
+    list.innerHTML = `<div class="cc-pos-empty">NO OPEN POSITIONS<br>Execute a trade to see live P&amp;L here</div>`;
+    return;
+  }
+
+  list.innerHTML = positions.map(p => {
+    const pos     = p.pnl >= 0;
+    const sign    = pos ? '+' : '';
+    const cls     = pos ? 'pos' : 'neg';
+    const pnlTxt  = sign + fmt$(p.pnl);
+    const pctTxt  = sign + p.pnl_pct.toFixed(2) + '%';
+    const ticker  = p.ticker.replace('-USD', '');
+    const qty     = p.qty % 1 === 0 ? p.qty : p.qty.toFixed(4);
+    return `<div class="cc-pos-tile ${cls}">
+      <div class="cc-pos-tile-top">
+        <span class="cc-pos-tile-tkr">${ticker}</span>
+        <span class="cc-pos-tile-pnl" style="color:${pos ? 'var(--green)' : 'var(--red)'}">${pnlTxt} (${pctTxt})</span>
+        <button class="btn-ghost btn--sm" style="font-size:9px;padding:1px 5px;margin-left:4px" onclick="closePaperPosition('${p.ticker}')">✕</button>
+      </div>
+      <div class="cc-pos-tile-meta">
+        <span>${p.side}</span>
+        <span>QTY: ${qty}</span>
+        <span>ENTRY: ${fmt$(p.entry_price)}</span>
+        <span>NOW: ${fmt$(p.current_price)}</span>
+        <span>MKT: ${fmt$(p.market_value)}</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function _applyCCHistory(d) {
