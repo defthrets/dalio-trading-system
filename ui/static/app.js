@@ -83,6 +83,7 @@ function initTabs() {
       if (id === 'asx-scanner')         loadScanner('asx');
       if (id === 'crypto-scanner')      loadScanner('crypto');
       if (id === 'commodities-scanner') loadScanner('commodities');
+      if (id === 'command-center')      loadSuggestOpportunities();
       if (id === 'comms-config')        initSettingsTab();
       // Show tutorial on first visit
       showTutorial(id);
@@ -522,18 +523,69 @@ function signalCardHTML(s) {
     </div>`;
 }
 
-function renderOpportunities(opps) {
-  if (!opps.length) { el('opportunityList').innerHTML = '<div style="padding:14px;color:var(--text-muted);font-size:10px">NO NEW OPPORTUNITIES</div>'; return; }
-  el('opportunityList').innerHTML = opps.map(s => `
-    <div class="opp-card">
-      <div class="opp-ticker">${s.ticker}
-        <span class="opp-action sc-action ${s.action}" style="margin-left:8px">${s.action}</span>
+async function loadSuggestOpportunities(n = 8) {
+  const list = el('opportunityList');
+  if (!list) return;
+  list.innerHTML = '<div style="padding:14px;color:var(--text-muted);font-size:10px;animation:blink 1s infinite">⟳ SCANNING ALL MARKETS…</div>';
+  try {
+    const d = await fetchJSON(`/api/suggest?n=${n}`);
+    renderOpportunities(d.opportunities || [], d);
+  } catch(e) {
+    list.innerHTML = `<div style="padding:14px;color:var(--red);font-size:10px">SCAN FAILED: ${e.message}</div>`;
+  }
+}
+
+function renderOpportunities(opps, meta = {}) {
+  const list = el('opportunityList');
+  if (!list) return;
+  if (!opps || !opps.length) {
+    list.innerHTML = '<div style="padding:14px;color:var(--text-muted);font-size:10px">NO OPPORTUNITIES — LOAD SCANNER TABS FIRST TO POPULATE DATA</div>';
+    return;
+  }
+  const regime = (meta.regime_label || '').toUpperCase();
+  const fitColour = { strong:'var(--green)', moderate:'var(--primary)', neutral:'var(--text-2)', avoid:'var(--red)' };
+  const actionColour = { BUY:'var(--green)', LONG:'var(--green)', SELL:'var(--red)', SHORT:'var(--red)', WATCH:'var(--amber)' };
+
+  list.innerHTML = opps.map((o, i) => {
+    const chgSign  = o.change_pct >= 0 ? '+' : '';
+    const chgCol   = o.change_pct >= 0 ? 'var(--green)' : 'var(--red)';
+    const fitCol   = fitColour[o.quadrant_fit] || 'var(--text-2)';
+    const actCol   = actionColour[o.action]    || 'var(--text-1)';
+    const rsiCol   = o.rsi < 35 ? 'var(--green)' : o.rsi > 65 ? 'var(--red)' : 'var(--amber)';
+    const scoreBar = Math.min(Math.round(o.score), 100);
+    const reasons  = (o.reasoning || []).slice(0, 3);
+
+    return `<div class="opp-card opp-card--rich" onclick="this.classList.toggle('opp-expanded')">
+      <div class="opp-header">
+        <span class="opp-rank">#${i+1}</span>
+        <span class="opp-ticker" style="color:${actCol}">${o.ticker}</span>
+        <span class="opp-badge" style="color:${actCol};border-color:${actCol}">${o.action}</span>
+        <span class="opp-market">${(o.market||'').toUpperCase()}</span>
+        <span class="opp-price">$${o.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}</span>
+        <span style="color:${chgCol};font-size:9px">${chgSign}${o.change_pct.toFixed(2)}%</span>
+        <span class="opp-fit-badge" style="color:${fitCol};border-color:${fitCol}">${(o.quadrant_fit||'').toUpperCase()}</span>
+        <div class="opp-score-bar"><div class="opp-score-fill" style="width:${scoreBar}%;background:${fitCol}"></div></div>
+        <span class="opp-score-val">${o.score.toFixed(0)}</span>
       </div>
-      <div style="font-size:9px;color:var(--text-2);margin-bottom:3px">
-        $${s.price?.toFixed(2)} &nbsp;·&nbsp; Conf: ${s.confidence.toFixed(1)}% &nbsp;·&nbsp; ${s.trend}
+      <div class="opp-metrics">
+        <span>RSI <b style="color:${rsiCol}">${o.rsi.toFixed(0)}</b></span>
+        <span>TREND <b>${o.trend}</b></span>
+        <span>SMA20 <b style="color:${o.above_sma20?'var(--green)':'var(--red)'}">${o.above_sma20?'↑ ABOVE':'↓ BELOW'}</b></span>
+        <span>52W <b>${o.pct_from_lo >= 0 ? '+' : ''}${o.pct_from_lo}% FROM LOW</b></span>
+        <span>SL <b style="color:var(--red)">$${o.stop_loss.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}</b></span>
+        <span>TP <b style="color:var(--green)">$${o.take_profit.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}</b></span>
+        <span>R:R <b style="color:var(--primary)">${o.rr_ratio.toFixed(1)}x</b></span>
+        <span>VOL <b>${o.volume_fmt||'--'}</b></span>
       </div>
-      <div class="opp-reason">${s.dalio_justification?.reasons?.[0] ?? 'Strong quadrant alignment'}</div>
-    </div>`).join('');
+      <div class="opp-reasons">
+        ${reasons.map(r => `<div class="opp-reason-line">▸ ${r}</div>`).join('')}
+      </div>
+      <div class="opp-actions">
+        <button class="scan-trade-btn" onclick="event.stopPropagation();scannerOpenTrade('${o.ticker}',${o.price})">▲ TRADE</button>
+        <button class="scan-wl-btn"    onclick="event.stopPropagation();toggleWatchlist('${o.ticker}',this)">☆ WATCH</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function showJustification(s) {

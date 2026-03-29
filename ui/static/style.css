@@ -762,6 +762,62 @@ canvas { display: block; max-width: 100%; }
 .opp-action { display: inline-block; font-size: 8px; font-family: var(--font-hud); letter-spacing: 1px; padding: 1px 5px; margin-bottom: 4px; }
 .opp-reason { color: var(--text-2); font-size: 9px; }
 
+/* ─── Rich Opportunity Cards ─── */
+.opp-card--rich {
+  padding: 9px 11px;
+  border-left: 3px solid var(--primary);
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.opp-card--rich:hover { background: rgba(0,212,255,0.04); border-color: var(--primary); }
+.opp-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.opp-rank { font-family: var(--font-hud); font-size: 9px; color: var(--text-muted); min-width: 20px; }
+.opp-ticker { font-family: var(--font-hud); font-size: 12px; font-weight: 700; }
+.opp-badge {
+  font-family: var(--font-hud); font-size: 8px; letter-spacing: 1px;
+  padding: 1px 5px; border: 1px solid; border-radius: 2px;
+}
+.opp-market {
+  font-size: 8px; color: var(--text-muted); background: var(--bg-2);
+  padding: 1px 4px; border-radius: 2px;
+}
+.opp-price { font-family: var(--font-mono); font-size: 10px; color: var(--text-1); margin-left: auto; }
+.opp-fit-badge {
+  font-size: 8px; font-family: var(--font-hud); letter-spacing: 1px;
+  padding: 1px 5px; border: 1px solid; border-radius: 2px;
+}
+.opp-score-bar {
+  flex: 1; min-width: 40px; max-width: 80px;
+  height: 3px; background: var(--bg-2); border-radius: 2px; overflow: hidden;
+}
+.opp-score-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+.opp-score-val { font-size: 9px; color: var(--text-2); min-width: 22px; text-align: right; }
+
+.opp-metrics {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  font-size: 8px; color: var(--text-2); font-family: var(--font-mono);
+}
+.opp-metrics span b { font-size: 8px; }
+
+.opp-reasons { display: none; flex-direction: column; gap: 3px; }
+.opp-card--rich.opp-expanded .opp-reasons { display: flex; }
+.opp-reason-line { font-size: 8px; color: var(--text-2); line-height: 1.4; }
+.opp-reason-line::first-letter { color: var(--primary); }
+
+.opp-actions { display: none; gap: 6px; }
+.opp-card--rich.opp-expanded .opp-actions { display: flex; }
+
+.opportunity-list { padding: 8px; display: flex; flex-direction: column; gap: 5px;
+  max-height: 520px; overflow-y: auto; }
+
 .just-content { padding: 14px; }
 .just-placeholder {
   display: flex;

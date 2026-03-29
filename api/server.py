@@ -1056,6 +1056,235 @@ async def _gen_signals(n: int = 12) -> list[dict]:
     return (active + holds)[:n]
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# TRADE OPPORTUNITY ENGINE
+# Synthesises scanner rows, price history, RSI/trend, and Dalio quadrant
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _opp_from_signal_fallback(sigs: list, quadrant: str, playbook: dict,
+                               qdata: dict, existing_classes: list, n: int) -> list:
+    """Fallback when no scanner cache exists — build opps from signal list."""
+    regime_label = qdata.get("label", quadrant.replace("_"," ").title())
+    results = []
+    for s in sigs:
+        if s["action"] in ("HOLD", "SELL", "SHORT"):
+            continue
+        ac    = ASSET_CLASS_MAP.get(s["ticker"], "equities")
+        q_fit = ("strong"   if ac in playbook["strong_buy"] else
+                 "moderate" if ac in playbook["buy"]        else
+                 "avoid"    if ac in playbook["avoid"]      else "neutral")
+        q_w   = {"strong": 1.4, "moderate": 1.0, "neutral": 0.6, "avoid": 0.2}[q_fit]
+        score = round(s["confidence"] * q_w, 1)
+        jus   = s.get("dalio_justification", {})
+        reason_0 = (f"Regime: {regime_label} — {ac.replace('_',' ').title()} is "
+                    f"{'favoured' if q_fit in ('strong','moderate') else 'on avoid list'}.")
+        reason_1 = f"RSI {s['rsi']:.0f} | trend: {s['trend']} | signal: {s['action']}"
+        reasoning = [reason_0, reason_1]
+        if isinstance(jus, dict):
+            for key in ("narrative", "recommendation"):
+                val = jus.get(key, "")
+                if val and isinstance(val, str):
+                    reasoning.append(val[:120])
+                    break
+        results.append({
+            "ticker": s["ticker"], "market": "signal", "action": s["action"],
+            "price": s["price"], "change_pct": 0, "rsi": s["rsi"],
+            "trend": s["trend"], "above_sma20": s["trend"] == "uptrend",
+            "hi_52w": s["take_profit"], "lo_52w": s["stop_loss"],
+            "pct_from_hi": 0, "pct_from_lo": 0, "sma20": s["price"],
+            "stop_loss": s["stop_loss"], "take_profit": s["take_profit"],
+            "rr_ratio": s["rr_ratio"], "score": score,
+            "asset_class": ac, "quadrant_fit": q_fit,
+            "data_source": s["data_source"],
+            "reasoning": reasoning,
+            "volume_fmt": "--", "sector": "--",
+            "quadrant": quadrant, "regime_label": regime_label,
+        })
+    results.sort(key=lambda o: o["score"], reverse=True)
+    return results[:n]
+
+
+async def _gen_opportunities(n: int = 8) -> list[dict]:
+    """
+    Return the top-N trade opportunities by synthesising:
+      1. All cached scanner rows (ASX, crypto, commodities)
+      2. 3-month price history → RSI, trend, 20-day SMA, 52-week range
+      3. Dalio quadrant playbook (regime fit scoring)
+      4. Current portfolio state (diversification bonus)
+    """
+    import time as _t
+
+    qdata    = STATE.last_quadrant or _gen_quadrant_data()
+    quadrant = qdata.get("quadrant", "rising_growth")
+    playbook = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
+    existing_classes = [ASSET_CLASS_MAP.get(t, "equities") for t in PAPER.positions]
+
+    # 1. Collect all scanner rows from cache ──────────────────────────────
+    all_rows: list[dict] = []
+    for mkt in ("crypto", "asx", "commodities"):
+        cached = _scanner_cache.get(mkt)
+        if cached:
+            for r in cached["rows"]:
+                row = dict(r)
+                row["_market"] = mkt
+                all_rows.append(row)
+
+    if not all_rows:
+        # No cache — fall back to signal-based suggestions
+        sigs = await _gen_signals(n * 2)
+        return _opp_from_signal_fallback(sigs, quadrant, playbook, qdata, existing_classes, n)
+
+    # 2. Pre-score with scanner data only (fast, no extra API calls) ──────
+    def _prescore(r: dict) -> float:
+        tkr = r["ticker"]
+        if tkr in PAPER.positions:
+            return -999.0                         # skip held positions
+        ac  = ASSET_CLASS_MAP.get(tkr, "equities")
+        chg = r.get("change_pct", 0.0)
+        q_s = (100 if ac in playbook["strong_buy"] else
+               70  if ac in playbook["buy"]        else
+               10  if ac in playbook["avoid"]      else 45)
+        mom = min(abs(chg) * 3.0, 30.0)
+        dir_b = (15 if ac in playbook["strong_buy"] and chg > 0 else
+                 10 if ac in playbook["avoid"] and chg < 0      else 0)
+        div_b = max(0.0, 20.0 - existing_classes.count(ac) * 5)
+        return q_s * 0.40 + mom * 0.25 + dir_b * 0.20 + div_b * 0.15
+
+    all_rows.sort(key=_prescore, reverse=True)
+    candidates = [r for r in all_rows if r["ticker"] not in PAPER.positions][:30]
+
+    # 3. Fetch 3-month price history for top candidates ───────────────────
+    tickers     = [r["ticker"] for r in candidates[:20]]
+    history_map = await _get_prices(tickers, "3mo") or {}
+
+    # 4. Full scoring with technicals ─────────────────────────────────────
+    opportunities: list[dict] = []
+
+    for r in candidates:
+        tkr    = r["ticker"]
+        ac     = ASSET_CLASS_MAP.get(tkr, "equities")
+        closes = history_map.get(tkr)
+        chg    = r.get("change_pct", 0.0)
+        price  = r.get("price", 0.0)
+        if not price:
+            continue
+
+        # Technical indicators
+        if closes and len(closes) >= 14:
+            rsi        = _calc_rsi(closes)
+            trend      = _calc_trend(closes)
+            hi52       = float(max(closes))
+            lo52       = float(min(closes))
+            sma20      = float(np.mean(closes[-20:])) if len(closes) >= 20 else price
+            above_sma  = price > sma20
+            vol_d      = float(np.std(np.diff(closes)) / price) if len(closes) > 2 else 0.02
+            data_src   = "LIVE"
+        else:
+            rsi        = 50.0
+            trend      = "sideways"
+            hi52       = price * 1.20
+            lo52       = price * 0.80
+            sma20      = price
+            above_sma  = chg > 0
+            vol_d      = 0.025
+            data_src   = "SCANNER"
+
+        pct_from_hi = round((price / hi52 - 1) * 100, 1) if hi52 else 0
+        pct_from_lo = round((price / lo52 - 1) * 100, 1) if lo52 else 0
+
+        # Determine primary action
+        if   rsi < 32 and trend != "downtrend": action = "BUY"
+        elif rsi > 68 and trend != "uptrend":   action = "SELL"
+        elif trend == "uptrend" and rsi < 58:   action = "LONG"
+        elif trend == "downtrend" and rsi > 42: action = "SHORT"
+        else:                                   action = "WATCH"
+
+        # For BUY opportunities list: skip pure shorts unless quadrant says avoid
+        is_short_signal = action in ("SELL", "SHORT")
+        is_avoid_class  = ac in playbook["avoid"]
+        if is_short_signal and not is_avoid_class:
+            continue
+
+        # Quadrant weight
+        q_score = (100 if ac in playbook["strong_buy"] else
+                   70  if ac in playbook["buy"]        else
+                   10  if ac in playbook["avoid"]      else 45)
+        q_fit   = ("strong"   if ac in playbook["strong_buy"] else
+                   "moderate" if ac in playbook["buy"]        else
+                   "avoid"    if ac in playbook["avoid"]      else "neutral")
+
+        # RSI score: oversold is good for longs, overbought for shorts
+        if not is_short_signal:
+            rsi_score = max(0.0, 50.0 - rsi) * 0.8   # max 40 pts when RSI=0
+        else:
+            rsi_score = max(0.0, rsi - 50.0) * 0.8
+
+        mom_score  = min(abs(chg) * 2.5, 25.0)
+        div_score  = max(0.0, 20.0 - existing_classes.count(ac) * 5.0)
+        composite  = round(
+            q_score   * 0.35 +
+            rsi_score * 0.30 +
+            mom_score * 0.20 +
+            div_score * 0.15,
+            1
+        )
+
+        # Risk/reward targets using volatility-derived ATR proxy
+        atr = max(vol_d * price * 14, price * 0.01)
+        sl  = round(price - atr * 1.5, 4)
+        tp  = round(price + atr * 2.5, 4)
+        rr  = round((tp - price) / max(price - sl, 1e-6), 2)
+
+        # Reasoning bullets
+        reasons = [
+            f"Regime: {quadrant.replace('_',' ').title()} — "
+            f"{ac.replace('_',' ').title()} is "
+            f"{'FAVOURED (strong buy)' if q_fit=='strong' else 'favoured' if q_fit=='moderate' else 'AVOID LIST' if q_fit=='avoid' else 'neutral'}.",
+            f"RSI {rsi:.0f} ({'oversold' if rsi<35 else 'overbought' if rsi>65 else 'neutral'}) | "
+            f"Trend: {trend} | {'Above' if above_sma else 'Below'} 20-day SMA.",
+            f"Today: {'+' if chg>=0 else ''}{chg:.2f}% | "
+            f"52w range: {pct_from_lo:+.1f}% from low, {pct_from_hi:+.1f}% from high.",
+            f"Stop ${sl:,.4f} → Target ${tp:,.4f} | R:R {rr:.1f}x",
+        ]
+        if pct_from_lo < 10:
+            reasons.append("Near 52-week low — potential high-reward entry zone.")
+        if above_sma and chg > 1:
+            reasons.append("Strong momentum: price above SMA and up today.")
+        if existing_classes.count(ac) == 0:
+            reasons.append(f"No current {ac.replace('_',' ')} exposure — adds portfolio diversification.")
+
+        opportunities.append({
+            "ticker":       tkr,
+            "market":       r["_market"],
+            "action":       action,
+            "price":        price,
+            "change_pct":   round(chg, 2),
+            "rsi":          round(rsi, 1),
+            "trend":        trend,
+            "above_sma20":  above_sma,
+            "hi_52w":       round(hi52, 4),
+            "lo_52w":       round(lo52, 4),
+            "pct_from_hi":  pct_from_hi,
+            "pct_from_lo":  pct_from_lo,
+            "sma20":        round(sma20, 4),
+            "stop_loss":    sl,
+            "take_profit":  tp,
+            "rr_ratio":     rr,
+            "score":        composite,
+            "asset_class":  ac,
+            "quadrant_fit": q_fit,
+            "data_source":  data_src,
+            "reasoning":    reasons,
+            "volume_fmt":   r.get("volume_fmt", "--"),
+            "sector":       r.get("sector", "--"),
+            "quadrant":     quadrant,
+            "regime_label": qdata.get("label", quadrant),
+        })
+
+    opportunities.sort(key=lambda o: o["score"], reverse=True)
+    return opportunities[:n]
+
+
 def _gen_justification(ticker: str, action: str) -> dict:
     quadrant = random.choice(list(QUADRANT_META.keys()))
     meta = QUADRANT_META[quadrant]
@@ -1797,6 +2026,7 @@ async def _run_cmd(message: str) -> dict:
             "  scanner asx                     -- ASX scanner data\n"
             "  scanner crypto                  -- Crypto scanner data\n"
             "  scanner commodities             -- Commodities scanner data\n"
+            "  suggest [n]                     -- Top N trade opportunities (all markets)\n"
             "  signals                         -- Top 5 active signals\n"
             "  analyse <ticker>                -- Dalio All Weather analysis\n"
             "  risk                            -- Portfolio risk assessment\n"
@@ -1972,6 +2202,28 @@ async def _run_cmd(message: str) -> dict:
             f"  Favour: {', '.join((pb['strong_buy']+pb['buy'])[:4]).replace('_',' ')}\n"
             f"  Avoid:  {', '.join(pb['avoid']).replace('_',' ')}"),
             "data": qdata}
+
+    # ── suggest / opportunities ───────────────────────────────────────────
+    suggest_m = _re.match(r"^(suggest|opportunities?|opps?)(?:\s+(\d+))?$", msg_lower)
+    if suggest_m:
+        n    = int(suggest_m.group(2) or 8)
+        opps = await _gen_opportunities(n)
+        if not opps:
+            return {"type":"suggest","message":"No opportunities found. Try loading the scanner tabs first to populate the data cache.","data":{"opportunities":[]}}
+        lines = []
+        for i, o in enumerate(opps, 1):
+            sign = "+" if o["change_pct"] >= 0 else ""
+            lines.append(
+                f"{i:>2}. [{o['action']:<5}] {o['ticker']:<14} ${o['price']:>12,.4f}  "
+                f"{sign}{o['change_pct']:.2f}%  RSI:{o['rsi']:.0f}  "
+                f"Score:{o['score']:.0f}  Fit:{o['quadrant_fit'].upper()}\n"
+                f"      {o['reasoning'][0]}\n"
+                f"      SL ${o['stop_loss']:,.4f}  TP ${o['take_profit']:,.4f}  R:R {o['rr_ratio']:.1f}x"
+            )
+        header = (f"Top {len(opps)} Opportunities — Regime: {opps[0].get('regime_label','').upper()}\n"
+                  f"{'─'*72}\n")
+        return {"type":"suggest","message": header + "\n\n".join(lines),
+                "data":{"opportunities": opps, "quadrant": opps[0].get("quadrant","")}}
 
     # ── signals ───────────────────────────────────────────────────────────
     if msg_lower in ("signals","top signals","best signals"):
@@ -2454,6 +2706,40 @@ async def _scan_coingecko(tickers: list) -> list:
                 "in_watchlist": t in WATCHLIST,
             })
     return rows
+
+
+@app.get("/api/suggest")
+async def suggest_trades(n: int = 8):
+    """
+    Return top-N trade opportunities synthesised from:
+      - All cached scanner data (ASX, crypto, commodities)
+      - 3-month price history (RSI, trend, SMA20, 52w range)
+      - Dalio All-Weather quadrant playbook
+      - Current portfolio diversification state
+
+    Query param: n (default 8, max 20)
+
+    Example: GET /api/suggest?n=10
+    Response fields per opportunity:
+      ticker, market, action, price, change_pct, rsi, trend, above_sma20,
+      hi_52w, lo_52w, pct_from_hi, pct_from_lo, sma20, stop_loss,
+      take_profit, rr_ratio, score, asset_class, quadrant_fit,
+      data_source, reasoning[], volume_fmt, sector, quadrant, regime_label
+    """
+    n = min(max(1, n), 20)
+    opps = await _gen_opportunities(n)
+    qdata = STATE.last_quadrant or _gen_quadrant_data()
+    return {
+        "opportunities": opps,
+        "count": len(opps),
+        "quadrant": qdata.get("quadrant", ""),
+        "regime_label": qdata.get("label", ""),
+        "portfolio_positions": len(PAPER.positions),
+        "scanner_cached": {
+            mkt: bool(_scanner_cache.get(mkt))
+            for mkt in ("asx", "crypto", "commodities")
+        },
+    }
 
 
 @app.get("/api/markets/{market}")
