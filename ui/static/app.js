@@ -1428,28 +1428,14 @@ async function connectAlpaca() {
 // Actions
 // ═══════════════════════════════════════════════════════════
 
+// Single RUN CYCLE handler — lives next to SCAN NOW in Signal Ops
 async function triggerCycle() {
   const btn = el('runCycleBtn');
-  btn.classList.add('loading');
-  btn.textContent = '⌛ RUNNING...';
-  try {
-    await postJSON('/api/agent/cycle');
-    pushAlert('CYCLE', 'Manual cycle triggered', 'info');
-  } catch (e) {
-    pushAlert('ERROR', 'Cycle trigger failed', 'warning');
-  } finally {
-    btn.classList.remove('loading');
-    btn.textContent = '▶ RUN CYCLE';
-  }
-}
-
-// Signal Ops tab version of run cycle
-async function triggerCycleSignal() {
-  const btn = el('signalCycleBtn');
   if (btn) { btn.disabled = true; btn.textContent = '⌛ RUNNING...'; }
   try {
     await postJSON('/api/agent/cycle');
     await loadSignals();
+    pushAlert('CYCLE', 'Manual cycle triggered', 'info');
     pushActivityItem('▶', 'Cycle triggered from Signal Ops', 'info');
   } catch (e) {
     pushAlert('ERROR', `Cycle failed: ${e.message}`, 'warning');
@@ -1457,6 +1443,9 @@ async function triggerCycleSignal() {
     if (btn) { btn.disabled = false; btn.textContent = '▶ RUN CYCLE'; }
   }
 }
+
+// Alias kept for any legacy references
+const triggerCycleSignal = triggerCycle;
 
 async function testNotification(channel) {
   try {
@@ -3263,7 +3252,24 @@ const TUTORIAL_PAGES = [
 
 let _tutIdx = 0;
 
-function openTutorial(startIdx = 0) {
+// Tab ID → tutorial page index map
+const _TAB_TUT_IDX = {
+  'command-center':      0,
+  'signal-ops':          1,
+  'asx-scanner':         2,
+  'crypto-scanner':      3,
+  'commodities-scanner': 4,
+  'intel-center':        5,
+  'risk-matrix':         6,
+  'backtest-lab':        7,
+};
+
+function openTutorial(startIdx) {
+  if (startIdx === undefined) {
+    // Auto-detect active tab
+    const activeTab = document.querySelector('.tab-btn.active')?.dataset?.tab ?? 'command-center';
+    startIdx = _TAB_TUT_IDX[activeTab] ?? 0;
+  }
   _tutIdx = startIdx;
   _renderTutorial();
   el('tutorialOverlay')?.classList.remove('hidden');

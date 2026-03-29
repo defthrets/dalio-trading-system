@@ -56,10 +56,7 @@
     </div>
     <div class="header-right">
       <div class="live-clock" id="liveClock"></div>
-      <div class="mode-switcher" title="Switch paper / live trading">
-        <button class="mode-sw-opt active" id="modePaperBtn" onclick="setTradingMode('paper')">📄 PAPER</button>
-        <button class="mode-sw-opt" id="modeLiveBtn" onclick="setTradingMode('live')">🔴 LIVE</button>
-      </div>
+
       <button class="sound-toggle-btn" id="soundToggleBtn" onclick="toggleSound()" title="Toggle sound alerts">
         🔇 SOUND
       </button>
@@ -67,9 +64,7 @@
         <span class="ws-dot"></span>
         <span class="ws-label">LINK</span>
       </div>
-      <button class="btn-primary btn--sm" id="runCycleBtn" onclick="triggerCycle()">
-        ▶ RUN CYCLE
-      </button>
+
     </div>
   </header>
 
@@ -451,7 +446,7 @@
               </select>
             </div>
             <button class="btn-primary" onclick="loadSignals()">⚡ SCAN NOW</button>
-            <button class="btn-secondary" onclick="triggerCycleSignal()" id="signalCycleBtn" style="margin-left:6px">▶ RUN CYCLE</button>
+            <button class="btn-primary btn--sm" onclick="triggerCycleSignal()" id="runCycleBtn" style="margin-left:6px">▶ RUN CYCLE</button>
           </div>
         </div>
 
