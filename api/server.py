@@ -2030,7 +2030,16 @@ async def set_paper_config(payload: dict):
         raise HTTPException(400, "starting_cash must be >= 1")
     PAPER_STARTING_CASH = cash
     _save_paper_config({"starting_cash": cash})
-    return {"status": "ok", "starting_cash": PAPER_STARTING_CASH}
+    # If no open positions, apply new cash immediately and persist
+    applied = False
+    if not PAPER.positions:
+        PAPER.cash           = cash
+        PAPER.history        = []
+        PAPER.equity_history = []
+        PAPER.order_id       = 0
+        _save_paper_state()
+        applied = True
+    return {"status": "ok", "starting_cash": PAPER_STARTING_CASH, "applied": applied}
 
 
 # ─────────────────────────────────────────────

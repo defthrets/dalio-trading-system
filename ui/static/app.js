@@ -1442,8 +1442,22 @@ function _applyStoredTheme() {
 async function saveGeneralSettings() {
   const cash = parseFloat(el('settStartCash')?.value);
   if (cash && cash >= 1) {
-    await postJSON('/api/paper/config', { starting_cash: cash }).catch(() => {});
-    const inp = el('startingCashInput'); if (inp) inp.value = cash;
+    try {
+      const result = await postJSON('/api/paper/config', { starting_cash: cash });
+      // Sync both cash inputs
+      const inp = el('startingCashInput'); if (inp) inp.value = cash;
+      // If server applied immediately (no open positions), refresh portfolio
+      if (result.applied) {
+        await loadPaperPortfolio();
+        await loadPaperHistory();
+        loadPaperEquityCurve();
+        pushAlert('SETTINGS', `Starting cash set to $${cash.toLocaleString()} — portfolio reset`, 'info');
+      } else {
+        pushAlert('SETTINGS', `Starting cash updated to $${cash.toLocaleString()} — click RESET to apply`, 'warning');
+      }
+    } catch (e) {
+      pushAlert('SETTINGS', `Failed to save starting cash: ${e.message}`, 'warning');
+    }
   }
   _saveSetting('trade_size',    parseFloat(el('settTradeSize')?.value) || 100);
   _saveSetting('daily_sl',      parseFloat(el('settDailySL')?.value) || 2.0);
