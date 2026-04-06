@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(loadHealth, 10_000);        // Health every 10s
   setInterval(loadMarketSummary, 60_000); // Ticker strip every 60s
   setInterval(pollLivePnl, 15_000);       // Live P&L every 15s (global)
+  setInterval(autoRefreshNews, 300_000);  // Live news refresh every 5 min
 });
 
 // ─── Tab Navigation ───────────────────────────────────────
@@ -809,13 +810,28 @@ function showJustification(s) {
 }
 
 // ─── Sentiment ────────────────────────────────────────────
+let _newsRefreshCount = 0;
+
 async function loadSentiment() {
-  el('newsFeed').innerHTML = `<div class="news-loading"><div class="loading-spinner"></div><span>RUNNING FINBERT SCAN...</span></div>`;
+  const feed = el('newsFeed');
+  if (feed) feed.innerHTML = `<div class="news-loading"><div class="loading-spinner"></div><span>SCANNING 30+ NEWS SOURCES...</span></div>`;
   try {
     const d = await fetchJSON('/api/sentiment');
     STATE.sentiment = d;
+    _newsRefreshCount++;
     applySentiment(d);
+    // Update last refresh timestamp
+    const refreshEl = el('newsLastRefresh');
+    if (refreshEl) refreshEl.textContent = `LIVE · Updated ${new Date().toLocaleTimeString('en-AU', {hour:'2-digit',minute:'2-digit',hour12:false})}`;
   } catch {}
+}
+
+function autoRefreshNews() {
+  // Only auto-refresh if Intel Center tab is active
+  const intelTab = document.getElementById('tab-intel-center');
+  if (intelTab?.classList.contains('active')) {
+    loadSentiment();
+  }
 }
 
 function applySentiment(d) {

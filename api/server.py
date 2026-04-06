@@ -1664,11 +1664,23 @@ _NEWS_RSS_FEEDS = [
     ("Kitco Gold",         "https://www.kitco.com/rss/kitconews.xml"),
     ("OilPrice.com",       "https://oilprice.com/rss/main"),
     ("Mining.com",         "https://www.mining.com/feed/"),
+    # ── Geopolitical / Macro ──────────────────────────────────────────────────
+    ("BBC Business",       "https://feeds.bbci.co.uk/news/business/rss.xml"),
+    ("Al Jazeera Business","https://www.aljazeera.com/xml/rss/all.xml"),
+    ("The Guardian Money", "https://www.theguardian.com/uk/money/rss"),
+    ("NPR Economy",        "https://feeds.npr.org/1006/rss.xml"),
+    ("Economist Finance",  "https://www.economist.com/finance-and-economics/rss.xml"),
+    # ── Asia-Pacific ──────────────────────────────────────────────────────────
+    ("Nikkei Asia",        "https://asia.nikkei.com/rss"),
+    ("SMH Business AU",    "https://www.smh.com.au/rss/business.xml"),
+    ("LiveWire AU",        "https://www.livewiremarkets.com/rss"),
     # ── Google News RSS (no API key required) ───────────────────────────────
     ("GNews Crypto",       "https://news.google.com/rss/search?q=cryptocurrency+bitcoin+ethereum&hl=en&gl=US&ceid=US:en"),
     ("GNews Commodities",  "https://news.google.com/rss/search?q=gold+oil+commodities+futures&hl=en&gl=US&ceid=US:en"),
     ("GNews ASX",          "https://news.google.com/rss/search?q=ASX+Australian+stocks+market&hl=en-AU&gl=AU&ceid=AU:en"),
     ("GNews Markets",      "https://news.google.com/rss/search?q=stock+market+interest+rates+inflation&hl=en&gl=US&ceid=US:en"),
+    ("GNews Geopolitics",  "https://news.google.com/rss/search?q=geopolitics+sanctions+trade+war&hl=en&gl=US&ceid=US:en"),
+    ("GNews Central Banks","https://news.google.com/rss/search?q=federal+reserve+ECB+RBA+interest+rates&hl=en&gl=US&ceid=US:en"),
 ]
 
 _BULLISH_WORDS  = {"rally","surge","gain","high","record","beat","growth","rise","up","profit",
@@ -2096,7 +2108,7 @@ async def get_quadrant():
 
 
 _SENTIMENT_CACHE: dict = {}
-_SENTIMENT_TTL = 1800  # 30 minutes
+_SENTIMENT_TTL = 300  # 5 minutes — keep news fresh
 
 @app.get("/api/sentiment")
 async def get_sentiment():
