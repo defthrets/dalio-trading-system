@@ -2098,6 +2098,108 @@ canvas { display: block; max-width: 100%; }
   .logo-sub  { display: none; }
 }
 
+/* ─── Welcome Tutorial Popup ─── */
+.welcome-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  background: rgba(0,0,0,0.85);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn 0.4s ease;
+}
+.welcome-overlay.hidden { display: none; }
+.welcome-box {
+  background: var(--bg-panel);
+  border: 1px solid var(--primary-dim);
+  border-radius: 6px;
+  padding: 28px 32px;
+  max-width: 420px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 0 40px rgba(255,140,0,0.1), 0 0 80px rgba(0,0,0,0.6);
+}
+.welcome-illust {
+  margin: 0 auto 16px;
+  width: 120px; height: 80px;
+  display: flex; align-items: flex-end; justify-content: center; gap: 4px;
+}
+.welcome-placeholder-art {
+  display: flex; align-items: flex-end; justify-content: center; gap: 6px;
+  width: 100%; height: 100%;
+}
+.wpa-circle {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid var(--primary-dim);
+  align-self: flex-start; margin-right: 8px;
+  animation: holoBrainSpin 6s linear infinite;
+}
+.wpa-line {
+  width: 40px; height: 3px; background: var(--primary-dim);
+  border-radius: 2px; align-self: center;
+}
+.wpa-line.short { width: 24px; }
+.wpa-bar {
+  width: 14px; height: 32px; background: rgba(255,140,0,0.25);
+  border: 1px solid var(--primary-dim); border-radius: 2px;
+}
+.wpa-bar.tall { height: 52px; }
+.welcome-header {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-bottom: 12px;
+}
+.welcome-icon {
+  font-size: 22px; color: var(--primary);
+}
+.welcome-title {
+  font-family: var(--font-hud);
+  font-size: 20px; color: var(--primary);
+  letter-spacing: 2px;
+}
+.welcome-text {
+  font-size: 12px; color: var(--text-1); line-height: 1.6;
+  margin-bottom: 8px;
+}
+.welcome-subtext {
+  font-size: 10px; color: var(--text-muted); line-height: 1.5;
+  margin-bottom: 18px;
+}
+.welcome-btns {
+  display: flex; gap: 10px; justify-content: center; margin-bottom: 12px;
+}
+.welcome-btn-start {
+  font-family: var(--font-hud); font-size: 12px;
+  padding: 8px 20px; border: 1px solid var(--primary);
+  background: rgba(255,140,0,0.15); color: var(--primary);
+  border-radius: 3px; cursor: pointer;
+  transition: all 0.2s;
+}
+.welcome-btn-start:hover {
+  background: rgba(255,140,0,0.3);
+  box-shadow: 0 0 12px rgba(255,140,0,0.15);
+}
+.welcome-btn-skip {
+  font-family: var(--font-mono); font-size: 10px;
+  padding: 8px 16px; border: 1px solid var(--border);
+  background: transparent; color: var(--text-muted);
+  border-radius: 3px; cursor: pointer;
+  transition: all 0.2s;
+}
+.welcome-btn-skip:hover { border-color: var(--text-2); color: var(--text-2); }
+.welcome-never {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  font-size: 9px; color: var(--text-muted); cursor: pointer;
+}
+.welcome-never input { width: 12px; height: 12px; }
+
+/* Spot auto-advance timer bar */
+.spot-timer-bar {
+  position: absolute; bottom: 0; left: 0; height: 2px;
+  background: var(--primary); border-radius: 0 0 6px 6px;
+  animation: spotTimer 5s linear forwards;
+}
+@keyframes spotTimer {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
 /* ─── Speech Bubble Spotlight ─── */
 .spot-bubble {
   position: fixed;

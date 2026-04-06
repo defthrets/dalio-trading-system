@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
   _applyStoredTheme();
   loadAll();
   loadMarketSummary();
+  setTimeout(initWelcomeTutorial, 1500);  // Show welcome popup after initial load
   setInterval(loadAll, 30_000);           // Refresh all data every 30s
   setInterval(updateClock, 1000);
   setInterval(loadHealth, 10_000);        // Health every 10s
@@ -1396,47 +1397,63 @@ function updateWeightsChart(weights) {
 // Per-tab spot definitions — each spot targets a CSS selector
 const SPOTS = {
   'command-center': [
-    { id:'cmd-quadrant', sel:'#quadrantPanel',      arrow:'right',  title:'📊 ECONOMIC QUADRANT',    text:'The glowing cell shows the current economic regime. It tells you exactly what assets to buy or avoid right now.' },
-    { id:'cmd-equity',   sel:'#equityPanel',        arrow:'bottom', title:'📈 EQUITY CURVE',          text:'Your portfolio value over time. A rising line = the strategy is working. Each data point is a live portfolio snapshot.' },
-    { id:'cmd-vitals',   sel:'.panel--gauges',      arrow:'left',   title:'❤ PORTFOLIO VITALS',       text:'Daily P&L and drawdown at a glance. If drawdown hits 10%, the system auto-halts all trading to protect your capital.' },
-    { id:'cmd-cycle',    sel:'#runCycleBtn',        arrow:'bottom', title:'▶ RUN A SCAN NOW',         text:'Click to trigger an immediate market scan across all ASX, crypto, and commodity assets. New signals appear in seconds.' },
+    { id:'cmd-quadrant', sel:'#quadrantPanel',      arrow:'right',  title:'\ud83d\udcca ECONOMIC QUADRANT',    text:"This bad boy shows ya which economic regime we\'re in right now. The glowing cell is the money zone \u2014 tells ya exactly what to buy or dodge. Dead simple, yeah?" },
+    { id:'cmd-chart',    sel:'.panel--cc-chart',    arrow:'bottom', title:'\ud83d\udcc8 LIVE PRICE CHART',      text:"Click any position from your portfolio and she\'ll chart it right here \u2014 candles, line view, moving averages, RSI, even a 30-day crystal ball prediction. Fully sick." },
+    { id:'cmd-vitals',   sel:'.panel--gauges',      arrow:'left',   title:'\u2764 PORTFOLIO VITALS',       text:"Your daily P&L and drawdown in one hit. If drawdown cracks 10%, the system slams the brakes on all trading. No worries, it\'s got your back!" },
+    { id:'cmd-cycle',    sel:'#runCycleBtn',        arrow:'bottom', title:'\u25b6 RUN A SCAN NOW',         text:"Give this a click and she\'ll rip through all ASX, crypto, and commodity assets looking for trades. Fresh signals pop up in seconds. Easy as!" },
+  ],
+  'live-trading': [
+    { id:'lt-broker',   sel:'.panel--broker-bar',    arrow:'bottom', title:'\ud83d\udd17 BROKER STATUS',         text:"This strip shows if your broker\'s connected and ready to rumble. Green dot = good to go, red = something\'s cooked. Your account balance updates live." },
+    { id:'lt-equity',   sel:'.panel--live-equity',   arrow:'right',  title:'\ud83d\udcc8 EQUITY CURVE',          text:"Tracks your real portfolio value over time. Line going up = you\'re absolutely smashing it, legend. NAV is your total worth, ROI is your return." },
+    { id:'lt-summary',  sel:'.panel--live-summary',  arrow:'left',   title:'\ud83d\udcbc LIVE PORTFOLIO',        text:"Your real-money portfolio from your broker. Cash, P&L, positions \u2014 the whole shebang. Click any position to suss out more details." },
+    { id:'lt-signals',  sel:'.panel--live-signals',  arrow:'top',    title:'\u26a1 QUICK-TRADE',            text:"One-click trading from AI signals with real money. No mucking around \u2014 click a signal and the order fires off to your broker. Beauty!" },
   ],
   'signal-ops': [
-    { id:'sig-banner',   sel:'#strongSignalInPage', arrow:'bottom', title:'⚡ STRONG SIGNAL ALERT',   text:'When confidence is 82%+, this bar lights up. It tells you exactly what to do and where to jump in the signal list.' },
-    { id:'sig-grid',     sel:'#signalGrid',         arrow:'top',    title:'🃏 SIGNAL CARDS',           text:'Each card = one trade. BUY/LONG in green, SELL/SHORT in red. Cards are sorted by confidence — best signal first.' },
-    { id:'sig-rr',       sel:'.signal-controls',    arrow:'bottom', title:'🎚 FILTER SIGNALS',         text:'Raise the confidence slider to 75%+ for high-conviction only. Switch between ASX, Crypto, or all markets.' },
-    { id:'sig-just',     sel:'#justificationPanel', arrow:'left',   title:'🧠 AI JUSTIFICATION',       text:'Click any signal card to see the full reason — economic quadrant fit, sentiment score, RSI, and Dalio framework logic.' },
+    { id:'sig-banner',   sel:'#strongSignalInPage', arrow:'bottom', title:'\u26a1 STRONG SIGNAL ALERT',   text:"When confidence hits 82%+, this puppy lights up like a Christmas tree. It\'s basically screaming \'OI, CHECK THIS OUT!\' Top-shelf signal, mate." },
+    { id:'sig-grid',     sel:'#signalGrid',         arrow:'top',    title:'\ud83c\udccf SIGNAL CARDS',           text:"Each card is a trade idea. Green = BUY/LONG, Red = SELL/SHORT. They\'re sorted best-first so the top ones are the real bangers." },
+    { id:'sig-rr',       sel:'.signal-controls',    arrow:'bottom', title:'\ud83c\udf9a FILTER SIGNALS',         text:"Crank the confidence slider up to 75%+ if ya only want the high-conviction plays. You can also filter by market \u2014 ASX, Crypto, or everything." },
+    { id:'sig-just',     sel:'#justificationPanel', arrow:'left',   title:'\ud83e\udde0 AI JUSTIFICATION',       text:"Click any signal card and the AI spills the beans \u2014 why it reckons this trade\'s a goer. Economic fit, sentiment, RSI, the full Dalio breakdown." },
   ],
   'intel-center': [
-    { id:'int-risk',     sel:'.panel--conflict',    arrow:'right',  title:'⚠ GEOPOLITICAL RISK',      text:'Counts news articles with conflict keywords. Red ring = elevated risk. In risk periods, shift toward Gold and Bonds.' },
-    { id:'int-sent',     sel:'.panel--sentiment-chart', arrow:'left', title:'📰 SENTIMENT DISTRIBUTION', text:'Shows how many articles are positive/negative for each Dalio quadrant. Tells you what the market is most worried about.' },
-    { id:'int-news',     sel:'#newsFeed',           arrow:'top',    title:'🔴 NEWS FEED',              text:'Top headlines ranked by AI sentiment score. Red = negative (bearish). Green = positive (bullish). Conflict articles are flagged ⚠.' },
+    { id:'int-risk',     sel:'.panel--conflict',    arrow:'right',  title:'\u26a0 GEOPOLITICAL RISK',      text:"Counts dodgy news articles with conflict vibes. Red ring = things are getting spicy out there. When it\'s hot, lean into Gold and Bonds for safety, yeah?" },
+    { id:'int-sent',     sel:'.panel--sentiment-chart', arrow:'left', title:'\ud83d\udcf0 SENTIMENT',             text:"Shows the vibe check across all the news \u2014 how many articles are bullish vs bearish for each sector. Tells ya what the market\'s stressing about." },
+    { id:'int-news',     sel:'#newsFeed',           arrow:'top',    title:'\ud83d\udd34 NEWS FEED',              text:"Latest headlines scored by the AI. Red = bad news bears, Green = good vibes. Conflict articles get a \u26a0 flag so you can spot trouble quick smart." },
   ],
   'holy-grail': [
-    { id:'hg-heatmap',   sel:'.panel--heatmap',     arrow:'right',  title:'🟩 CORRELATION MATRIX',     text:'Each cell shows how two assets move together. Dark = independent (good). Bright green = they move in sync (bad for diversification).' },
-    { id:'hg-meter',     sel:'.panel--div-meter',   arrow:'left',   title:'🏆 HOLY GRAIL METER',       text:'Dalio\'s key target: hold 15+ assets with correlation below 0.30. When one falls, others hold up. This meter tracks your score.' },
-    { id:'hg-weights',   sel:'.panel--weights',     arrow:'bottom', title:'⚖ RISK-PARITY WEIGHTS',     text:'Suggested portfolio split so each asset contributes EQUAL risk. Not equal dollars — equal risk. This is the Dalio method.' },
+    { id:'hg-heatmap',   sel:'.panel--heatmap',     arrow:'right',  title:'\ud83d\udfe9 CORRELATION MATRIX',     text:"Shows how ya assets move together. Dark cells = independent (chef\'s kiss for diversification). Bright green = they move in sync, which is a bit ordinary." },
+    { id:'hg-meter',     sel:'.panel--div-meter',   arrow:'left',   title:'\ud83c\udfc6 HOLY GRAIL METER',       text:"Dalio reckons hold 15+ assets with low correlation and you\'ve cracked the code. When one tanks, the others hold up. This meter tracks how close ya are." },
+    { id:'hg-weights',   sel:'.panel--weights',     arrow:'bottom', title:'\u2696 RISK-PARITY WEIGHTS',     text:"The Dalio special \u2014 each asset gets weighted so they all contribute EQUAL risk. Not equal dollars, equal risk. Proper smart stuff, this one." },
   ],
   'risk-matrix': [
-    { id:'rm-cb',        sel:'.panel--circuit',     arrow:'right',  title:'🛑 CIRCUIT BREAKER',        text:'Your safety net. If daily loss > 2% OR total drawdown > 10%, trading halts automatically. No manual action needed.' },
-    { id:'rm-metrics',   sel:'.panel--risk-metrics',arrow:'left',   title:'📊 RISK METRICS',           text:'Sharpe > 1.0 is good. Sortino > 1.5 is solid. Max drawdown shows the worst loss. Win rate > 55% is strong for a systematic strategy.' },
-    { id:'rm-pos',       sel:'.panel--positions',   arrow:'top',    title:'📋 OPEN POSITIONS',         text:'All current trades and their unrealised P&L. Green = profitable. Red = underwater. Watch for positions near their stop-loss.' },
+    { id:'rm-cb',        sel:'.panel--circuit-breaker', arrow:'right',  title:'\ud83d\uded1 CIRCUIT BREAKER',    text:"Your safety net, legend. If daily loss smashes past 2% or total drawdown hits 10%, trading shuts down automatically. No panic selling on your watch!" },
+    { id:'rm-metrics',   sel:'.panel--risk-metrics',arrow:'left',   title:'\ud83d\udcca RISK METRICS',           text:"Sharpe above 1.0 = ripper. Sortino above 1.5 = absolute unit. Max drawdown shows the worst dip. Win rate over 55% means you\'re doing bloody well." },
+    { id:'rm-pos',       sel:'.panel--pos-table',   arrow:'top',    title:'\ud83d\udccb OPEN POSITIONS',         text:"All your current trades and how they\'re tracking. Green = making bank. Red = copping it. Keep an eye on anything near its stop-loss, yeah?" },
   ],
   'backtest-lab': [
-    { id:'bt-summary',   sel:'.panel--bt-summary',  arrow:'right',  title:'📈 BACKTEST RESULTS',       text:'Walk-forward testing: the system trains on 12 months of data, then tests on the next 3 months it\'s never seen. Prevents cheating.' },
-    { id:'bt-chart',     sel:'.panel--wf-chart',    arrow:'bottom', title:'📊 PERIOD CHART',            text:'Each bar = one test period. Green = profitable, Red = losing. Look for consistent green bars — that\'s a robust strategy.' },
-    { id:'bt-table',     sel:'.panel--bt-table',    arrow:'top',    title:'📋 PERIOD BREAKDOWN',        text:'Drill into each period: return, Sharpe, max drawdown, win rate, and number of trades. Consistent Sharpe > 1.0 is the goal.' },
+    { id:'bt-summary',   sel:'.panel--bt-summary',  arrow:'right',  title:'\ud83d\udcc8 BACKTEST RESULTS',       text:"Walk-forward testing \u2014 the system trains on 12 months, then tests on 3 months it\'s never seen. No peeking at answers, keeps things fair dinkum." },
+    { id:'bt-chart',     sel:'.panel--wf-chart',    arrow:'bottom', title:'\ud83d\udcca PERIOD CHART',            text:"Each bar = one test window. Green = made money, Red = lost money. You wanna see consistent green bars \u2014 that means the strat\'s legit, not just lucky." },
+    { id:'bt-table',     sel:'.panel--period-table', arrow:'top',   title:'\ud83d\udccb PERIOD BREAKDOWN',        text:"Drill into each period for the nitty gritty \u2014 returns, Sharpe, drawdown, win rate. Consistent Sharpe above 1.0 is the dream, mate." },
   ],
-  'comms-config': [
-    { id:'cfg-brokers',  sel:'.panel--brokers',     arrow:'top',    title:'🔗 BROKER CONNECTIONS',     text:'Connect your broker or exchange. Click "Open →" to go to the platform. For automation, Alpaca offers free paper trading with a full API.' },
-    { id:'cfg-discord',  sel:'.panel--discord',     arrow:'right',  title:'📣 DISCORD ALERTS',         text:'Get trade signals sent straight to a Discord channel. Paste your webhook URL and hit Test to verify it works.' },
-    { id:'cfg-mode',     sel:'#cfgMode',            arrow:'left',   title:'⚠ PAPER vs LIVE MODE',      text:'ALWAYS start in PAPER mode. It simulates trades with zero real money. Only switch to LIVE when you\'re confident in the signals.' },
+  'asx-scanner': [
+    { id:'asx-table',    sel:'.scanner-wrap',       arrow:'bottom', title:'\ud83c\udde6\ud83c\uddfa ASX SCANNER',            text:"Live prices for Aussie stocks! Filter by ticker, name, or sector. Green rows = up today, red = down. Click TRADE to have a crack at any stock." },
+    { id:'asx-filter',   sel:'#asxSearch',          arrow:'right',  title:'\ud83d\udd0d SEARCH & FILTER',         text:"Type any ticker or company name and she\'ll filter on the fly. You can also filter by sector \u2014 Banking, Mining, Energy, whatever tickles your fancy." },
+  ],
+  'crypto-scanner': [
+    { id:'cry-table',    sel:'#cryptoTable',        arrow:'bottom', title:'\u20bf CRYPTO SCANNER',           text:"All the top cryptos with live prices from CoinGecko. 24h change, volume, market cap \u2014 the works. Click TRADE to jump in or \u2605 to watchlist it." },
+  ],
+  'commodities-scanner': [
+    { id:'com-table',    sel:'#commStats',          arrow:'bottom', title:'\u26cf COMMODITIES',              text:"Gold, silver, oil, gas \u2014 the classic All-Weather hedges. These bad boys protect ya when inflation kicks off or geopolitics gets messy. Click TRADE to jump in." },
   ],
   'paper-trading': [
-    { id:'pt-order',    sel:'.panel--paper-order',   arrow:'right',  title:'📄 PLACE AN ORDER',         text:'Type any ticker (ASX, crypto, commodity), choose BUY or SELL, set quantity, and hit Execute. Prices pull from real market data.' },
-    { id:'pt-summary',  sel:'.panel--paper-summary', arrow:'left',   title:'💼 PORTFOLIO TRACKER',      text:'Your paper portfolio starts at your configured amount (default $1,000). Total value, P&L, and open positions update live every 15 seconds.' },
-    { id:'pt-signals',  sel:'.panel--paper-signals', arrow:'right',  title:'⚡ 1-CLICK SIGNAL TRADES',   text:'The system\'s top signals appear here pre-loaded. Adjust quantity and click BUY or SELL to instantly paper trade the recommendation.' },
-    { id:'pt-history',  sel:'.panel--paper-history', arrow:'top',    title:'📋 TRADE HISTORY',           text:'Every closed trade is recorded with entry price, exit price, and P&L. Use this to evaluate which signals perform best over time.' },
+    { id:'pt-order',    sel:'.panel--paper-order',   arrow:'right',  title:'\ud83d\udcc4 PLACE AN ORDER',         text:"Chuck in any ticker \u2014 ASX, crypto, commodity \u2014 pick BUY or SELL, set your quantity, and smash Execute. Uses real market prices but zero real dollars. Beaut!" },
+    { id:'pt-summary',  sel:'.panel--paper-summary', arrow:'left',   title:'\ud83d\udcbc PORTFOLIO TRACKER',      text:"Your paper trading war chest. Starts at your configured amount and tracks every move. Total value, P&L, positions \u2014 all updating live every 15 secs." },
+    { id:'pt-signals',  sel:'.panel--paper-signals', arrow:'right',  title:'\u26a1 1-CLICK SIGNAL TRADES',   text:"The AI\'s top picks pre-loaded and ready to go. See something you like? One click and it\'s in your paper portfolio. Fastest way to test the strat." },
+    { id:'pt-history',  sel:'.panel--paper-history', arrow:'top',    title:'\ud83d\udccb TRADE HISTORY',           text:"Every closed trade logged with entry, exit, and P&L. Have a squiz at which signals actually make money over time. That\'s where the real learnings are." },
+  ],
+  'comms-config': [
+    { id:'cfg-brokers',  sel:'.panel--brokers',     arrow:'top',    title:'\ud83d\udd17 BROKER CONNECTIONS',     text:"Hook up your broker or exchange here. Alpaca\'s a ripper for getting started \u2014 free paper trading with a full API. Click \'Open\' to head to their site." },
+    { id:'cfg-discord',  sel:'.panel--discord',     arrow:'right',  title:'\ud83d\udce3 DISCORD ALERTS',         text:"Get trade alerts beamed straight to your Discord server. Paste in your webhook URL, hit Test, and Bob\'s your uncle. Never miss a signal again!" },
+    { id:'cfg-mode',     sel:'#cfgMode',            arrow:'left',   title:'\u26a0 PAPER vs LIVE MODE',      text:"Start in PAPER mode, always. It\'s play money so you can suss out the system risk-free. Only flip to LIVE when you\'re confident. No rush, legend!" },
   ],
 };
 
@@ -1444,26 +1461,39 @@ let _spotQueue   = [];
 let _spotIdx     = 0;
 let _spotTabId   = null;
 let _spotHighlit = null;
+let _spotAutoTimer = null;
+let _guidedMode  = false;
+
+// Tab order for guided tutorial walkthrough
+const GUIDED_TAB_ORDER = [
+  'command-center', 'live-trading', 'signal-ops', 'intel-center',
+  'holy-grail', 'risk-matrix', 'backtest-lab',
+  'asx-scanner', 'crypto-scanner', 'commodities-scanner',
+  'paper-trading', 'comms-config'
+];
 
 function showTutorial(tabId, force = false) {
   _spotTabId = tabId;
   const spots = SPOTS[tabId] || [];
-  // Filter to unseen spots (unless force)
   _spotQueue = spots.filter(s => force || !localStorage.getItem(`dalios_spot_${s.id}`));
   _spotIdx   = 0;
-  if (!_spotQueue.length) return;
+  if (!_spotQueue.length) {
+    if (_guidedMode) _guidedNextTab();
+    return;
+  }
   _showSpot(_spotIdx);
 }
 
 function _showSpot(idx) {
+  clearTimeout(_spotAutoTimer);
   const bubble = el('spotBubble');
   if (!bubble) return;
 
-  // Remove previous highlight
   if (_spotHighlit) { _spotHighlit.classList.remove('spot-highlight'); _spotHighlit = null; }
 
   if (idx >= _spotQueue.length) {
     bubble.classList.add('hidden');
+    if (_guidedMode) _guidedNextTab();
     return;
   }
 
@@ -1471,19 +1501,51 @@ function _showSpot(idx) {
   el('spotTitle').textContent = spot.title;
   el('spotText').textContent  = spot.text;
   el('spotCount').textContent = `${idx + 1} / ${_spotQueue.length}`;
-  el('spotNextBtn').textContent = idx === _spotQueue.length - 1 ? 'Done ✓' : 'Next →';
 
-  // Arrow direction class
+  // In guided mode: auto-advance spots, show "NEXT TAB" on last spot
+  if (_guidedMode) {
+    const isLastSpot = idx === _spotQueue.length - 1;
+    const nextTabIdx = GUIDED_TAB_ORDER.indexOf(_spotTabId) + 1;
+    const hasMoreTabs = nextTabIdx < GUIDED_TAB_ORDER.length;
+
+    if (isLastSpot && hasMoreTabs) {
+      el('spotNextBtn').textContent = 'NEXT TAB \u2192';
+    } else if (isLastSpot) {
+      el('spotNextBtn').textContent = 'FINISH \u2713';
+    } else {
+      el('spotNextBtn').textContent = '';
+    }
+
+    // Auto-advance after 5s unless it's the last spot on this tab
+    if (!isLastSpot) {
+      _spotAutoTimer = setTimeout(() => _guidedAdvanceSpot(), 5000);
+    }
+
+    // Timer bar animation
+    const timerBar = bubble.querySelector('.spot-timer-bar');
+    if (timerBar) {
+      timerBar.style.animation = 'none';
+      timerBar.offsetHeight; // reflow
+      if (!isLastSpot) {
+        timerBar.style.animation = 'spotTimer 5s linear forwards';
+      } else {
+        timerBar.style.animation = 'none';
+        timerBar.style.width = '0';
+      }
+    }
+  } else {
+    el('spotNextBtn').textContent = idx === _spotQueue.length - 1 ? 'Done \u2713' : 'Next \u2192';
+  }
+
   bubble.className = `spot-bubble arrow-${spot.arrow}`;
 
-  // Find target and highlight it
   const target = document.querySelector(spot.sel);
   if (target) {
     target.classList.add('spot-highlight');
     _spotHighlit = target;
-    _positionBubble(bubble, target, spot.arrow);
+    target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    setTimeout(() => _positionBubble(bubble, target, spot.arrow), 100);
   } else {
-    // Fallback: centre of screen
     bubble.style.top  = '50%';
     bubble.style.left = '50%';
     bubble.style.transform = 'translate(-50%,-50%)';
@@ -1493,8 +1555,8 @@ function _showSpot(idx) {
 function _positionBubble(bubble, target, arrow) {
   const GAP  = 16;
   const tr   = target.getBoundingClientRect();
-  const bw   = 240;  // bubble width
-  const bh   = 160;  // estimated bubble height
+  const bw   = 240;
+  const bh   = 160;
   const vw   = window.innerWidth;
   const vh   = window.innerHeight;
 
@@ -1502,7 +1564,6 @@ function _positionBubble(bubble, target, arrow) {
   let top, left;
 
   if (arrow === 'right') {
-    // Bubble appears to the RIGHT of the target
     left = tr.right + GAP;
     top  = tr.top + (tr.height / 2) - (bh / 2);
     if (left + bw > vw - 8) { left = tr.left - bw - GAP; bubble.className = 'spot-bubble arrow-left'; }
@@ -1514,13 +1575,12 @@ function _positionBubble(bubble, target, arrow) {
     left = tr.left + (tr.width / 2) - (bw / 2);
     top  = tr.bottom + GAP;
     if (top + bh > vh - 8) { top = tr.top - bh - GAP; bubble.className = 'spot-bubble arrow-bottom'; }
-  } else { // top
+  } else {
     left = tr.left + (tr.width / 2) - (bw / 2);
     top  = tr.top - bh - GAP;
     if (top < 8) { top = tr.bottom + GAP; bubble.className = 'spot-bubble arrow-top'; }
   }
 
-  // Clamp to viewport
   top  = Math.max(8, Math.min(top,  vh - bh - 8));
   left = Math.max(8, Math.min(left, vw - bw - 8));
 
@@ -1528,39 +1588,109 @@ function _positionBubble(bubble, target, arrow) {
   bubble.style.left = `${left}px`;
 }
 
+function _guidedAdvanceSpot() {
+  const spot = _spotQueue[_spotIdx];
+  if (spot) localStorage.setItem(`dalios_spot_${spot.id}`, '1');
+  _spotIdx++;
+  _showSpot(_spotIdx);
+}
+
+function _guidedNextTab() {
+  const curIdx = GUIDED_TAB_ORDER.indexOf(_spotTabId);
+  const nextIdx = curIdx + 1;
+  if (nextIdx >= GUIDED_TAB_ORDER.length) {
+    // Tutorial complete!
+    _guidedMode = false;
+    if (_spotHighlit) { _spotHighlit.classList.remove('spot-highlight'); _spotHighlit = null; }
+    el('spotBubble')?.classList.add('hidden');
+    return;
+  }
+  const nextTab = GUIDED_TAB_ORDER[nextIdx];
+  // Switch tab
+  const btn = document.querySelector(`[data-tab="${nextTab}"]`);
+  if (btn) btn.click();
+  // Small delay to let the tab render
+  setTimeout(() => showTutorial(nextTab, true), 400);
+}
+
 function nextSpot() {
+  clearTimeout(_spotAutoTimer);
   if (!_spotQueue.length) return;
-  // Mark current as seen
   const spot = _spotQueue[_spotIdx];
   if (spot) localStorage.setItem(`dalios_spot_${spot.id}`, '1');
 
   _spotIdx++;
   if (_spotIdx >= _spotQueue.length) {
-    // Done — hide bubble, remove highlight
     if (_spotHighlit) { _spotHighlit.classList.remove('spot-highlight'); _spotHighlit = null; }
     el('spotBubble').classList.add('hidden');
+    if (_guidedMode) _guidedNextTab();
     return;
   }
   _showSpot(_spotIdx);
 }
 
 function skipAllSpots() {
-  // Mark all remaining spots as seen
+  clearTimeout(_spotAutoTimer);
   (_spotQueue || []).forEach(s => localStorage.setItem(`dalios_spot_${s.id}`, '1'));
   if (_spotHighlit) { _spotHighlit.classList.remove('spot-highlight'); _spotHighlit = null; }
   el('spotBubble').classList.add('hidden');
   _spotQueue = [];
+  _guidedMode = false;
 }
 
 function openCurrentTutorial() {
   const activeBtn = document.querySelector('.tab-btn.active');
   const tabId = activeBtn?.dataset?.tab ?? 'command-center';
-  // Clear seen state for this tab's spots so they all show again
   (SPOTS[tabId] || []).forEach(s => localStorage.removeItem(`dalios_spot_${s.id}`));
+  _guidedMode = false;
   showTutorial(tabId, true);
 }
 
 function closeTutorial() { skipAllSpots(); }
+
+// ─── Welcome Popup & Guided Tutorial ─────────────────────
+
+function initWelcomeTutorial() {
+  if (localStorage.getItem('dalios_welcome_never')) return;
+  if (localStorage.getItem('dalios_welcome_done')) return;
+  const overlay = el('welcomeOverlay');
+  if (overlay) overlay.classList.remove('hidden');
+}
+
+function startGuidedTutorial() {
+  // Dismiss welcome overlay
+  const overlay = el('welcomeOverlay');
+  if (overlay) overlay.classList.add('hidden');
+  localStorage.setItem('dalios_welcome_done', '1');
+
+  // Check "never show again"
+  const neverCb = el('welcomeNeverAgain');
+  if (neverCb && neverCb.checked) {
+    localStorage.setItem('dalios_welcome_never', '1');
+  }
+
+  // Clear all spot seen-states for a fresh walkthrough
+  GUIDED_TAB_ORDER.forEach(tabId => {
+    (SPOTS[tabId] || []).forEach(s => localStorage.removeItem(`dalios_spot_${s.id}`));
+  });
+
+  // Start guided mode on command-center
+  _guidedMode = true;
+  const ccBtn = document.querySelector('[data-tab="command-center"]');
+  if (ccBtn) ccBtn.click();
+  setTimeout(() => showTutorial('command-center', true), 400);
+}
+
+function skipWelcomeTutorial() {
+  const overlay = el('welcomeOverlay');
+  if (overlay) overlay.classList.add('hidden');
+  localStorage.setItem('dalios_welcome_done', '1');
+
+  const neverCb = el('welcomeNeverAgain');
+  if (neverCb && neverCb.checked) {
+    localStorage.setItem('dalios_welcome_never', '1');
+  }
+}
 
 // ═══════════════════════════════════════════════════════════
 // Strong Signal Alert System
