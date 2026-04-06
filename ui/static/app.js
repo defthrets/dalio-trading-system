@@ -2524,10 +2524,17 @@ async function loadBrokerStatus() {
 }
 
 function onBrokerSelect(val) {
-  ['alpacaFields','ibkrFields','binanceFields','coinbaseFields','stakeFields'].forEach(id => {
+  ['alpacaFields','ibkrFields','binanceFields','coinbaseFields','coinspotFields','stakeFields'].forEach(id => {
     const el2 = el(id); if (el2) el2.style.display = 'none';
   });
-  const map = { alpaca:'alpacaFields', ibkr:'ibkrFields', binance:'binanceFields', coinbase:'coinbaseFields', stake:'stakeFields' };
+  const map = {
+    alpaca:   'alpacaFields',
+    ibkr:     'ibkrFields',
+    binance:  'binanceFields',
+    coinbase: 'coinbaseFields',
+    coinspot: 'coinspotFields',
+    stake:    'stakeFields',
+  };
   if (map[val]) { const el2 = el(map[val]); if (el2) el2.style.display = 'block'; }
 }
 
@@ -2565,6 +2572,14 @@ async function connectBroker() {
     payload.api_secret = el('coinbaseSecret')?.value?.trim();
     if (!payload.api_key || !payload.api_secret) {
       if (res) res.innerHTML = '<span style="color:var(--red)">API key name and private key required</span>';
+      if (btn) { btn.textContent = '▶ CONNECT BROKER'; btn.classList.remove('loading'); }
+      return;
+    }
+  } else if (broker === 'coinspot') {
+    payload.api_key    = el('coinspotKey')?.value?.trim();
+    payload.api_secret = el('coinspotSecret')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) {
+      if (res) res.innerHTML = '<span style="color:var(--red)">API key and secret required</span>';
       if (btn) { btn.textContent = '▶ CONNECT BROKER'; btn.classList.remove('loading'); }
       return;
     }

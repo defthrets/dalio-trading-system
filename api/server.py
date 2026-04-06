@@ -742,6 +742,109 @@ class CoinbaseBroker(BrokerBase):
         return await self.place_order(ticker, "SELL", pos["qty"], None)
 
 
+class CoinSpotBroker(BrokerBase):
+    """CoinSpot Australian crypto exchange — REST API v2."""
+    name = "coinspot"
+    _BASE = "https://www.coinspot.com.au"
+
+    def __init__(self):
+        self._api_key:    Optional[str] = None
+        self._api_secret: Optional[str] = None
+        self._connected   = False
+
+    def is_connected(self) -> bool:
+        return self._connected
+
+    def _sign_request(self, data: dict):
+        import time as _t, hmac as _hmac, hashlib as _hs
+        nonce = str(int(_t.time() * 1000))
+        data["nonce"] = nonce
+        body  = json.dumps(data, separators=(",", ":"))
+        sig   = _hmac.new(self._api_secret.encode(), body.encode(), _hs.sha512).hexdigest()
+        return body, sig
+
+    async def _post(self, endpoint: str, payload: dict) -> dict:
+        body, sig = self._sign_request(payload)
+        headers   = {"Content-Type": "application/json",
+                     "key":  self._api_key,
+                     "sign": sig}
+        timeout = aiohttp.ClientTimeout(total=12)
+        async with aiohttp.ClientSession(timeout=timeout) as sess:
+            async with sess.post(f"{self._BASE}{endpoint}", data=body, headers=headers) as resp:
+                result = await resp.json(content_type=None)
+                if result.get("status") not in ("ok", "error"):
+                    pass  # some endpoints return non-standard status
+                if result.get("status") == "error":
+                    raise RuntimeError(f"CoinSpot error: {result.get('message','unknown')}")
+                return result
+
+    async def connect(self, api_key: str, api_secret: str, **kwargs) -> None:
+        self._api_key    = api_key
+        self._api_secret = api_secret
+        # Verify credentials with a balances fetch
+        await self.get_account()
+        self._connected = True
+        logger.info("CoinSpot connected")
+
+    async def get_account(self) -> dict:
+        result  = await self._post("/api/v2/my/balances", {})
+        bals    = result.get("balances", [])
+        total   = sum(float(v.get("audbalance", 0))
+                      for b in bals if isinstance(b, dict)
+                      for v in b.values() if isinstance(v, dict))
+        return {"broker": "coinspot", "account_value": round(total, 2),
+                "buying_power": round(total, 2), "cash": round(total, 2), "currency": "AUD"}
+
+    async def place_order(self, ticker: str, side: str, qty: float,
+                          price: Optional[float] = None) -> dict:
+        coin     = ticker.replace("-AUD", "").replace("-USD", "").upper()
+        endpoint = ("/api/v2/my/coin/buy/now"
+                    if side.upper() in ("BUY", "LONG")
+                    else "/api/v2/my/coin/sell/now")
+        result   = await self._post(endpoint, {"cointype": coin, "amount": qty, "amounttype": "coin"})
+        return {"order_id": result.get("id", f"cs_{int(datetime.utcnow().timestamp())}"),
+                "ticker": ticker, "side": side, "qty": qty, "price": price,
+                "timestamp": datetime.utcnow().isoformat()}
+
+    async def get_positions(self) -> list:
+        result = await self._post("/api/v2/my/balances", {})
+        out    = []
+        for b in result.get("balances", []):
+            if not isinstance(b, dict): continue
+            for coin, details in b.items():
+                if not isinstance(details, dict): continue
+                bal = float(details.get("balance", 0))
+                if bal > 0:
+                    out.append({"ticker": f"{coin}-AUD", "qty": bal,
+                                "avg_cost": None,
+                                "market_val": float(details.get("audbalance", 0)),
+                                "pnl": None, "side": "LONG"})
+        return out
+
+    async def get_history(self) -> list:
+        result = await self._post("/api/v2/my/orders/completed", {})
+        rows   = []
+        for o in result.get("buyorders", []):
+            rows.append({"ticker": f"{o.get('cointype','')}-AUD", "side": "BUY",
+                         "qty": float(o.get("amount", 0)),
+                         "price": float(o.get("rate", 0)),
+                         "timestamp": o.get("created", "")})
+        for o in result.get("sellorders", []):
+            rows.append({"ticker": f"{o.get('cointype','')}-AUD", "side": "SELL",
+                         "qty": float(o.get("amount", 0)),
+                         "price": float(o.get("rate", 0)),
+                         "timestamp": o.get("created", "")})
+        return rows
+
+    async def close_position(self, ticker: str) -> dict:
+        positions = await self.get_positions()
+        coin      = ticker.replace("-AUD", "").replace("-USD", "").upper()
+        pos       = next((p for p in positions if coin in p["ticker"].upper()), None)
+        if not pos:
+            raise ValueError(f"No CoinSpot balance for {ticker}")
+        return await self.place_order(ticker, "SELL", pos["qty"])
+
+
 class StakeBroker(BrokerBase):
     name = "stake"
     def is_connected(self) -> bool: return False
@@ -985,16 +1088,29 @@ async def _gen_signals(n: int = 12) -> list[dict]:
     Generate trade signals from real yfinance price data.
     Pulls from scanner cache first (free), then fetches fresh for uncached tickers.
     """
-    # ── Seed candidate pool from scanner cache (already fetched) ──────────
-    cached_tickers: list = []
+    # ── Seed candidate pool — equal split across ASX / Crypto / Commodities ──
+    # Pull best movers from scanner cache first (already have prices)
+    cached_by_market: dict = {"asx": [], "crypto": [], "commodities": []}
     for mkt in ("asx", "crypto", "commodities"):
         cached = _scanner_cache.get(mkt)
         if cached:
-            cached_tickers.extend(r["ticker"] for r in cached["rows"] if r.get("price", 0) > 0)
+            rows = sorted(cached["rows"], key=lambda r: abs(r.get("change_pct", 0)), reverse=True)
+            cached_by_market[mkt] = [r["ticker"] for r in rows if r.get("price", 0) > 0][:n]
 
-    # Mix cached tickers with a fresh random sample
-    random_sample = random.sample(ALL_TICKERS, min(n * 2, len(ALL_TICKERS)))
-    candidates = list(dict.fromkeys(cached_tickers + random_sample))  # dedup, preserve order
+    # Sample fresh tickers per market to pad out any empty cache slots
+    n_each = max(4, (n * 2) // 3)
+    fresh = {
+        "asx":         random.sample(ASX_TICKERS,        min(n_each, len(ASX_TICKERS))),
+        "crypto":      random.sample(CRYPTO_TICKERS,     min(n_each, len(CRYPTO_TICKERS))),
+        "commodities": random.sample(COMMODITY_TICKERS,  min(n_each, len(COMMODITY_TICKERS))),
+    }
+
+    # Merge: cached first, then fresh, ensuring equal market representation
+    candidates = list(dict.fromkeys(
+        cached_by_market["asx"]         + fresh["asx"] +
+        cached_by_market["crypto"]       + fresh["crypto"] +
+        cached_by_market["commodities"]  + fresh["commodities"]
+    ))
     candidates = candidates[:n * 4]
 
     # ── Fetch 3-month price history ───────────────────────────────────────
@@ -1390,6 +1506,7 @@ def _gen_quadrant_data() -> dict:
 
 # ─── Real Financial News RSS Feeds ─────────────────────────────────────────
 _NEWS_RSS_FEEDS = [
+    # ── Equities / General ──────────────────────────────────────────────────
     ("Reuters Business",   "https://feeds.reuters.com/reuters/businessNews"),
     ("Reuters Markets",    "https://feeds.reuters.com/reuters/UKmarkets"),
     ("Yahoo Finance",      "https://finance.yahoo.com/news/rssindex"),
@@ -1402,6 +1519,20 @@ _NEWS_RSS_FEEDS = [
     ("FT Markets",         "https://www.ft.com/rss/home/uk"),
     ("Bloomberg Mkts",     "https://feeds.bloomberg.com/markets/news.rss"),
     ("WSJ Markets",        "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"),
+    # ── Crypto-specific ─────────────────────────────────────────────────────
+    ("CoinDesk",           "https://www.coindesk.com/arc/outboundfeeds/rss/"),
+    ("CoinTelegraph",      "https://cointelegraph.com/rss"),
+    ("Decrypt",            "https://decrypt.co/feed"),
+    ("CryptoSlate",        "https://cryptoslate.com/feed/"),
+    # ── Commodities / Macro ─────────────────────────────────────────────────
+    ("Kitco Gold",         "https://www.kitco.com/rss/kitconews.xml"),
+    ("OilPrice.com",       "https://oilprice.com/rss/main"),
+    ("Mining.com",         "https://www.mining.com/feed/"),
+    # ── Google News RSS (no API key required) ───────────────────────────────
+    ("GNews Crypto",       "https://news.google.com/rss/search?q=cryptocurrency+bitcoin+ethereum&hl=en&gl=US&ceid=US:en"),
+    ("GNews Commodities",  "https://news.google.com/rss/search?q=gold+oil+commodities+futures&hl=en&gl=US&ceid=US:en"),
+    ("GNews ASX",          "https://news.google.com/rss/search?q=ASX+Australian+stocks+market&hl=en-AU&gl=AU&ceid=AU:en"),
+    ("GNews Markets",      "https://news.google.com/rss/search?q=stock+market+interest+rates+inflation&hl=en&gl=US&ceid=US:en"),
 ]
 
 _BULLISH_WORDS  = {"rally","surge","gain","high","record","beat","growth","rise","up","profit",
@@ -2040,6 +2171,42 @@ async def get_assets():
 # Paper Trading Endpoints
 # ─────────────────────────────────────────────
 
+_BINANCE_PRICE_CACHE: dict = {}
+_BINANCE_PRICE_TS:    float = 0.0
+_BINANCE_PRICE_TTL:   float = 20.0   # 20-second cache
+
+async def _fetch_binance_prices() -> dict:
+    """Fetch all USDT spot prices from Binance public REST — no API key needed.
+    Returns {yfinance_ticker: price} e.g. {"BTC-USD": 65432.1}
+    """
+    global _BINANCE_PRICE_CACHE, _BINANCE_PRICE_TS
+    import time as _t
+    now = _t.time()
+    if now - _BINANCE_PRICE_TS < _BINANCE_PRICE_TTL and _BINANCE_PRICE_CACHE:
+        return _BINANCE_PRICE_CACHE
+
+    try:
+        timeout = aiohttp.ClientTimeout(total=8)
+        async with aiohttp.ClientSession(timeout=timeout) as sess:
+            async with sess.get("https://api.binance.com/api/v3/ticker/price") as resp:
+                if resp.status != 200:
+                    return _BINANCE_PRICE_CACHE
+                data = await resp.json(content_type=None)
+        result = {}
+        for item in data:
+            sym = item["symbol"]  # e.g. "BTCUSDT"
+            if sym.endswith("USDT"):
+                base = sym[:-4]   # "BTC"
+                result[f"{base}-USD"] = float(item["price"])
+        _BINANCE_PRICE_CACHE = result
+        _BINANCE_PRICE_TS    = now
+        logger.debug(f"Binance price feed: {len(result)} USDT pairs cached")
+        return result
+    except Exception as e:
+        logger.warning(f"Binance price feed failed: {e}")
+        return _BINANCE_PRICE_CACHE
+
+
 def _normalize_ticker(ticker: str) -> str:
     """Normalise user-entered tickers to yfinance format.
     BTC → BTC-USD, ETH → ETH-USD, bhp → BHP.AX (if known), etc.
@@ -2060,23 +2227,31 @@ def _normalize_ticker(ticker: str) -> str:
 
 
 async def _live_price(ticker: str) -> Optional[float]:
-    """Get the most recent closing price for a ticker (real or demo)."""
-    # Try cache from market_summary first
+    """Get the most recent price for a ticker.
+    Priority: scanner cache → Binance (crypto) → yfinance → demo seed.
+    """
+    # 1. Scanner cache (fastest — already in memory)
     cached_ms = _cache_get("market_summary")
     if cached_ms:
         for item in cached_ms:
             if item.get("ticker") == ticker and item.get("price") is not None:
                 return float(item["price"])
-    # Try yfinance
+
+    # 2. Binance public API for crypto (fast, real-time, no auth needed)
+    if ticker.endswith("-USD"):
+        bn_prices = await _fetch_binance_prices()
+        if ticker in bn_prices:
+            return bn_prices[ticker]
+
+    # 3. yfinance fallback
     prices = await _get_prices([ticker], "5d")
     if prices and ticker in prices and prices[ticker]:
         return float(prices[ticker][-1])
-    # Demo fallback: return seeded price
-    meta = _ASSET_META.get(ticker, {})
+
+    # 4. Demo seed (never None — prevents order failure on unknown tickers)
     seed = abs(hash(ticker)) % 10000
     rng  = random.Random(seed)
-    base = rng.uniform(10, 300)
-    return round(base, 2)
+    return round(rng.uniform(10, 300), 2)
 
 
 async def _prices_for_positions(tickers: list) -> dict:
@@ -3263,7 +3438,8 @@ async def set_trading_mode(payload: dict):
 async def broker_connect(payload: dict):
     global ACTIVE_BROKER
     broker_name = payload.get("broker", "").lower()
-    _BROKER_MAP = {"ibkr": IBKRBroker, "alpaca": AlpacaBroker, "binance": BinanceBroker, "coinbase": CoinbaseBroker, "stake": StakeBroker}
+    _BROKER_MAP = {"ibkr": IBKRBroker, "alpaca": AlpacaBroker, "binance": BinanceBroker,
+                   "coinbase": CoinbaseBroker, "coinspot": CoinSpotBroker, "stake": StakeBroker}
     if broker_name not in _BROKER_MAP:
         raise HTTPException(400, f"broker must be one of: {', '.join(_BROKER_MAP)}")
     broker: BrokerBase = _BROKER_MAP[broker_name]()

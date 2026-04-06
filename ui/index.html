@@ -1179,6 +1179,7 @@
                 <optgroup label="Crypto">
                   <option value="binance">BINANCE (Spot / Futures)</option>
                   <option value="coinbase">COINBASE ADVANCED TRADE</option>
+                  <option value="coinspot">COINSPOT (AUD Crypto)</option>
                 </optgroup>
                 <optgroup label="ASX / Retail">
                   <option value="stake">STAKE (ASX / US)</option>
@@ -1261,6 +1262,23 @@
               <div class="broker-hint">
                 Use <strong>Coinbase Advanced Trade API</strong> (CDP keys). Generate at<br>
                 coinbase.com → Settings → API. Requires <strong>Trade</strong> permission.
+              </div>
+            </div>
+
+            <!-- CoinSpot fields -->
+            <div id="coinspotFields" style="display:none">
+              <div class="po-row">
+                <label class="po-label">API KEY</label>
+                <input type="text" id="coinspotKey" class="po-input" placeholder="CoinSpot API key" autocomplete="off"/>
+              </div>
+              <div class="po-row">
+                <label class="po-label">API SECRET</label>
+                <input type="password" id="coinspotSecret" class="po-input" placeholder="••••••••••••••••••" autocomplete="off"/>
+              </div>
+              <div class="broker-hint">
+                Generate keys at <strong>coinspot.com.au → My Account → API Keys</strong>.<br>
+                Enable <strong>Read + Trade</strong> permissions. IP restriction recommended.<br>
+                Trades execute in AUD against your CoinSpot wallet balance.
               </div>
             </div>
 
