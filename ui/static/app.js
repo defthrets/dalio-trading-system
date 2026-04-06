@@ -3602,7 +3602,7 @@ function _applyCCPortfolio(d) {
         const pnlCls = p.pnl >= 0 ? 'td-green' : 'td-red';
         const pnlTxt = (p.pnl >= 0 ? '+' : '') + fmt$(p.pnl);
         const pctTxt = (p.pnl_pct >= 0 ? '+' : '') + p.pnl_pct.toFixed(2) + '%';
-        return `<tr>
+        return `<tr style="cursor:pointer" onclick="selectPositionForChart('${p.ticker}')">
           <td class="td-cyan" style="font-weight:700">${p.ticker.replace('-USD','')}</td>
           <td class="${p.side === 'LONG' ? 'td-green' : 'td-red'}">${p.side}</td>
           <td>${p.qty % 1 === 0 ? p.qty : p.qty.toFixed(4)}</td>
@@ -3642,7 +3642,7 @@ function renderCcLivePositions(positions) {
     const pctTxt  = sign + p.pnl_pct.toFixed(2) + '%';
     const ticker  = p.ticker.replace('-USD', '');
     const qty     = p.qty % 1 === 0 ? p.qty : p.qty.toFixed(4);
-    return `<div class="cc-pos-tile ${cls}">
+    return `<div class="cc-pos-tile ${cls}" style="cursor:pointer" onclick="selectPositionForChart('${p.ticker}')">
       <div class="cc-pos-tile-top">
         <span class="cc-pos-tile-tkr">${ticker}</span>
         <span class="cc-pos-tile-pnl" style="color:${pos ? 'var(--green)' : 'var(--red)'}">${pnlTxt} (${pctTxt})</span>
@@ -4403,6 +4403,254 @@ function updatePredictionFromEquity(equityHistory) {
 
   const lastPred = predicted.filter(v => v != null).pop();
   setEl('ccPredictedVal', lastPred ? '$' + lastPred.toLocaleString() : '--');
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// LIVE PRICE CHART — Candlestick / Line with SMA, RSI, Prediction
+// ═══════════════════════════════════════════════════════════
+
+let _priceChart = null;
+let _rsiChart = null;
+let _priceChartType = 'candlestick';  // 'candlestick' or 'line'
+let _selectedTicker = null;
+let _priceChartData = null;
+
+function selectPositionForChart(ticker) {
+  _selectedTicker = ticker;
+  // Highlight selected row
+  document.querySelectorAll('#ccPositionsBody tr, #ccLivePosList .cc-pos-tile').forEach(r => r.classList.remove('selected'));
+  const rows = document.querySelectorAll(`#ccPositionsBody tr, #ccLivePosList .cc-pos-tile`);
+  rows.forEach(r => {
+    if (r.textContent.includes(ticker.replace('-USD',''))) r.classList.add('selected');
+  });
+  loadPriceChart();
+}
+
+function togglePriceChartType() {
+  _priceChartType = _priceChartType === 'candlestick' ? 'line' : 'candlestick';
+  const btn = el('priceChartTypeBtn');
+  if (btn) btn.textContent = _priceChartType === 'candlestick' ? 'CANDLES' : 'LINE';
+  if (_priceChartData) renderPriceChart(_priceChartData);
+}
+
+function updatePriceChartOverlays() {
+  if (_priceChartData) renderPriceChart(_priceChartData);
+}
+
+async function loadPriceChart() {
+  if (!_selectedTicker) return;
+  const ticker = _selectedTicker;
+  const period = el('priceChartPeriod')?.value || '6mo';
+  const interval = el('priceChartInterval')?.value || '1d';
+
+  setEl('priceChartTicker', ticker.replace('-USD',''));
+  setEl('priceChartPrice', 'Loading...');
+  setEl('priceChartChange', '');
+
+  try {
+    const d = await fetchJSON(`/api/chart/${encodeURIComponent(ticker)}?period=${period}&interval=${interval}`);
+    _priceChartData = d;
+    if (d.candles?.length) {
+      const last = d.candles[d.candles.length - 1];
+      const prev = d.candles.length > 1 ? d.candles[d.candles.length - 2] : last;
+      const chg = ((last.c - prev.c) / prev.c * 100);
+      setEl('priceChartPrice', '$' + last.c.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:4}));
+      const chgEl = el('priceChartChange');
+      if (chgEl) {
+        chgEl.textContent = `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`;
+        chgEl.style.color = chg >= 0 ? 'var(--green)' : 'var(--red)';
+      }
+      if (d.info?.name) setEl('priceChartTitle', `PRICE: ${d.info.name}`);
+    }
+    renderPriceChart(d);
+  } catch (e) {
+    setEl('priceChartPrice', 'ERROR');
+    console.warn('Price chart error:', e);
+  }
+}
+
+function renderPriceChart(d) {
+  const canvas = el('priceChartCanvas');
+  if (!canvas) return;
+  if (_priceChart) { _priceChart.destroy(); _priceChart = null; }
+  if (_rsiChart) { _rsiChart.destroy(); _rsiChart = null; }
+
+  const candles = d.candles || [];
+  if (!candles.length) return;
+
+  const showSMA = el('priceChartSMA')?.checked;
+  const showPred = el('priceChartPred')?.checked;
+  const useCandlestick = _priceChartType === 'candlestick' && typeof Chart.controllers?.candlestick !== 'undefined';
+
+  // Parse timestamps for x-axis
+  const timestamps = candles.map(c => new Date(c.t).getTime());
+  const labels = candles.map(c => c.t.split('T')[0]);
+
+  const datasets = [];
+
+  if (useCandlestick) {
+    datasets.push({
+      label: d.ticker,
+      data: candles.map((c, i) => ({ x: timestamps[i], o: c.o, h: c.h, l: c.l, c: c.c })),
+      color: { up: '#00cc44', down: '#ff3355', unchanged: '#888' },
+      borderColor: { up: '#00cc44', down: '#ff3355', unchanged: '#888' },
+      backgroundColor: { up: 'rgba(0,204,68,0.7)', down: 'rgba(255,51,85,0.7)', unchanged: '#888' },
+    });
+  } else {
+    datasets.push({
+      label: d.ticker,
+      data: useCandlestick ? candles.map((c, i) => ({ x: timestamps[i], y: c.c })) : candles.map(c => c.c),
+      borderColor: candles[candles.length-1].c >= candles[0].c ? '#00cc44' : '#ff3355',
+      backgroundColor: candles[candles.length-1].c >= candles[0].c ? 'rgba(0,204,68,0.05)' : 'rgba(255,51,85,0.05)',
+      borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: true,
+    });
+  }
+
+  // SMA overlays
+  if (showSMA && d.sma20) {
+    const smaData = useCandlestick
+      ? timestamps.reduce((arr, ts, i) => { if (d.sma20[i] != null) arr.push({ x: ts, y: d.sma20[i] }); return arr; }, [])
+      : d.sma20;
+    datasets.push({
+      label: 'SMA 20', data: smaData, type: 'line',
+      borderColor: '#ff8c00', borderWidth: 1, borderDash: [3,3],
+      pointRadius: 0, tension: 0.3, fill: false, spanGaps: true,
+    });
+  }
+  if (showSMA && d.sma50) {
+    const smaData = useCandlestick
+      ? timestamps.reduce((arr, ts, i) => { if (d.sma50[i] != null) arr.push({ x: ts, y: d.sma50[i] }); return arr; }, [])
+      : d.sma50;
+    datasets.push({
+      label: 'SMA 50', data: smaData, type: 'line',
+      borderColor: '#00d4ff', borderWidth: 1, borderDash: [5,3],
+      pointRadius: 0, tension: 0.3, fill: false, spanGaps: true,
+    });
+  }
+
+  // Prediction overlay (line mode only — not compatible with candlestick time axis)
+  const allLabels = [...labels];
+  if (showPred && !useCandlestick && d.prediction?.mid?.length) {
+    const predMid = Array(candles.length).fill(null);
+    const predUpperArr = Array(candles.length).fill(null);
+    const predLowerArr = Array(candles.length).fill(null);
+    predMid[candles.length - 1] = candles[candles.length - 1].c;
+    predUpperArr[candles.length - 1] = candles[candles.length - 1].c;
+    predLowerArr[candles.length - 1] = candles[candles.length - 1].c;
+    d.prediction.dates.forEach((dt, i) => {
+      allLabels.push(dt);
+      predMid.push(d.prediction.mid[i]);
+      predUpperArr.push(d.prediction.upper[i]);
+      predLowerArr.push(d.prediction.lower[i]);
+    });
+    datasets.push({
+      label: 'Prediction', data: predMid, type: 'line',
+      borderColor: '#ff8c00', borderWidth: 1.5, borderDash: [4,4],
+      pointRadius: 0, tension: 0.3, fill: false,
+    });
+    datasets.push({
+      label: '95% Upper', data: predUpperArr, type: 'line',
+      borderColor: 'rgba(0,204,68,0.3)', borderWidth: 1,
+      pointRadius: 0, tension: 0.3, fill: false, backgroundColor: 'transparent',
+    });
+    datasets.push({
+      label: '95% Lower', data: predLowerArr, type: 'line',
+      borderColor: 'rgba(255,51,85,0.3)', borderWidth: 1,
+      pointRadius: 0, tension: 0.3, fill: '-1', backgroundColor: 'rgba(255,140,0,0.04)',
+    });
+  }
+
+  const xScaleBase = { ticks: { color: '#555', font: { size: 8, family: 'JetBrains Mono' }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }, grid: { color: 'rgba(255,255,255,0.03)' } };
+  const xScale = useCandlestick
+    ? { ...xScaleBase, type: 'timeseries', time: { unit: 'day', displayFormats: { day: 'dd MMM' } } }
+    : { ...xScaleBase, display: true };
+
+  const ctx = canvas.getContext('2d');
+  _priceChart = new Chart(ctx, {
+    type: useCandlestick ? 'candlestick' : 'line',
+    data: useCandlestick ? { datasets } : { labels: allLabels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      scales: {
+        x: xScale,
+        y: {
+          display: true, position: 'right',
+          ticks: { color: '#666', font: { size: 8, family: 'JetBrains Mono' } },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+        },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#111', borderColor: '#333', borderWidth: 1,
+          titleFont: { size: 9, family: 'JetBrains Mono' },
+          bodyFont: { size: 9, family: 'JetBrains Mono' },
+        },
+      },
+    },
+  });
+
+  // RSI chart
+  if (d.rsi?.length) {
+    const rsiCanvas = el('rsiChartCanvas');
+    if (rsiCanvas) {
+      const rsiCtx = rsiCanvas.getContext('2d');
+      const rsiData = d.rsi.slice(0, candles.length);
+      _rsiChart = new Chart(rsiCtx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'RSI 14',
+            data: rsiData,
+            borderColor: '#cc5de8',
+            borderWidth: 1.2,
+            pointRadius: 0,
+            tension: 0.3,
+            fill: false,
+          }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: false,
+          scales: {
+            x: { display: false },
+            y: {
+              display: true, position: 'right', min: 0, max: 100,
+              ticks: { color: '#555', font: { size: 7, family: 'JetBrains Mono' }, stepSize: 30 },
+              grid: { color: 'rgba(255,255,255,0.03)' },
+            },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: { enabled: false },
+            // Draw overbought/oversold lines
+            annotation: undefined,
+          },
+        },
+        plugins: [{
+          id: 'rsiLines',
+          afterDraw(chart) {
+            const yScale = chart.scales.y;
+            const ctx = chart.ctx;
+            ctx.save();
+            // Oversold line at 30
+            const y30 = yScale.getPixelForValue(30);
+            ctx.strokeStyle = 'rgba(0,204,68,0.3)';
+            ctx.setLineDash([3,3]);
+            ctx.beginPath(); ctx.moveTo(chart.chartArea.left, y30); ctx.lineTo(chart.chartArea.right, y30); ctx.stroke();
+            // Overbought line at 70
+            const y70 = yScale.getPixelForValue(70);
+            ctx.strokeStyle = 'rgba(255,51,85,0.3)';
+            ctx.beginPath(); ctx.moveTo(chart.chartArea.left, y70); ctx.lineTo(chart.chartArea.right, y70); ctx.stroke();
+            ctx.restore();
+          }
+        }],
+      });
+    }
+  }
 }
 
 

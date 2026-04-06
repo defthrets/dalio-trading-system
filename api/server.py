@@ -3481,13 +3481,15 @@ async def get_recommendations(n: int = 6):
       - per-trade reasoning bullets
     """
     n = min(max(1, n), 12)
-    opps = await _gen_opportunities(n * 2)
+    opps = await _gen_opportunities(n * 4)  # larger pool to filter for >65% conviction
     qdata = STATE.last_quadrant or _gen_quadrant_data()
     quadrant = qdata.get("quadrant", "rising_growth")
     sigs = await _gen_signals(12)
 
     recs = []
-    for opp in opps[:n]:
+    for opp in opps:
+        if opp["score"] < 65:
+            continue
         ticker = opp["ticker"]
         analysis = dalio_analyse_trade(
             ticker, opp["action"] if opp["action"] not in ("SELL", "SHORT") else "SELL",
@@ -3504,6 +3506,8 @@ async def get_recommendations(n: int = 6):
             "asset_class":       analysis["asset_class"],
         }
         recs.append(rec)
+        if len(recs) >= n:
+            break
 
     return {
         "recommendations": recs,
@@ -3511,6 +3515,109 @@ async def get_recommendations(n: int = 6):
         "quadrant": quadrant,
         "regime_label": qdata.get("label", ""),
     }
+
+
+@app.get("/api/chart/{ticker}")
+async def chart_data(ticker: str, period: str = "6mo", interval: str = "1d"):
+    """OHLCV candlestick data for a single ticker via yfinance."""
+    if not YF_AVAILABLE:
+        raise HTTPException(503, "yfinance not available")
+
+    allowed_periods = {"1mo", "3mo", "6mo", "1y", "2y", "5y", "max"}
+    allowed_intervals = {"1m", "5m", "15m", "1h", "1d", "1wk", "1mo"}
+    if period not in allowed_periods:
+        period = "6mo"
+    if interval not in allowed_intervals:
+        interval = "1d"
+
+    cache_key = f"chart_{ticker}_{period}_{interval}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    loop = asyncio.get_event_loop()
+
+    def _fetch():
+        try:
+            t = yf.Ticker(ticker)
+            hist = t.history(period=period, interval=interval, auto_adjust=True)
+            if hist is None or hist.empty:
+                return None
+            hist = hist.dropna(subset=["Close"])
+            candles = []
+            for idx, row in hist.iterrows():
+                ts = idx.isoformat() if hasattr(idx, 'isoformat') else str(idx)
+                candles.append({
+                    "t": ts,
+                    "o": round(float(row["Open"]), 4),
+                    "h": round(float(row["High"]), 4),
+                    "l": round(float(row["Low"]), 4),
+                    "c": round(float(row["Close"]), 4),
+                    "v": int(row.get("Volume", 0)),
+                })
+            # Compute SMA20, SMA50, RSI
+            closes = [c["c"] for c in candles]
+            sma20 = []
+            sma50 = []
+            for i in range(len(closes)):
+                sma20.append(round(sum(closes[max(0,i-19):i+1]) / min(i+1, 20), 4) if i >= 19 else None)
+                sma50.append(round(sum(closes[max(0,i-49):i+1]) / min(i+1, 50), 4) if i >= 49 else None)
+
+            # RSI 14
+            rsi_vals = [None] * len(closes)
+            if len(closes) >= 15:
+                gains, losses = [], []
+                for j in range(1, len(closes)):
+                    d = closes[j] - closes[j-1]
+                    gains.append(max(d, 0))
+                    losses.append(max(-d, 0))
+                avg_gain = sum(gains[:14]) / 14
+                avg_loss = sum(losses[:14]) / 14
+                for j in range(14, len(closes)):
+                    if j > 14:
+                        avg_gain = (avg_gain * 13 + gains[j-1]) / 14
+                        avg_loss = (avg_loss * 13 + losses[j-1]) / 14
+                    rs = avg_gain / avg_loss if avg_loss > 0 else 100
+                    rsi_vals[j] = round(100 - 100 / (1 + rs), 1)
+
+            # Prediction (30-period forward from mean return + volatility)
+            prediction = {"dates": [], "mid": [], "upper": [], "lower": []}
+            if len(closes) >= 10:
+                rets = [(closes[i] - closes[i-1]) / closes[i-1] for i in range(1, len(closes))]
+                mean_ret = sum(rets) / len(rets)
+                std_ret = (sum((r - mean_ret)**2 for r in rets) / (len(rets) - 1)) ** 0.5 if len(rets) > 1 else 0
+                last_price = closes[-1]
+                pred = last_price
+                for i in range(1, 31):
+                    pred *= (1 + mean_ret)
+                    spread = last_price * std_ret * 1.96 * (i ** 0.5)
+                    prediction["dates"].append(f"+{i}")
+                    prediction["mid"].append(round(pred, 4))
+                    prediction["upper"].append(round(pred + spread, 4))
+                    prediction["lower"].append(round(pred - spread, 4))
+
+            info = {}
+            try:
+                ti = t.info
+                info = {"name": ti.get("shortName", ticker), "sector": ti.get("sector", ""),
+                        "marketCap": ti.get("marketCap"), "currency": ti.get("currency", "USD")}
+            except Exception:
+                info = {"name": ticker, "sector": "", "marketCap": None, "currency": "USD"}
+
+            return {
+                "ticker": ticker, "period": period, "interval": interval,
+                "candles": candles, "sma20": sma20, "sma50": sma50, "rsi": rsi_vals,
+                "prediction": prediction, "info": info, "count": len(candles),
+            }
+        except Exception as exc:
+            logger.warning(f"Chart data error for {ticker}: {exc}")
+            return None
+
+    result = await asyncio.wait_for(loop.run_in_executor(None, _fetch), timeout=15)
+    if result is None:
+        raise HTTPException(404, f"No chart data for {ticker}")
+    _cache_set(cache_key, result)
+    return result
 
 
 @app.get("/api/markets/{market}")
