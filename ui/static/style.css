@@ -588,7 +588,7 @@ a:hover { color: var(--primary); text-decoration: underline; }
   color: var(--primary);
 }
 
-/* ── Animated Stock Chart Logo ── */
+/* ── Hologram Brain Logo ── */
 .holo-brain {
   width: 44px;
   height: 44px;
@@ -597,71 +597,61 @@ a:hover { color: var(--primary); text-decoration: underline; }
   justify-content: center;
   text-shadow: none;
 }
-.logo-stock-chart {
-  filter: drop-shadow(0 0 4px rgba(0,255,136,0.4)) drop-shadow(0 0 8px rgba(255,68,68,0.3));
-  animation: chartPulse 3s ease-in-out infinite;
+.holo-brain-scene {
+  width: 40px;
+  height: 40px;
+  perspective: 200px;
 }
-/* Green bar grows up from baseline */
-.bar-green {
-  animation: greenGrow 2s cubic-bezier(.22,.68,.36,1.2) forwards, greenPulse 2s ease-in-out 2s infinite;
+.holo-brain-rotator {
+  width: 100%;
+  height: 100%;
+  animation: holoBrainSpin 6s linear infinite;
+  transform-style: preserve-3d;
 }
-@keyframes greenGrow {
-  0%   { y: 36; height: 0; }
-  100% { y: 8; height: 28; }
+@keyframes holoBrainSpin {
+  0%   { transform: rotateY(0deg); }
+  100% { transform: rotateY(360deg); }
 }
-@keyframes greenPulse {
-  0%, 100% { filter: brightness(1); }
-  50%      { filter: brightness(1.4); }
+.holo-brain-svg {
+  width: 40px;
+  height: 40px;
+  filter: drop-shadow(0 0 6px rgba(0,212,255,0.5)) drop-shadow(0 0 14px rgba(0,255,170,0.2));
+  backface-visibility: visible;
 }
-/* Red bar drops/shrinks down */
-.bar-red {
-  animation: redDrop 2s cubic-bezier(.22,.68,.36,1.2) forwards, redPulse 2.5s ease-in-out 2s infinite;
+/* Neural spark nodes flicker */
+.holo-node {
+  animation: holoNodePulse 2s ease-in-out infinite;
 }
-@keyframes redDrop {
-  0%   { y: 8; height: 28; }
-  100% { y: 22; height: 14; }
+.holo-node.n2 { animation-delay: 0.4s; }
+.holo-node.n3 { animation-delay: 0.8s; }
+@keyframes holoNodePulse {
+  0%, 100% { opacity: 0.3; r: 0.5; }
+  50%      { opacity: 1; r: 1.2; }
 }
-@keyframes redPulse {
-  0%, 100% { filter: brightness(1); }
-  50%      { filter: brightness(1.3); }
+/* Scan line sweeps vertically */
+.holo-scanline {
+  animation: holoScan 3s ease-in-out infinite;
 }
-/* Up arrow fades in after bars animate */
-.arrow-up {
-  animation: arrowFadeIn 0.5s ease-out 1.8s forwards, arrowBounceUp 1.5s ease-in-out 2.3s infinite;
+@keyframes holoScan {
+  0%   { y1: 3; y2: 3; opacity: 0; }
+  10%  { opacity: 0.6; }
+  90%  { opacity: 0.6; }
+  100% { y1: 28; y2: 28; opacity: 0; }
 }
-.arrow-down {
-  animation: arrowFadeIn 0.5s ease-out 1.8s forwards, arrowBounceDown 1.5s ease-in-out 2.3s infinite;
+/* Holographic flicker on the whole icon */
+.holo-brain-scene::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(transparent 0%, rgba(0,212,255,0.03) 50%, transparent 100%);
+  animation: holoFlicker 4s ease-in-out infinite;
+  pointer-events: none;
 }
-@keyframes arrowFadeIn {
-  0%   { opacity: 0; }
-  100% { opacity: 0.9; }
-}
-@keyframes arrowBounceUp {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-2px); }
-}
-@keyframes arrowBounceDown {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(2px); }
-}
-/* Green graph line draws itself */
-.graph-line-green {
-  stroke-dasharray: 60;
-  stroke-dashoffset: 60;
-  animation: lineGrow 2s ease-out 0.5s forwards, lineGlow 2s ease-in-out 2.5s infinite;
-}
-@keyframes lineGrow {
-  0%   { stroke-dashoffset: 60; }
-  100% { stroke-dashoffset: 0; }
-}
-@keyframes lineGlow {
-  0%, 100% { stroke: #00ff88; filter: none; }
-  50%      { stroke: #44ffaa; filter: drop-shadow(0 0 3px #00ff88); }
-}
-/* Overall chart glow pulse */
-@keyframes chartPulse {
-  0%, 100% { filter: drop-shadow(0 0 4px rgba(0,255,136,0.4)) drop-shadow(0 0 8px rgba(255,68,68,0.3)); }
-  50%      { filter: drop-shadow(0 0 8px rgba(0,255,136,0.7)) drop-shadow(0 0 14px rgba(255,68,68,0.5)); }
+@keyframes holoFlicker {
+  0%, 100% { opacity: 0.5; }
+  25%      { opacity: 1; }
+  50%      { opacity: 0.3; }
+  75%      { opacity: 0.8; }
 }
 .logo-text { display: flex; flex-direction: column; line-height: 1.1; }
 .logo-main {

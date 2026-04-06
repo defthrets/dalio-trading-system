@@ -25,38 +25,40 @@
     <div class="header-left">
       <div class="logo-block">
         <span class="logo-icon holo-brain" title="DALIOS Trading">
-          <svg class="logo-stock-chart" viewBox="0 0 40 40" width="40" height="40">
-            <defs>
-              <linearGradient id="greenBarGrad" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0%" stop-color="#00ff88"/>
-                <stop offset="100%" stop-color="#00cc44"/>
-              </linearGradient>
-              <linearGradient id="redBarGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#ff4444"/>
-                <stop offset="100%" stop-color="#cc0022"/>
-              </linearGradient>
-              <filter id="barGlow">
-                <feGaussianBlur stdDeviation="1.5" result="blur"/>
-                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-              </filter>
-            </defs>
-            <!-- baseline -->
-            <line x1="2" y1="36" x2="38" y2="36" stroke="#444" stroke-width="0.5"/>
-            <!-- green bar (growing up) -->
-            <rect class="bar-green" x="6" y="36" width="10" height="0" rx="1" fill="url(#greenBarGrad)" filter="url(#barGlow)"/>
-            <!-- red bar (dropping down) -->
-            <rect class="bar-red" x="24" y="8" width="10" height="28" rx="1" fill="url(#redBarGrad)" filter="url(#barGlow)"/>
-            <!-- tiny tick marks -->
-            <line x1="2" y1="20" x2="4" y2="20" stroke="#555" stroke-width="0.4"/>
-            <line x1="2" y1="12" x2="4" y2="12" stroke="#555" stroke-width="0.4"/>
-            <line x1="2" y1="28" x2="4" y2="28" stroke="#555" stroke-width="0.4"/>
-            <!-- green graph line growing upward -->
-            <polyline class="graph-line-green" points="3,34 10,28 17,30 24,20 31,14 37,6" fill="none" stroke="#00ff88" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" filter="url(#barGlow)"/>
-            <!-- small arrow on green bar -->
-            <polygon class="arrow-up" points="11,2 8,7 14,7" fill="#00ff88" opacity="0"/>
-            <!-- small arrow on red bar -->
-            <polygon class="arrow-down" points="29,38 26,33 32,33" fill="#ff4444" opacity="0"/>
-          </svg>
+          <div class="holo-brain-scene">
+            <div class="holo-brain-rotator">
+              <svg class="holo-brain-svg" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="holoGrad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#00d4ff"/>
+                    <stop offset="50%" stop-color="#00ffaa"/>
+                    <stop offset="100%" stop-color="#00d4ff"/>
+                  </linearGradient>
+                  <filter id="holoGlow">
+                    <feGaussianBlur stdDeviation="1" result="blur"/>
+                    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                  </filter>
+                </defs>
+                <!-- Brain outline -->
+                <path d="M15,3 C9,3 5,7 5,12 C5,14 6,16 7,17 C6,18 5,20 5,22 C5,25 8,27 11,27 C12,27 13,26.5 14,26 C14.5,26.5 14.8,27 15,27 C15.2,27 15.5,26.5 16,26 C17,26.5 18,27 19,27 C22,27 25,25 25,22 C25,20 24,18 23,17 C24,16 25,14 25,12 C25,7 21,3 15,3Z"
+                      fill="none" stroke="url(#holoGrad)" stroke-width="0.6" filter="url(#holoGlow)" opacity="0.9"/>
+                <!-- Brain fissure -->
+                <path d="M15,5 L15,25" fill="none" stroke="url(#holoGrad)" stroke-width="0.3" opacity="0.5" stroke-dasharray="1,1.5"/>
+                <!-- Neural connections -->
+                <path d="M8,12 Q12,10 15,12 Q18,14 22,12" fill="none" stroke="#00d4ff" stroke-width="0.3" opacity="0.6"/>
+                <path d="M9,17 Q12,15 15,17 Q18,19 21,17" fill="none" stroke="#00ffaa" stroke-width="0.3" opacity="0.5"/>
+                <path d="M10,22 Q13,20 15,22 Q17,24 20,22" fill="none" stroke="#00d4ff" stroke-width="0.3" opacity="0.4"/>
+                <!-- Neural spark nodes -->
+                <circle class="holo-node" cx="10" cy="10" r="0.8" fill="#00d4ff"/>
+                <circle class="holo-node n2" cx="20" cy="10" r="0.8" fill="#00ffaa"/>
+                <circle class="holo-node n3" cx="15" cy="15" r="0.8" fill="#00d4ff"/>
+                <circle class="holo-node" cx="11" cy="20" r="0.6" fill="#00ffaa"/>
+                <circle class="holo-node n2" cx="19" cy="20" r="0.6" fill="#00d4ff"/>
+                <!-- Scan line -->
+                <line class="holo-scanline" x1="5" y1="3" x2="25" y2="3" stroke="#00ffaa" stroke-width="0.4" opacity="0"/>
+              </svg>
+            </div>
+          </div>
         </span>
         <div class="logo-text">
           <span class="logo-main">DALIOS</span>
