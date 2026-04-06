@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260406p" />
+  <link rel="stylesheet" href="/static/style.css?v=20260406q" />
 </head>
 <body>
   <!-- Scanline overlay -->
@@ -1172,204 +1172,38 @@
     <section id="tab-live-trading" class="tab-panel">
       <div class="panel-grid panel-grid--live">
 
-        <!-- ── BROKER CONNECTION ── -->
-        <div class="panel panel--broker-connect">
-          <div class="panel-header">
-            <span class="panel-title">⚡ BROKER CONNECTION</span>
-            <span class="panel-tag" id="brokerStatusBadge">NOT CONNECTED</span>
-          </div>
-          <div class="broker-connect-form">
-            <div class="po-row">
-              <label class="po-label">BROKER</label>
-              <select class="ctrl-select" id="brokerSelect" onchange="onBrokerSelect(this.value)">
-                <option value="">-- SELECT BROKER --</option>
-                <optgroup label="Equities / Multi-asset">
-                  <option value="alpaca">ALPACA (REST API)</option>
-                  <option value="ibkr">INTERACTIVE BROKERS (TWS)</option>
-                </optgroup>
-                <optgroup label="Crypto">
-                  <option value="binance">BINANCE (Spot / Futures)</option>
-                  <option value="coinbase">COINBASE ADVANCED TRADE</option>
-                  <option value="coinspot">COINSPOT (AUD Crypto)</option>
-                  <option value="kraken">KRAKEN</option>
-                  <option value="bybit">BYBIT</option>
-                  <option value="okx">OKX</option>
-                  <option value="kucoin">KUCOIN</option>
-                  <option value="bitget">BITGET</option>
-                  <option value="independentreserve">INDEPENDENT RESERVE (AUD)</option>
-                </optgroup>
-                <optgroup label="ASX / Retail">
-                  <option value="stake">STAKE (ASX / US)</option>
-                </optgroup>
-              </select>
+        <!-- ── BROKER STATUS BAR (full width) ── -->
+        <div class="panel panel--broker-bar">
+          <div class="broker-bar-inner">
+            <div class="broker-bar-status">
+              <span class="broker-bar-dot" id="brokerBarDot">●</span>
+              <span id="brokerBarLabel">NO BROKER CONNECTED</span>
             </div>
-
-            <!-- Alpaca fields -->
-            <div id="alpacaFields" style="display:none">
-              <div class="po-row">
-                <label class="po-label">API KEY</label>
-                <input type="text" id="alpacaKey" class="po-input" placeholder="PKXXXXXXXXXXXXXXXX" autocomplete="off"/>
-              </div>
-              <div class="po-row">
-                <label class="po-label">API SECRET</label>
-                <input type="password" id="alpacaSecret" class="po-input" placeholder="••••••••••••••••••" autocomplete="off"/>
-              </div>
-              <div class="po-row">
-                <label class="po-label">ENDPOINT</label>
-                <select class="ctrl-select" id="alpacaUrl">
-                  <option value="https://paper-api.alpaca.markets">Paper (Sandbox)</option>
-                  <option value="https://api.alpaca.markets">Live (Real Money)</option>
-                </select>
-              </div>
+            <div class="broker-bar-stats" id="brokerBarStats" style="display:none">
+              <span class="bbs-item"><span class="bbs-label">ACCT</span> <span class="bbs-val" id="bbsAcctVal">—</span></span>
+              <span class="bbs-item"><span class="bbs-label">BUYING POWER</span> <span class="bbs-val" id="bbsBuyPow">—</span></span>
+              <span class="bbs-item"><span class="bbs-label">CASH</span> <span class="bbs-val" id="bbsCash">—</span></span>
             </div>
-
-            <!-- IBKR fields -->
-            <div id="ibkrFields" style="display:none">
-              <div class="po-row">
-                <label class="po-label">TWS HOST</label>
-                <input type="text" id="ibkrHost" class="po-input" value="127.0.0.1"/>
-              </div>
-              <div class="po-row">
-                <label class="po-label">TWS PORT</label>
-                <input type="number" id="ibkrPort" class="po-input" value="7497"/>
-              </div>
-              <div class="po-row">
-                <label class="po-label">CLIENT ID</label>
-                <input type="number" id="ibkrClientId" class="po-input" value="1"/>
-              </div>
-              <div class="broker-hint">
-                Ensure TWS or IB Gateway is running and API connections are enabled.<br>
-                Paper trading port: <strong>7497</strong> · Live port: <strong>7496</strong>
-              </div>
-            </div>
-
-            <!-- Binance fields -->
-            <div id="binanceFields" style="display:none">
-              <div class="po-row">
-                <label class="po-label">API KEY</label>
-                <input type="text" id="binanceKey" class="po-input" placeholder="Binance API key" autocomplete="off"/>
-              </div>
-              <div class="po-row">
-                <label class="po-label">API SECRET</label>
-                <input type="password" id="binanceSecret" class="po-input" placeholder="••••••••••••••••••" autocomplete="off"/>
-              </div>
-              <div class="po-row">
-                <label class="po-label">MODE</label>
-                <select class="ctrl-select" id="binanceTestnet">
-                  <option value="false">Live (Real Funds)</option>
-                  <option value="true">Testnet (Paper)</option>
-                </select>
-              </div>
-              <div class="broker-hint">
-                Generate keys at binance.com → API Management. Enable <strong>Spot Trading</strong> permission.<br>
-                Restrict to server IP for security. Futures requires separate USDⓈ-M keys.
-              </div>
-            </div>
-
-            <!-- Coinbase fields -->
-            <div id="coinbaseFields" style="display:none">
-              <div class="po-row">
-                <label class="po-label">API KEY NAME</label>
-                <input type="text" id="coinbaseKey" class="po-input" placeholder="organizations/…/apiKeys/…" autocomplete="off"/>
-              </div>
-              <div class="po-row">
-                <label class="po-label">PRIVATE KEY</label>
-                <textarea id="coinbaseSecret" class="po-input" rows="3" placeholder="-----BEGIN EC PRIVATE KEY-----&#10;..." style="resize:vertical;font-size:11px;" autocomplete="off"></textarea>
-              </div>
-              <div class="broker-hint">
-                Use <strong>Coinbase Advanced Trade API</strong> (CDP keys). Generate at<br>
-                coinbase.com → Settings → API. Requires <strong>Trade</strong> permission.
-              </div>
-            </div>
-
-            <!-- CoinSpot fields -->
-            <div id="coinspotFields" style="display:none">
-              <div class="po-row">
-                <label class="po-label">API KEY</label>
-                <input type="text" id="coinspotKey" class="po-input" placeholder="CoinSpot API key" autocomplete="off"/>
-              </div>
-              <div class="po-row">
-                <label class="po-label">API SECRET</label>
-                <input type="password" id="coinspotSecret" class="po-input" placeholder="••••••••••••••••••" autocomplete="off"/>
-              </div>
-              <div class="broker-hint">
-                Generate keys at <strong>coinspot.com.au → My Account → API Keys</strong>.<br>
-                Enable <strong>Read + Trade</strong> permissions. IP restriction recommended.<br>
-                Trades execute in AUD against your CoinSpot wallet balance.
-              </div>
-            </div>
-
-            <!-- Stake fields -->
-            <div id="stakeFields" style="display:none">
-              <div class="broker-hint" style="color:var(--amber);border-color:var(--amber-dim);background:var(--amber-glow)">
-                ⚠ <strong>Stake does not offer a public bot-trading API.</strong><br>
-                Orders cannot be automated — use Alpaca or IBKR for algorithmic ASX/US trading.<br>
-                This entry is informational only.
-              </div>
-            </div>
-
-            <div style="margin-top:4px">
-              <button class="btn-primary btn--full" id="brokerConnectBtn" onclick="connectBroker()">▶ CONNECT</button>
-            </div>
-            <div class="po-result" id="brokerConnectResult"></div>
-
-            <!-- Account summary (shown after connect) -->
-            <div id="brokerAccountSummary" style="display:none" class="broker-account-summary">
-              <div class="bas-row"><span class="bas-label">ACCOUNT VALUE</span><span class="bas-val" id="basValue">—</span></div>
-              <div class="bas-row"><span class="bas-label">BUYING POWER</span><span class="bas-val" id="basBuying">—</span></div>
-              <div class="bas-row"><span class="bas-label">CASH</span><span class="bas-val" id="basCash">—</span></div>
-              <div class="bas-row"><span class="bas-label">BROKER</span><span class="bas-val" id="basBroker">—</span></div>
-            </div>
+            <button class="btn-ghost btn--sm" onclick="document.querySelector('[data-tab=comms-config]').click()">⚙ CONFIGURE BROKERS</button>
           </div>
         </div>
 
-        <!-- ── LIVE ORDER ENTRY ── -->
-        <div class="panel panel--live-order">
+        <!-- ── PORTFOLIO SUMMARY ── -->
+        <div class="panel panel--live-summary">
           <div class="panel-header">
-            <span class="panel-title">🔴 PLACE LIVE ORDER</span>
-            <span class="panel-tag live-mode-tag" id="liveModeTag">PAPER MODE</span>
+            <span class="panel-title">◈ PORTFOLIO</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span class="panel-tag" id="livePnlBadge">P&amp;L: --</span>
+              <button class="btn-ghost btn--sm" onclick="loadRealPortfolio()">↻ REFRESH</button>
+            </div>
           </div>
-          <div class="paper-order-form">
-            <div class="live-mode-warning" id="liveModeWarning">
-              ⚠ Connect a broker and switch to LIVE mode to place real orders.
-            </div>
-            <div class="po-row">
-              <label class="po-label">ASSET</label>
-              <input type="text" id="livePoTicker" class="po-input po-ticker-input"
-                placeholder="e.g. AAPL, SPY, BTC/USD"
-                oninput="onLiveTickerInput(this.value)"
-                autocomplete="off" spellcheck="false"/>
-              <div id="livePoQuoteResult" class="po-quote-result"></div>
-            </div>
-            <div class="po-row">
-              <label class="po-label">SIDE</label>
-              <div class="po-side-btns">
-                <button class="po-side-btn po-buy active" id="livePoBuyBtn" onclick="setLivePoSide('BUY',this)">▲ BUY</button>
-                <button class="po-side-btn po-sell" id="livePoSellBtn" onclick="setLivePoSide('SELL',this)">▼ SELL</button>
-              </div>
-            </div>
-            <div class="po-row">
-              <label class="po-label">QUANTITY</label>
-              <input type="number" id="livePoQty" class="po-input" value="1" min="0.0001" step="any" oninput="updateLivePoEstimate()"/>
-            </div>
-            <div class="po-row">
-              <label class="po-label">LIMIT PRICE (optional — blank = market)</label>
-              <input type="number" id="livePoPrice" class="po-input" placeholder="Market order if empty" step="any" oninput="updateLivePoEstimate()"/>
-            </div>
-            <div class="po-estimate" id="livePoEstimate">
-              <span class="po-est-label">EST. COST</span>
-              <span class="po-est-val" id="livePoEstVal">—</span>
-            </div>
-            <button class="btn-primary btn--full live-order-btn" id="livePoSubmitBtn" onclick="submitLiveOrder()">🔴 PLACE LIVE ORDER</button>
-            <div class="po-result" id="livePoResult"></div>
-          </div>
-        </div>
-
-        <!-- ── LIVE PORTFOLIO ── -->
-        <div class="panel panel--live-portfolio">
-          <div class="panel-header">
-            <span class="panel-title">◈ LIVE PORTFOLIO</span>
-            <button class="btn-ghost btn--sm" onclick="loadRealPortfolio()">↻ REFRESH</button>
+          <div class="paper-summary-grid" id="livePortfolioStats">
+            <div class="ps-stat"><div class="ps-label">TOTAL VALUE</div><div class="ps-val" id="liveAcctVal">—</div></div>
+            <div class="ps-stat"><div class="ps-label">CASH</div><div class="ps-val" id="liveCash">—</div></div>
+            <div class="ps-stat"><div class="ps-label">INVESTED</div><div class="ps-val" id="liveInvested">—</div></div>
+            <div class="ps-stat"><div class="ps-label">UNREALISED P&amp;L</div><div class="ps-val" id="livePnl" style="color:var(--text-2)">$0.00</div></div>
+            <div class="ps-stat"><div class="ps-label">BUYING POWER</div><div class="ps-val" id="liveBuyPow">—</div></div>
+            <div class="ps-stat"><div class="ps-label">OPEN POSITIONS</div><div class="ps-val" id="liveOpenCount">0</div></div>
           </div>
 
           <!-- Equity Curve -->
@@ -1381,11 +1215,10 @@
             <canvas id="liveEquityChart" height="90"></canvas>
           </div>
 
-          <!-- Account stats -->
-          <div class="paper-summary-grid" id="livePortfolioStats" style="display:none">
-            <div class="ps-stat"><div class="ps-label">ACCOUNT VALUE</div><div class="ps-val" id="liveAcctVal">—</div></div>
-            <div class="ps-stat"><div class="ps-label">BUYING POWER</div><div class="ps-val" id="liveBuyPow">—</div></div>
-            <div class="ps-stat"><div class="ps-label">CASH</div><div class="ps-val" id="liveCash">—</div></div>
+          <!-- Position Heatmap -->
+          <div class="pos-heatmap-wrap" id="liveHeatmapWrap" style="display:none">
+            <div class="pec-header"><span class="pec-label">POSITION HEATMAP</span></div>
+            <div class="pos-heatmap" id="liveHeatmap"></div>
           </div>
 
           <!-- Positions table -->
@@ -1395,7 +1228,7 @@
           <div class="paper-positions-wrap">
             <table class="data-table">
               <thead>
-                <tr><th>TICKER</th><th>SIDE</th><th>QTY</th><th>AVG COST</th><th>MKT VAL</th><th>P&amp;L</th><th>P&amp;L %</th><th>ACTION</th></tr>
+                <tr><th>TICKER</th><th>SIDE</th><th>QTY</th><th>AVG COST</th><th>MKT VAL</th><th>P&amp;L</th><th>P&amp;L %</th><th></th></tr>
               </thead>
               <tbody id="livePositionsBody">
                 <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:16px">Connect a broker to see live positions</td></tr>
@@ -1404,22 +1237,23 @@
           </div>
         </div>
 
-        <!-- ── LIVE SIGNAL QUICK-TRADE ── -->
+        <!-- ── LIVE SIGNAL QUICK-TRADE (full-width) ── -->
         <div class="panel panel--live-signals">
           <div class="panel-header">
             <span class="panel-title">⚡ SIGNAL QUICK-TRADE</span>
-            <span class="panel-tag">1-CLICK LIVE EXECUTION</span>
+            <span class="panel-tag">1-CLICK EXECUTION</span>
             <button class="btn-ghost btn--sm" onclick="loadLiveSignals()">↻ REFRESH</button>
           </div>
           <div class="paper-signal-grid" id="liveSignalList">
-            <div style="padding:14px;color:var(--text-muted);font-size:11px">Connect a broker to trade signals live...</div>
+            <div style="padding:14px;color:var(--text-muted);font-size:11px">Loading signals...</div>
           </div>
         </div>
 
-        <!-- ── LIVE HISTORY ── -->
+        <!-- ── ORDER HISTORY ── -->
         <div class="panel panel--live-history">
           <div class="panel-header">
             <span class="panel-title">◈ ORDER HISTORY</span>
+            <span class="panel-tag" id="liveTradeCount">0 ORDERS</span>
             <button class="btn-ghost btn--sm" onclick="loadRealHistory()">↻ REFRESH</button>
           </div>
           <div class="paper-positions-wrap">
@@ -1459,18 +1293,6 @@
 
           <!-- AU Brokers -->
           <div class="broker-grid" id="bcat-au">
-            <div class="broker-card" data-broker="commsec">
-              <div class="broker-logo">CBA</div>
-              <div class="broker-info">
-                <div class="broker-name">CommSec</div>
-                <div class="broker-desc">Australia's #1 broker. ASX, ETFs, options. CBA-backed. No public API — manual execution only.</div>
-                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">ETF</span><span class="btag">Options</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Manual Only</span>
-                <a class="broker-link" href="https://www.commsec.com.au" target="_blank">Open →</a>
-              </div>
-            </div>
             <div class="broker-card featured" data-broker="coinspot">
               <div class="broker-logo api-glow">CS</div>
               <div class="broker-info">
@@ -1495,18 +1317,6 @@
                 <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('coinspot')">⚡ TEST</button>
                 <button class="btn-ghost" onclick="saveBrokerCreds('coinspot')">💾 SAVE</button>
                 <span class="bcfg-result" id="bcfgResult-coinspot"></span>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="selfwealth">
-              <div class="broker-logo">SW</div>
-              <div class="broker-info">
-                <div class="broker-name">SelfWealth</div>
-                <div class="broker-desc">Flat $9.50/trade. ASX & US markets. No public API — manual execution only.</div>
-                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Manual Only</span>
-                <a class="broker-link" href="https://www.selfwealth.com.au" target="_blank">Open →</a>
               </div>
             </div>
             <div class="broker-card featured" data-broker="stake">
@@ -1556,18 +1366,6 @@
                 <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('moomoo')">⚡ TEST</button>
                 <button class="btn-ghost" onclick="saveBrokerCreds('moomoo')">💾 SAVE</button>
                 <span class="bcfg-result" id="bcfgResult-moomoo"></span>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="superhero">
-              <div class="broker-logo">SH</div>
-              <div class="broker-info">
-                <div class="broker-name">Superhero</div>
-                <div class="broker-desc">$0 ETF brokerage. $2 ASX trades. CHESS-sponsored. No public API — manual execution only.</div>
-                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">ETF</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Manual Only</span>
-                <a class="broker-link" href="https://www.superhero.com.au" target="_blank">Open →</a>
               </div>
             </div>
             <div class="broker-card featured" data-broker="ig">
@@ -1626,18 +1424,6 @@
                 <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('cmc')">⚡ TEST</button>
                 <button class="btn-ghost" onclick="saveBrokerCreds('cmc')">💾 SAVE</button>
                 <span class="bcfg-result" id="bcfgResult-cmc"></span>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="nabtrade">
-              <div class="broker-logo">NAB</div>
-              <div class="broker-info">
-                <div class="broker-name">nabtrade</div>
-                <div class="broker-desc">NAB's investing platform. ASX, US, bonds, managed funds. No public trading API — manual execution only.</div>
-                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span><span class="btag">Bonds</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Manual Only</span>
-                <a class="broker-link" href="https://www.nabtrade.com.au" target="_blank">Open →</a>
               </div>
             </div>
           </div>
@@ -2193,10 +1979,63 @@
   </main>
 
   <!-- ═══════════════════════════════════════════════
-       STATUS BAR
+       ORDER POPUP MODAL
   ═══════════════════════════════════════════════ -->
+  <div class="order-modal-overlay" id="orderModalOverlay" style="display:none" onclick="if(event.target===this)closeOrderModal()">
+    <div class="order-modal">
+      <div class="order-modal-header">
+        <span class="order-modal-title">◈ PLACE ORDER</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="order-modal-mode-toggle">
+            <button class="omt-btn active" id="omtLive" onclick="setOrderModalMode('live')">◆ LIVE</button>
+            <button class="omt-btn" id="omtPaper" onclick="setOrderModalMode('paper')">▷ PAPER</button>
+          </div>
+          <button class="order-modal-close" onclick="closeOrderModal()">✕</button>
+        </div>
+      </div>
+      <div class="order-modal-broker-status" id="omBrokerStatus">
+        <span class="broker-bar-dot" id="omBrokerDot">●</span>
+        <span id="omBrokerLabel">NO BROKER</span>
+      </div>
+      <div class="order-modal-body">
+        <div class="po-row">
+          <label class="po-label">ASSET</label>
+          <div class="po-asset-wrap">
+            <input type="text" id="omTicker" class="po-input po-ticker-input"
+              placeholder="e.g. BTC, CBA.AX, AAPL"
+              oninput="onOmTickerInput(this.value)"
+              autocomplete="off" spellcheck="false"/>
+            <div id="omQuoteResult" class="po-quote-result"></div>
+          </div>
+        </div>
+        <div class="po-row">
+          <label class="po-label">SIDE</label>
+          <div class="po-side-btns">
+            <button class="po-side-btn po-buy active" id="omBuyBtn" onclick="setOmSide('BUY',this)">▲ BUY / LONG</button>
+            <button class="po-side-btn po-sell" id="omSellBtn" onclick="setOmSide('SELL',this)">▼ SELL / CLOSE</button>
+          </div>
+        </div>
+        <div class="po-row om-row-inline">
+          <div style="flex:1">
+            <label class="po-label">QUANTITY</label>
+            <input type="number" id="omQty" class="po-input" value="1" min="0.0001" step="any" oninput="updateOmEstimate()"/>
+          </div>
+          <div style="flex:1">
+            <label class="po-label">LIMIT PRICE <span style="color:var(--text-2);font-size:9px">(blank = market)</span></label>
+            <input type="number" id="omPrice" class="po-input" placeholder="Market" step="any" oninput="updateOmEstimate()"/>
+          </div>
+        </div>
+        <div class="po-estimate">
+          <span class="po-est-label">EST. COST</span>
+          <span class="po-est-val" id="omEstVal">—</span>
+        </div>
+        <button class="btn-primary btn--full" id="omSubmitBtn" onclick="submitOrderModal()">◆ PLACE LIVE ORDER</button>
+        <div class="po-result" id="omResult"></div>
+      </div>
+    </div>
+  </div>
 
-  <script src="/static/app.js?v=20260406p"></script>
+  <script src="/static/app.js?v=20260406q"></script>
 
   <!-- ═══════════════════════════════════════════════
        SPEECH BUBBLE SPOTLIGHT TOOLTIP

@@ -830,8 +830,14 @@ canvas { display: block; max-width: 100%; }
 .signal-card.SELL::after, .signal-card.SHORT::after { background: var(--red); }
 .signal-card.HOLD::after  { background: var(--amber); }
 
-.sc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.sc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 6px; }
 .sc-ticker { font-family: var(--font-hud); font-size: 11px; font-weight: 700; color: var(--text-1); }
+.sc-trade-btn {
+  background: var(--primary); color: #000; border: none; border-radius: 3px;
+  font-size: 9px; font-weight: 700; padding: 2px 8px; cursor: pointer;
+  font-family: var(--font-hud); letter-spacing: 0.5px; margin-left: auto;
+}
+.sc-trade-btn:hover { background: #ffaa00; }
 .sc-action {
   font-family: var(--font-hud);
   font-size: 13px;
@@ -2706,14 +2712,62 @@ canvas { display: block; max-width: 100%; }
    ═══════════════════════════════════════════════════════════ */
 
 .panel-grid--live {
-  grid-template-columns: 320px 1fr;
-  grid-template-rows: auto auto;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto auto auto;
   gap: 12px;
 }
-.panel--broker-connect { grid-column: 1; grid-row: 1; }
-.panel--live-order     { grid-column: 1; grid-row: 2; }
-.panel--live-portfolio { grid-column: 2; grid-row: 1 / span 2; }
-.panel--live-history   { grid-column: 1 / span 2; grid-row: 3; }
+.panel--broker-bar     { grid-column: 1; }
+.panel--live-summary   { grid-column: 1; }
+.panel--live-signals   { grid-column: 1; }
+.panel--live-history   { grid-column: 1; }
+
+/* ─── Broker Status Bar ─── */
+.broker-bar-inner {
+  display: flex; align-items: center; gap: 16px; padding: 8px 14px; flex-wrap: wrap;
+}
+.broker-bar-status { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+.broker-bar-dot { font-size: 11px; color: var(--red); }
+.broker-bar-stats { display: flex; gap: 16px; flex: 1; }
+.bbs-item { font-size: 11px; }
+.bbs-label { color: var(--text-2); margin-right: 4px; }
+.bbs-val { color: var(--green); font-weight: 700; }
+
+/* ─── Order Modal ─── */
+.order-modal-overlay {
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+}
+.order-modal {
+  background: var(--bg-panel); border: 1px solid var(--primary);
+  border-radius: 8px; width: 440px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 0 40px rgba(255,140,0,0.15);
+}
+.order-modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+}
+.order-modal-title { font-size: 13px; font-weight: 700; letter-spacing: 1px; color: var(--primary); }
+.order-modal-close {
+  background: none; border: 1px solid var(--border); color: var(--text-2);
+  width: 28px; height: 28px; border-radius: 4px; cursor: pointer; font-size: 13px;
+}
+.order-modal-close:hover { color: var(--red); border-color: var(--red); }
+.order-modal-mode-toggle { display: flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.omt-btn {
+  background: transparent; border: none; color: var(--text-2); padding: 4px 12px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.5px; cursor: pointer;
+  font-family: inherit;
+}
+.omt-btn.active { background: var(--primary); color: #000; }
+.omt-btn:hover:not(.active) { background: rgba(255,140,0,0.1); }
+.order-modal-broker-status {
+  display: flex; align-items: center; gap: 6px; padding: 6px 16px;
+  font-size: 10px; letter-spacing: 1px; border-bottom: 1px solid var(--border);
+  color: var(--text-2);
+}
+.order-modal-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.om-row-inline { display: flex; gap: 10px; }
 
 .broker-connect-form { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
 

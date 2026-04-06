@@ -627,6 +627,7 @@ function signalCardHTML(s) {
         <span class="sc-ticker">${s.ticker.replace('-USD','')}</span>
         <span class="sc-action ${s.action}">${actionVerb(s.action)}</span>
         ${srcBadge}
+        <button class="sc-trade-btn" onclick="event.stopPropagation();openOrderModal('${s.ticker}','${['BUY','LONG'].includes(s.action)?'BUY':'SELL'}',${s.price||0})" title="Open order form">◆ TRADE</button>
       </div>
       <div class="sc-price">
         <strong style="font-size:13px">${fmtSignalPrice(s)}</strong>
@@ -2236,21 +2237,20 @@ function renderLiveSignalList(signals) {
   list.innerHTML = active.map(s => {
     const isBuy  = ['BUY','LONG'].includes(s.action);
     const actCol = isBuy ? 'var(--green)' : 'var(--red)';
-    const suggestQty = (1000 / (s.price || 100)).toFixed(s.price > 100 ? 2 : 4);
+    const conf = s.confidence ?? 0;
     const dalioScore = s.dalio_score != null ? `<span class="psr-conf" title="Dalio Fit">⬡ ${s.dalio_score}%</span>` : '';
-    return `<div class="paper-sig-row">
+    return `<div class="paper-sig-row" style="cursor:pointer" onclick="openOrderModal('${s.ticker}',${isBuy ? "'BUY'" : "'SELL'"},${s.price})">
       <div class="psr-left">
         <span class="psr-ticker">${s.ticker.replace('-USD','')}</span>
         <span class="psr-action" style="color:${actCol};font-size:11px">${s.action}</span>
         <span class="psr-price">${fmtSignalPrice(s)}</span>
-        <span class="psr-conf">Conf: ${s.confidence.toFixed(0)}%</span>
+        <span class="psr-conf">Conf: ${conf.toFixed(0)}%</span>
         ${dalioScore}
         <span class="psr-conf" style="color:var(--text-2)">${s.reason || ''}</span>
       </div>
       <div class="psr-right">
-        <input type="number" class="po-input psr-qty" id="lsrQty-${s.ticker}" value="${suggestQty}" min="0.0001" step="any"/>
-        <button class="psr-btn ${isBuy ? 'buy' : 'sell'}" onclick="quickLiveTrade('${s.ticker}',${s.price},'${isBuy ? 'BUY' : 'SELL'}','lsrQty-${s.ticker}')">
-          ${isBuy ? '▲ BUY' : '▼ SELL'}
+        <button class="psr-btn ${isBuy ? 'buy' : 'sell'}">
+          ${isBuy ? '▲ TRADE' : '▼ TRADE'}
         </button>
       </div>
     </div>`;
@@ -2287,6 +2287,143 @@ function updateLivePoEstimate() {
   }
 }
 let _liveQuotePrice = 0;
+
+// ═══════════════════════════════════════════════════════════
+// UNIVERSAL ORDER MODAL
+// ═══════════════════════════════════════════════════════════
+
+let _omMode = 'live';      // 'live' or 'paper'
+let _omSide = 'BUY';
+let _omTicker = '';
+let _omQuotePrice = 0;
+
+function openOrderModal(ticker, side, price) {
+  const overlay = el('orderModalOverlay');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  _omTicker = ticker || '';
+  _omSide = side || 'BUY';
+  _omQuotePrice = price || 0;
+  const inp = el('omTicker');
+  if (inp) { inp.value = _omTicker; if (_omTicker) onOmTickerInput(_omTicker); }
+  setOmSide(_omSide, _omSide === 'BUY' ? el('omBuyBtn') : el('omSellBtn'));
+  if (_omQuotePrice > 0) {
+    el('omQty').value = Math.max(1, Math.floor(1000 / _omQuotePrice));
+  }
+  updateOmEstimate();
+  updateOmBrokerStatus();
+  setOrderModalMode(_omMode);
+  document.addEventListener('keydown', _omEscHandler);
+}
+
+function closeOrderModal() {
+  const overlay = el('orderModalOverlay');
+  if (overlay) overlay.style.display = 'none';
+  const res = el('omResult');
+  if (res) res.innerHTML = '';
+  document.removeEventListener('keydown', _omEscHandler);
+}
+
+function _omEscHandler(e) { if (e.key === 'Escape') closeOrderModal(); }
+
+function setOrderModalMode(mode) {
+  _omMode = mode;
+  el('omtLive')?.classList.toggle('active', mode === 'live');
+  el('omtPaper')?.classList.toggle('active', mode === 'paper');
+  const btn = el('omSubmitBtn');
+  if (btn) {
+    if (mode === 'live') {
+      btn.textContent = '◆ PLACE LIVE ORDER';
+      btn.style.background = 'var(--red)';
+    } else {
+      btn.textContent = '▷ PLACE PAPER ORDER';
+      btn.style.background = 'var(--primary)';
+    }
+  }
+  updateOmBrokerStatus();
+}
+
+function updateOmBrokerStatus() {
+  const dot = el('omBrokerDot');
+  const label = el('omBrokerLabel');
+  if (_omMode === 'paper') {
+    if (dot) dot.style.color = 'var(--amber)';
+    if (label) label.textContent = 'PAPER MODE — simulated trades';
+  } else {
+    // Check if broker is connected
+    fetchJSON('/api/broker/status').then(d => {
+      if (d.connected) {
+        if (dot) dot.style.color = 'var(--green)';
+        if (label) label.textContent = `${(d.broker||'').toUpperCase()} CONNECTED`;
+      } else {
+        if (dot) dot.style.color = 'var(--red)';
+        if (label) label.textContent = 'NO BROKER — connect in Settings';
+      }
+    }).catch(() => {
+      if (dot) dot.style.color = 'var(--red)';
+      if (label) label.textContent = 'NO BROKER';
+    });
+  }
+}
+
+function setOmSide(side, btn) {
+  _omSide = side;
+  el('omBuyBtn')?.classList.toggle('active', side === 'BUY');
+  el('omSellBtn')?.classList.toggle('active', side === 'SELL');
+}
+
+async function onOmTickerInput(val) {
+  const ticker = val.trim().toUpperCase();
+  _omTicker = ticker;
+  _omQuotePrice = 0;
+  const res = el('omQuoteResult');
+  if (!ticker || ticker.length < 1) { if (res) res.innerHTML = ''; return; }
+  try {
+    const d = await fetchJSON(`/api/paper/quote?ticker=${encodeURIComponent(ticker)}`);
+    _omQuotePrice = d.price || 0;
+    if (res && _omQuotePrice > 0) {
+      res.innerHTML = `<span style="color:var(--green)">${ticker} — ${fmt$(_omQuotePrice)}</span>`;
+    }
+    updateOmEstimate();
+  } catch {}
+}
+
+function updateOmEstimate() {
+  const qty = parseFloat(el('omQty')?.value) || 0;
+  const limitP = parseFloat(el('omPrice')?.value);
+  const estEl = el('omEstVal');
+  if (!estEl) return;
+  const price = limitP > 0 ? limitP : _omQuotePrice;
+  estEl.textContent = (price > 0 && qty > 0) ? `~${fmt$(price * qty)}` : '—';
+}
+
+async function submitOrderModal() {
+  const qty = parseFloat(el('omQty')?.value);
+  const price = el('omPrice')?.value ? parseFloat(el('omPrice').value) : undefined;
+  const btn = el('omSubmitBtn');
+  const res = el('omResult');
+  if (!_omTicker) { if (res) res.innerHTML = `<span style="color:var(--red)">Enter a ticker</span>`; return; }
+  if (!qty || qty <= 0) { if (res) res.innerHTML = `<span style="color:var(--red)">Enter quantity</span>`; return; }
+
+  const endpoint = _omMode === 'live' ? '/api/real/order' : '/api/paper/order';
+  const modeLabel = _omMode === 'live' ? 'LIVE' : 'PAPER';
+  if (btn) { btn.textContent = '⌛ PLACING...'; btn.disabled = true; }
+
+  try {
+    const d = await postJSON(endpoint, { ticker: _omTicker, side: _omSide, qty, price });
+    if (res) res.innerHTML = `<span style="color:var(--green)">✓ ${modeLabel} ${_omSide} ${qty}× ${_omTicker} — ${d.status || 'OK'}</span>`;
+    pushAlert(modeLabel, `${_omSide} ${qty}× ${_omTicker}`, 'info');
+    if (_omMode === 'live') { loadRealPortfolio(); loadRealHistory(); }
+    else { loadPaperPortfolio(); loadPaperHistory(); }
+  } catch (e) {
+    if (res) res.innerHTML = `<span style="color:var(--red)">✗ ${e.message || 'Failed'}</span>`;
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = _omMode === 'live' ? '◆ PLACE LIVE ORDER' : '▷ PLACE PAPER ORDER';
+    }
+  }
+}
 
 // ═══════════════════════════════════════════════════════════
 // MARKET SCANNER (ASX / CRYPTO / COMMODITIES)
@@ -2411,12 +2548,7 @@ function sortScanner(market, key) {
 }
 
 function scannerOpenTrade(ticker, price) {
-  // Jump to paper trading tab and pre-fill the ticker
-  document.querySelector('[data-tab="paper-trading"]')?.click();
-  setTimeout(() => {
-    const inp = el('poTicker');
-    if (inp) { inp.value = ticker; onPoTickerInput(ticker); }
-  }, 200);
+  openOrderModal(ticker, 'BUY', price);
 }
 
 // ─── Watchlist ─────────────────────────────────────────────
@@ -2767,6 +2899,7 @@ function initLiveTrading() {
   loadRealPortfolio();
   loadRealHistory();
   loadRealEquityCurve();
+  loadLiveSignals();
   clearInterval(_liveRefreshTimer);
   _liveRefreshTimer = setInterval(() => {
     if (document.querySelector('.tab-btn.active')?.dataset?.tab === 'live-trading') {
@@ -2779,19 +2912,24 @@ function initLiveTrading() {
 async function loadBrokerStatus() {
   try {
     const d = await fetchJSON('/api/broker/status');
-    const badge = el('brokerStatusBadge');
-    if (badge) {
-      badge.textContent = d.connected ? `✓ ${(d.broker||'').toUpperCase()} CONNECTED` : 'NOT CONNECTED';
-      badge.style.color = d.connected ? 'var(--green)' : 'var(--red)';
-    }
+    // Update broker bar on live trading tab
+    const barDot = el('brokerBarDot');
+    const barLabel = el('brokerBarLabel');
+    const barStats = el('brokerBarStats');
     if (d.connected) {
-      const summ = el('brokerAccountSummary');
-      if (summ) summ.style.display = 'block';
-      setEl('basValue',   fmt$(d.account_value  || 0));
-      setEl('basBuying',  fmt$(d.buying_power    || 0));
-      setEl('basCash',    fmt$(d.cash            || 0));
-      setEl('basBroker',  (d.broker || '').toUpperCase());
+      if (barDot) barDot.style.color = 'var(--green)';
+      if (barLabel) barLabel.textContent = `${(d.broker||'').toUpperCase()} CONNECTED`;
+      if (barStats) {
+        barStats.style.display = 'flex';
+        setEl('bbsAcctVal', fmt$(d.account_value || 0));
+        setEl('bbsBuyPow', fmt$(d.buying_power || 0));
+        setEl('bbsCash', fmt$(d.cash || 0));
+      }
       updateModeUI(_tradingMode, true);
+    } else {
+      if (barDot) barDot.style.color = 'var(--red)';
+      if (barLabel) barLabel.textContent = 'NO BROKER CONNECTED';
+      if (barStats) barStats.style.display = 'none';
     }
   } catch {}
 }
@@ -3057,19 +3195,53 @@ async function connectBroker() {
 async function loadRealPortfolio() {
   try {
     const d = await fetchJSON('/api/real/portfolio');
-    const statsEl = el('livePortfolioStats');
-    if (statsEl) statsEl.style.display = 'grid';
-    setEl('liveAcctVal', fmt$(d.account_value || 0));
-    setEl('liveBuyPow',  fmt$(d.buying_power  || 0));
-    setEl('liveCash',    fmt$(d.cash          || 0));
+    const acctVal = d.account_value || 0;
+    const cash = d.cash || 0;
+    const positions = d.positions || [];
+    const invested = positions.reduce((s, p) => s + (p.market_val || 0), 0);
+    const totalPnl = positions.reduce((s, p) => s + (p.pnl || 0), 0);
+
+    setEl('liveAcctVal',   fmt$(acctVal));
+    setEl('liveCash',      fmt$(cash));
+    setEl('liveBuyPow',    fmt$(d.buying_power || 0));
+    setEl('liveInvested',  fmt$(invested));
+    setEl('liveOpenCount', positions.length);
+
+    const pnlEl = el('livePnl');
+    if (pnlEl) {
+      pnlEl.textContent = (totalPnl >= 0 ? '+' : '') + fmt$(totalPnl);
+      pnlEl.style.color = totalPnl >= 0 ? 'var(--green)' : 'var(--red)';
+    }
+    const badge = el('livePnlBadge');
+    if (badge) {
+      badge.textContent = `P&L: ${totalPnl >= 0 ? '+' : ''}${fmt$(totalPnl)}`;
+      badge.style.color = totalPnl >= 0 ? 'var(--green)' : 'var(--red)';
+    }
+
+    // Position heatmap
+    const hmWrap = el('liveHeatmapWrap');
+    const hm = el('liveHeatmap');
+    if (hm && positions.length) {
+      if (hmWrap) hmWrap.style.display = 'block';
+      hm.innerHTML = positions.map(p => {
+        const pnlPct = p.pnl_pct || 0;
+        const bg = pnlPct >= 0 ? `rgba(0,204,68,${Math.min(0.6, pnlPct/10)})` : `rgba(255,34,34,${Math.min(0.6, Math.abs(pnlPct)/10)})`;
+        return `<div class="hm-cell" style="background:${bg}" title="${p.ticker}: ${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%" onclick="openOrderModal('${p.ticker}','SELL',${p.market_val/p.qty||0})">
+          <span class="hm-ticker">${p.ticker.replace('-USD','').replace('.AX','')}</span>
+          <span class="hm-pct" style="color:${pnlPct>=0?'var(--green)':'var(--red)'}">${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}%</span>
+        </div>`;
+      }).join('');
+    } else if (hmWrap) { hmWrap.style.display = 'none'; }
+
+    // Positions table
     const body = el('livePositionsBody');
-    if (body && d.positions) {
-      if (!d.positions.length) {
+    if (body) {
+      if (!positions.length) {
         body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:16px">No open positions</td></tr>`;
       } else {
-        body.innerHTML = d.positions.map(p => {
+        body.innerHTML = positions.map(p => {
           const pnlCls = (p.pnl || 0) >= 0 ? 'td-green' : 'td-red';
-          return `<tr>
+          return `<tr style="cursor:pointer" onclick="openOrderModal('${p.ticker}','SELL',${p.market_val/(p.qty||1)})">
             <td class="td-cyan" style="font-weight:700">${p.ticker}</td>
             <td class="${p.side === 'LONG' || p.side === 'long' ? 'td-green' : 'td-red'}">${p.side?.toUpperCase()}</td>
             <td>${typeof p.qty === 'number' ? (p.qty % 1 === 0 ? p.qty : p.qty.toFixed(4)) : p.qty}</td>
@@ -3077,7 +3249,7 @@ async function loadRealPortfolio() {
             <td>${fmt$(p.market_val || 0)}</td>
             <td class="${pnlCls}">${p.pnl != null ? ((p.pnl >= 0 ? '+' : '') + fmt$(p.pnl)) : '—'}</td>
             <td class="${pnlCls}">${p.pnl_pct != null ? ((p.pnl_pct >= 0 ? '+' : '') + p.pnl_pct.toFixed(2) + '%') : '—'}</td>
-            <td><button class="po-close-btn" onclick="closeLivePosition('${p.ticker}')">✕ CLOSE</button></td>
+            <td><button class="po-close-btn" onclick="event.stopPropagation();closeLivePosition('${p.ticker}')">✕</button></td>
           </tr>`;
         }).join('');
       }
@@ -3089,8 +3261,10 @@ async function loadRealHistory() {
   try {
     const d = await fetchJSON('/api/real/history');
     const body = el('liveHistoryBody');
-    if (!body || !d.history?.length) return;
-    body.innerHTML = d.history.map(h => `<tr>
+    const history = d.history || [];
+    setEl('liveTradeCount', `${history.length} ORDERS`);
+    if (!body || !history.length) return;
+    body.innerHTML = history.map(h => `<tr>
       <td class="td-cyan">${h.ticker}</td>
       <td class="${h.side === 'buy' ? 'td-green' : 'td-red'}">${(h.side||'').toUpperCase()}</td>
       <td>${h.qty}</td>

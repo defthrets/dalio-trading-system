@@ -3607,10 +3607,8 @@ async def broker_connect(payload: dict):
                    "kraken": KrakenBroker, "bybit": BybitBroker, "okx": OKXBroker,
                    "kucoin": KuCoinBroker, "bitget": BitgetBroker,
                    "independentreserve": IndependentReserveBroker, "stake": StakeBroker,
-                   "selfwealth": SelfWealthBroker, "ig": IGBroker,
-                   "cmc": CMCBroker, "schwab": SchwabBroker,
-                   "commsec": CommsecBroker, "moomoo": MomooBroker,
-                   "superhero": SuperheroBroker, "nabtrade": NabtradeBroker,
+                   "ig": IGBroker, "cmc": CMCBroker, "schwab": SchwabBroker,
+                   "moomoo": MomooBroker,
                    "robinhood": RobinhoodBroker, "webull": WebullBroker}
     if broker_name not in _BROKER_MAP:
         raise HTTPException(400, f"broker must be one of: {', '.join(_BROKER_MAP)}")
