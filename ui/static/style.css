@@ -644,6 +644,20 @@ a:hover { color: var(--primary); text-decoration: underline; }
   0%, 100% { transform: translateY(0); }
   50%      { transform: translateY(2px); }
 }
+/* Green graph line draws itself */
+.graph-line-green {
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: lineGrow 2s ease-out 0.5s forwards, lineGlow 2s ease-in-out 2.5s infinite;
+}
+@keyframes lineGrow {
+  0%   { stroke-dashoffset: 60; }
+  100% { stroke-dashoffset: 0; }
+}
+@keyframes lineGlow {
+  0%, 100% { stroke: #00ff88; filter: none; }
+  50%      { stroke: #44ffaa; filter: drop-shadow(0 0 3px #00ff88); }
+}
 /* Overall chart glow pulse */
 @keyframes chartPulse {
   0%, 100% { filter: drop-shadow(0 0 4px rgba(0,255,136,0.4)) drop-shadow(0 0 8px rgba(255,68,68,0.3)); }
