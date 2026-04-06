@@ -1518,7 +1518,7 @@ function _showSpot(idx) {
 
     // Auto-advance after 5s unless it's the last spot on this tab
     if (!isLastSpot) {
-      _spotAutoTimer = setTimeout(() => _guidedAdvanceSpot(), 5000);
+      _spotAutoTimer = setTimeout(() => _guidedAdvanceSpot(), 10000);
     }
 
     // Timer bar animation
@@ -1527,7 +1527,7 @@ function _showSpot(idx) {
       timerBar.style.animation = 'none';
       timerBar.offsetHeight; // reflow
       if (!isLastSpot) {
-        timerBar.style.animation = 'spotTimer 5s linear forwards';
+        timerBar.style.animation = 'spotTimer 10s linear forwards';
       } else {
         timerBar.style.animation = 'none';
         timerBar.style.width = '0';

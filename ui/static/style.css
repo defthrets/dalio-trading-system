@@ -2118,29 +2118,18 @@ canvas { display: block; max-width: 100%; }
 }
 .welcome-illust {
   margin: 0 auto 16px;
-  width: 120px; height: 80px;
-  display: flex; align-items: flex-end; justify-content: center; gap: 4px;
+  display: flex; align-items: center; justify-content: center;
 }
-.welcome-placeholder-art {
-  display: flex; align-items: flex-end; justify-content: center; gap: 6px;
-  width: 100%; height: 100%;
+.welcome-mascot {
+  width: 160px;
+  height: auto;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+  animation: mascotBounce 2s ease-in-out infinite;
 }
-.wpa-circle {
-  width: 28px; height: 28px; border-radius: 50%;
-  border: 2px solid var(--primary-dim);
-  align-self: flex-start; margin-right: 8px;
-  animation: holoBrainSpin 6s linear infinite;
+@keyframes mascotBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
-.wpa-line {
-  width: 40px; height: 3px; background: var(--primary-dim);
-  border-radius: 2px; align-self: center;
-}
-.wpa-line.short { width: 24px; }
-.wpa-bar {
-  width: 14px; height: 32px; background: rgba(255,140,0,0.25);
-  border: 1px solid var(--primary-dim); border-radius: 2px;
-}
-.wpa-bar.tall { height: 52px; }
 .welcome-header {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   margin-bottom: 12px;
@@ -2219,21 +2208,21 @@ canvas { display: block; max-width: 100%; }
 /* Mascot alongside bubble */
 .spot-mascot {
   position: absolute;
-  width: 100px;
+  width: 200px;
   height: auto;
-  bottom: -12px;
+  bottom: -20px;
   pointer-events: none;
-  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+  filter: drop-shadow(0 3px 10px rgba(0,0,0,0.6));
   transition: transform 0.3s ease;
   z-index: 1;
 }
 .spot-mascot.mascot-left {
-  right: calc(100% + 4px);
+  right: calc(100% + 6px);
   left: auto;
   transform: scaleX(1);
 }
 .spot-mascot.mascot-right {
-  left: calc(100% + 4px);
+  left: calc(100% + 6px);
   right: auto;
   transform: scaleX(-1);
 }
@@ -2323,29 +2312,33 @@ canvas { display: block; max-width: 100%; }
   width: 0;
   height: 0;
 }
+/* arrow-right = bubble is RIGHT of target, arrow points LEFT toward target */
 .spot-bubble.arrow-right .spot-arrow {
-  right: -10px; top: 18px;
-  border-top: 8px solid transparent;
-  border-bottom: 8px solid transparent;
-  border-left: 10px solid var(--border-hi);
-}
-.spot-bubble.arrow-left .spot-arrow {
   left: -10px; top: 18px;
   border-top: 8px solid transparent;
   border-bottom: 8px solid transparent;
   border-right: 10px solid var(--border-hi);
 }
-.spot-bubble.arrow-bottom .spot-arrow {
-  bottom: -10px; left: 20px;
-  border-left: 8px solid transparent;
-  border-right: 8px solid transparent;
-  border-top: 10px solid var(--border-hi);
+/* arrow-left = bubble is LEFT of target, arrow points RIGHT toward target */
+.spot-bubble.arrow-left .spot-arrow {
+  right: -10px; top: 18px;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 10px solid var(--border-hi);
 }
-.spot-bubble.arrow-top .spot-arrow {
+/* arrow-bottom = bubble is BELOW target, arrow points UP toward target */
+.spot-bubble.arrow-bottom .spot-arrow {
   top: -10px; left: 20px;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
   border-bottom: 10px solid var(--border-hi);
+}
+/* arrow-top = bubble is ABOVE target, arrow points DOWN toward target */
+.spot-bubble.arrow-top .spot-arrow {
+  bottom: -10px; left: 20px;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 10px solid var(--border-hi);
 }
 /* Highlight pulse on targeted element */
 .spot-highlight {
