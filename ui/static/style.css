@@ -1,49 +1,49 @@
 /* ═══════════════════════════════════════════════════════════
    DALIOS — Automated Trading Framework
-   Military / Hacker Terminal UI
+   Orange Terminal UI — Modern & Clean
    ═══════════════════════════════════════════════════════════ */
 
 /* ─── Variables ─── */
 :root {
-  /* ── Backgrounds: medium steel-gray ── */
-  --bg-0:        #16191f;
-  --bg-1:        #1a1e27;
-  --bg-2:        #212732;
-  --bg-panel:    #1c2030;
-  --bg-panel-2:  #202538;
-  --bg-card:     #1e2436;
-  --bg-row-hover:#252d3e;
+  /* ── Backgrounds: pure black to near-black ── */
+  --bg-0:        #000000;
+  --bg-1:        #0a0a0a;
+  --bg-2:        #141414;
+  --bg-panel:    #0d0d0d;
+  --bg-panel-2:  #111111;
+  --bg-card:     #0f0f0f;
+  --bg-row-hover:#1a1a1a;
 
-  /* ── Primary accent: ELECTRIC CYAN ── */
-  --primary:     #00d4ff;
-  --primary-dim: #009ec0;
-  --primary-dark:#0a1f30;
-  --primary-glow:rgba(0,212,255,0.13);
+  /* ── Primary accent: WARM ORANGE ── */
+  --primary:     #ff8c00;
+  --primary-dim: #cc7000;
+  --primary-dark:#1a1000;
+  --primary-glow:rgba(255,140,0,0.12);
 
   /* ── Semantic: kept distinct ── */
-  --green:       #00ff88;   /* profit / BUY / success */
-  --green-dim:   #00cc6e;
-  --green-dark:  #0a2018;
-  --green-glow:  rgba(0,255,136,0.11);
-  --amber:       #ffcc00;   /* warning / caution */
-  --amber-dim:   #cc9e00;
-  --amber-glow:  rgba(255,204,0,0.11);
-  --red:         #ff3355;   /* loss / SELL / danger */
-  --red-dim:     #cc1a3a;
-  --red-glow:    rgba(255,51,85,0.13);
-  --cyan:        #00d4ff;   /* data / info (same as primary) */
-  --cyan-glow:   rgba(0,212,255,0.11);
+  --green:       #00e676;   /* profit / BUY / success */
+  --green-dim:   #00b85c;
+  --green-dark:  #0a1a10;
+  --green-glow:  rgba(0,230,118,0.10);
+  --amber:       #ffc107;   /* warning / caution */
+  --amber-dim:   #cc9a00;
+  --amber-glow:  rgba(255,193,7,0.10);
+  --red:         #ff1744;   /* loss / SELL / danger */
+  --red-dim:     #d50032;
+  --red-glow:    rgba(255,23,68,0.12);
+  --cyan:        #ff8c00;   /* data / info (now orange, same as primary) */
+  --cyan-glow:   rgba(255,140,0,0.10);
 
-  /* ── Text: cool blue-white, more visible on lighter bg ── */
-  --text-primary:#d4eaf8;
-  --text-1:      #c0d8ee;
-  --text-2:      #5a8aaa;
-  --text-muted:  #3a5f78;
+  /* ── Text: warm white/gray for readability on black ── */
+  --text-primary:#f0e8e0;
+  --text-1:      #e0d6cc;
+  --text-2:      #8a7e72;
+  --text-muted:  #5a524a;
 
-  /* ── Borders: visible on medium bg ── */
-  --border:      #2a3a50;
-  --border-hi:   #354a65;
-  --border-act:  #00d4ff;
+  /* ── Borders: subtle warm gray ── */
+  --border:      #222222;
+  --border-hi:   #333333;
+  --border-act:  #ff8c00;
 
   --font-mono:   'JetBrains Mono', 'Share Tech Mono', 'Courier New', monospace;
   --font-hud:    'Orbitron', 'Share Tech Mono', monospace;
@@ -58,7 +58,7 @@
   position: absolute;
   top: -60%; left: -80px;
   width: 50px; height: 200%;
-  background: linear-gradient(90deg, transparent, rgba(0,212,255,0.05), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255,140,0,0.05), transparent);
   transform: rotate(15deg);
   pointer-events: none;
   transition: none;
@@ -111,7 +111,7 @@
 
 /* Ticker item flash on price change */
 @keyframes tickerFlash {
-  0%   { background: rgba(0,212,255,0.12); }
+  0%   { background: rgba(255,140,0,0.12); }
   100% { background: transparent; }
 }
 .ticker-item.flashed { animation: tickerFlash 0.8s ease; }
@@ -868,8 +868,8 @@ canvas { display: block; max-width: 100%; }
 .sc-ai-overview {
   margin-top: 8px;
   padding: 7px 8px;
-  background: rgba(0, 229, 255, 0.04);
-  border: 1px solid rgba(0, 229, 255, 0.15);
+  background: rgba(255, 140, 0, 0.04);
+  border: 1px solid rgba(255, 140, 0, 0.15);
   border-left: 2px solid var(--cyan);
   border-radius: 2px;
   font-size: 15px;
@@ -929,7 +929,7 @@ canvas { display: block; max-width: 100%; }
   flex-direction: column;
   gap: 5px;
 }
-.opp-card--rich:hover { background: rgba(0,212,255,0.04); border-color: var(--primary); }
+.opp-card--rich:hover { background: rgba(255,140,0,0.04); border-color: var(--primary); }
 .opp-header {
   display: flex;
   align-items: center;
@@ -1135,7 +1135,7 @@ canvas { display: block; max-width: 100%; }
   color: var(--text-2);
   transition: background var(--transition);
 }
-.data-table tr:hover td { background: var(--green-glow); color: var(--text-1); }
+.data-table tr:hover td { background: var(--bg-row-hover); color: var(--text-1); }
 .data-table .td-green  { color: var(--green); font-family: var(--font-hud); }
 .data-table .td-red    { color: var(--red); font-family: var(--font-hud); }
 .data-table .td-amber  { color: var(--amber); }
@@ -1414,7 +1414,7 @@ canvas { display: block; max-width: 100%; }
   border-radius: 4px;
   padding: 16px 20px;
   margin: -4px 0 4px;
-  box-shadow: 0 4px 20px rgba(0,212,255,.06);
+  box-shadow: 0 4px 20px rgba(255,140,0,.06);
 }
 .broker-config-panel.hidden { display: none; }
 .bcfg-title {
@@ -1567,7 +1567,7 @@ canvas { display: block; max-width: 100%; }
   border-top: 2px solid var(--primary);
   border-radius: 4px;
   padding: 12px 14px 10px;
-  box-shadow: 0 6px 28px rgba(0,0,0,0.55), 0 0 18px rgba(0,229,255,0.08);
+  box-shadow: 0 6px 28px rgba(0,0,0,0.55), 0 0 18px rgba(255,140,0,0.08);
   animation: bubble-pop 0.22s cubic-bezier(.34,1.56,.64,1);
   pointer-events: all;
 }
@@ -1651,7 +1651,7 @@ canvas { display: block; max-width: 100%; }
   letter-spacing: 1px;
   transition: all var(--transition);
 }
-.spot-btn-next:hover { background: rgba(0,229,255,0.18); }
+.spot-btn-next:hover { background: rgba(255,140,0,0.18); }
 /* Arrow variations */
 .spot-arrow {
   position: absolute;
@@ -1686,7 +1686,7 @@ canvas { display: block; max-width: 100%; }
 .spot-highlight {
   outline: 2px solid var(--cyan) !important;
   outline-offset: 3px;
-  box-shadow: 0 0 16px rgba(0,229,255,0.22) !important;
+  box-shadow: 0 0 16px rgba(255,140,0,0.22) !important;
   border-radius: 3px;
   transition: outline 0.2s, box-shadow 0.2s;
 }
@@ -1709,12 +1709,12 @@ canvas { display: block; max-width: 100%; }
   align-items: center;
   gap: 14px;
   padding: 10px 20px;
-  background: linear-gradient(90deg, #001622 0%, #002233 50%, #001622 100%);
+  background: linear-gradient(90deg, #0d0800 0%, #1a1000 50%, #0d0800 100%);
   border-top: 2px solid var(--primary);
   box-shadow: 0 -4px 20px var(--primary-glow);
 }
 .strong-signal-banner.sell .ssb-inner {
-  background: linear-gradient(90deg, #160008 0%, #280010 50%, #160008 100%);
+  background: linear-gradient(90deg, #1a0008 0%, #2a0010 50%, #1a0008 100%);
   border-top-color: var(--red);
   box-shadow: 0 -4px 20px rgba(255,34,34,0.25);
 }
@@ -1889,8 +1889,8 @@ canvas { display: block; max-width: 100%; }
   transition: all var(--transition);
 }
 .broker-card:hover { border-color: var(--border-hi); background: var(--bg-panel-2); }
-.broker-card.featured { border-color: rgba(0,229,255,0.25); }
-.broker-card.featured:hover { border-color: var(--cyan); box-shadow: 0 0 14px rgba(0,229,255,0.08); }
+.broker-card.featured { border-color: rgba(255,140,0,0.25); }
+.broker-card.featured:hover { border-color: var(--cyan); box-shadow: 0 0 14px rgba(255,140,0,0.08); }
 
 .broker-logo {
   width: 42px;
@@ -1910,7 +1910,7 @@ canvas { display: block; max-width: 100%; }
 .broker-logo.api-glow {
   border-color: var(--cyan);
   color: var(--cyan);
-  box-shadow: 0 0 10px rgba(0,229,255,0.12);
+  box-shadow: 0 0 10px rgba(255,140,0,0.12);
 }
 .broker-info { flex: 1; min-width: 0; }
 .broker-name {
@@ -1955,7 +1955,7 @@ canvas { display: block; max-width: 100%; }
   color: var(--cyan);
   text-decoration: none;
   letter-spacing: 1px;
-  border: 1px solid rgba(0,229,255,0.3);
+  border: 1px solid rgba(255,140,0,0.3);
   padding: 2px 7px;
   border-radius: 2px;
   transition: all var(--transition);
@@ -1965,8 +1965,8 @@ canvas { display: block; max-width: 100%; }
 
 /* Alpaca connect panel */
 .broker-connect-panel {
-  background: rgba(0,229,255,0.03);
-  border: 1px solid rgba(0,229,255,0.2);
+  background: rgba(255,140,0,0.03);
+  border: 1px solid rgba(255,140,0,0.2);
   border-radius: 3px;
   padding: 14px 16px;
   margin-top: 8px;
@@ -1987,7 +1987,7 @@ canvas { display: block; max-width: 100%; }
 .tutorial-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(6, 14, 22, 0.88);
+  background: rgba(0, 0, 0, 0.88);
   backdrop-filter: blur(4px);
   z-index: 9000;
   display: flex;
@@ -2784,7 +2784,7 @@ canvas { display: block; max-width: 100%; }
   z-index: 900;
   background: var(--bg-1);
   border-top: 1px solid var(--primary);
-  box-shadow: 0 -4px 32px rgba(0,212,255,0.08);
+  box-shadow: 0 -4px 32px rgba(255,140,0,0.08);
   font-family: var(--font-mono);
 }
 
@@ -2797,7 +2797,7 @@ canvas { display: block; max-width: 100%; }
   user-select: none;
   gap: 12px;
 }
-.cli-header:hover { background: rgba(0,212,255,0.04); }
+.cli-header:hover { background: rgba(255,140,0,0.04); }
 
 .cli-title {
   font-family: var(--font-hud);
@@ -2935,7 +2935,7 @@ canvas { display: block; max-width: 100%; }
   white-space: nowrap;
   transition: background var(--transition), box-shadow var(--transition);
 }
-.cli-send-btn:hover { background: rgba(0,212,255,0.12); box-shadow: 0 0 10px var(--primary-glow); }
+.cli-send-btn:hover { background: rgba(255,140,0,0.12); box-shadow: 0 0 10px var(--primary-glow); }
 
 /* Push main content up so CLI bar doesn't cover it */
 body { padding-bottom: 42px; }
@@ -3048,7 +3048,7 @@ body.cli-expanded { padding-bottom: 272px; }
   border-radius: 2px;
   transition: all var(--transition);
 }
-.scan-wl-btn.in { border-color: var(--primary); color: var(--primary); background: rgba(0,212,255,0.07); }
+.scan-wl-btn.in { border-color: var(--primary); color: var(--primary); background: rgba(255,140,0,0.07); }
 .scan-wl-btn:hover { color: var(--primary); border-color: var(--primary); }
 
 .scan-trade-btn {
@@ -3144,7 +3144,7 @@ body.cli-expanded { padding-bottom: 272px; }
 .sett-theme-btn.active {
   border-color: var(--primary);
   color: var(--primary);
-  background: rgba(0,212,255,0.08);
+  background: rgba(255,140,0,0.08);
 }
 .sett-theme-btn:hover { color: var(--text-1); }
 
@@ -3293,7 +3293,7 @@ body.cli-expanded { padding-bottom: 272px; }
   cursor: pointer;
   transition: background var(--transition);
 }
-.cc-rec-card:hover { background: rgba(0,212,255,0.04); }
+.cc-rec-card:hover { background: rgba(255,140,0,0.04); }
 .cc-rec-card.fit-strong   { border-left-color: var(--green); }
 .cc-rec-card.fit-moderate { border-left-color: var(--primary); }
 .cc-rec-card.fit-avoid    { border-left-color: var(--red); }
