@@ -1011,7 +1011,7 @@ a:hover { color: var(--primary); text-decoration: underline; }
   display: none; /* legacy — replaced by panel-grid--cc-hub */
 }
 .panel-grid--cc-hub {
-  grid-template-columns: 280px 1fr 1fr 260px;
+  grid-template-columns: 280px 1fr 1fr 1fr;
   grid-template-rows: auto 280px auto auto auto;
   gap: 12px;
 }
