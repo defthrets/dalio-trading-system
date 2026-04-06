@@ -1291,7 +1291,10 @@
               </div>
             </div>
 
-            <button class="btn-primary btn--full" id="brokerConnectBtn" onclick="connectBroker()">▶ CONNECT BROKER</button>
+            <div style="display:flex;gap:8px;margin-top:4px">
+              <button class="btn-primary" style="flex:1" id="brokerConnectBtn" onclick="connectBroker()">▶ CONNECT</button>
+              <button class="btn-ghost" style="flex:1" id="brokerWizardBtn" onclick="openBrokerWizard()" disabled>📋 SETUP GUIDE</button>
+            </div>
             <div class="po-result" id="brokerConnectResult"></div>
 
             <!-- Account summary (shown after connect) -->
@@ -2046,6 +2049,31 @@
     </div>
     <div class="quick-pos-body" id="quickPosBody">
       <div style="padding:14px;color:var(--text-muted);font-size:10px">Loading positions…</div>
+    </div>
+  </div>
+
+
+  <!-- ── Broker Setup Wizard ───────────────────────────────── -->
+  <div class="bwiz-overlay hidden" id="bwizOverlay" onclick="closeBrokerWizard(event)">
+    <div class="bwiz-box" onclick="event.stopPropagation()">
+      <div class="bwiz-header">
+        <div>
+          <div class="bwiz-title">⚡ BROKER SETUP WIZARD</div>
+          <div class="bwiz-broker-tag" id="bwizBrokerTag">SELECT A BROKER</div>
+        </div>
+        <button class="bwiz-close" onclick="closeBrokerWizard()">✕</button>
+      </div>
+      <div class="bwiz-steps" id="bwizSteps">
+        <!-- injected by JS -->
+      </div>
+      <div class="bwiz-body" id="bwizBody">
+        <!-- injected by JS -->
+      </div>
+      <div class="bwiz-footer">
+        <button class="bwiz-back" id="bwizBackBtn" onclick="bwizBack()">← BACK</button>
+        <span class="bwiz-result" id="bwizResult"></span>
+        <button class="bwiz-next" id="bwizNextBtn" onclick="bwizNext()">NEXT →</button>
+      </div>
     </div>
   </div>
 

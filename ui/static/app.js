@@ -2536,6 +2536,373 @@ function onBrokerSelect(val) {
     stake:    'stakeFields',
   };
   if (map[val]) { const el2 = el(map[val]); if (el2) el2.style.display = 'block'; }
+  // Enable setup guide button when a valid broker is selected
+  const wBtn = el('brokerWizardBtn');
+  if (wBtn) wBtn.disabled = !val || val === 'stake';
+}
+
+// ═══════════════════════════════════════════════════════════
+// BROKER SETUP WIZARD
+// ═══════════════════════════════════════════════════════════
+
+const _BWIZ_CONFIG = {
+  alpaca: {
+    label: 'ALPACA',
+    color: '#ffcc00',
+    steps: ['OVERVIEW', 'GET KEYS', 'CONNECT'],
+    pages: [
+      {
+        title: 'About Alpaca',
+        body: `
+          <p class="bwiz-intro">Alpaca is a commission-free brokerage API for US equities and crypto. It offers both a paper trading sandbox and live trading with real funds.</p>
+          <div class="bwiz-note info">✓ Free paper trading account — no minimum deposit<br>✓ Live trading requires identity verification<br>✓ Supports ASX via international equities on some plans</div>
+          <ul class="bwiz-steps-list">
+            <li><span class="bwiz-num">1</span><span>Go to <strong class="bwiz-link" onclick="void(0)">alpaca.markets</strong> and click <strong>Get Started for Free</strong></span></li>
+            <li><span class="bwiz-num">2</span><span>Sign up with email — no credit card needed for paper trading</span></li>
+            <li><span class="bwiz-num">3</span><span>For live trading: complete identity verification in the dashboard</span></li>
+          </ul>`,
+      },
+      {
+        title: 'Getting Your API Keys',
+        body: `
+          <ul class="bwiz-steps-list">
+            <li><span class="bwiz-num">1</span><span>Log in to <strong>app.alpaca.markets</strong></span></li>
+            <li><span class="bwiz-num">2</span><span>In the left sidebar click <strong>API Keys</strong> (or go to Your Account → API Keys)</span></li>
+            <li><span class="bwiz-num">3</span><span>Click <strong>Generate New Key</strong> — give it a name like "DALIOS"</span></li>
+            <li><span class="bwiz-num">4</span><span>Copy both the <strong>Key ID</strong> (starts with PK...) and the <strong>Secret Key</strong> — the secret is only shown once!</span></li>
+            <li><span class="bwiz-num">5</span><span>For paper trading use the <strong>Paper</strong> endpoint. For real money use <strong>Live</strong>.</span></li>
+          </ul>
+          <div class="bwiz-note">⚠ The secret key is shown only once at creation time. If you lose it, you'll need to generate new keys.</div>`,
+      },
+      {
+        title: 'Enter Your Credentials',
+        body: `
+          <div class="bwiz-field-row"><label class="bwiz-label">API KEY (starts with PK...)</label><input class="bwiz-input" id="bwizAlpacaKey" placeholder="PKXXXXXXXXXXXXXXXX" autocomplete="off"/></div>
+          <div class="bwiz-field-row"><label class="bwiz-label">API SECRET</label><input class="bwiz-input" type="password" id="bwizAlpacaSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
+          <div class="bwiz-field-row"><label class="bwiz-label">ENDPOINT</label>
+            <select class="bwiz-select" id="bwizAlpacaUrl">
+              <option value="https://paper-api.alpaca.markets">Paper Trading (Sandbox — no real money)</option>
+              <option value="https://api.alpaca.markets">Live Trading (Real Funds)</option>
+            </select>
+          </div>`,
+        onConnect: () => {
+          const key = el('bwizAlpacaKey')?.value?.trim();
+          const sec = el('bwizAlpacaSecret')?.value?.trim();
+          const url = el('bwizAlpacaUrl')?.value;
+          if (!key || !sec) return null;
+          el('alpacaKey').value = key;
+          el('alpacaSecret').value = sec;
+          el('alpacaUrl').value = url;
+          el('brokerSelect').value = 'alpaca';
+          onBrokerSelect('alpaca');
+          return { broker:'alpaca', api_key:key, api_secret:sec, base_url:url };
+        },
+      },
+    ],
+  },
+
+  ibkr: {
+    label: 'INTERACTIVE BROKERS',
+    color: '#00d4ff',
+    steps: ['OVERVIEW', 'INSTALL TWS', 'CONNECT'],
+    pages: [
+      {
+        title: 'About Interactive Brokers',
+        body: `
+          <p class="bwiz-intro">IBKR (Interactive Brokers) is a professional-grade broker supporting ASX, US, and global equities. DALIOS connects to it via Trader Workstation (TWS) running locally on your machine.</p>
+          <div class="bwiz-note info">✓ Full ASX access including all listed stocks<br>✓ Global markets: US, UK, EU, Asia<br>✓ No API key — connection goes through TWS running on your computer</div>
+          <ul class="bwiz-steps-list">
+            <li><span class="bwiz-num">1</span><span>You need an IBKR account — sign up at <strong>interactivebrokers.com.au</strong></span></li>
+            <li><span class="bwiz-num">2</span><span>Download and install <strong>Trader Workstation (TWS)</strong> or <strong>IB Gateway</strong> (lighter-weight)</span></li>
+            <li><span class="bwiz-num">3</span><span>TWS/Gateway must be running on this computer whenever DALIOS places live orders</span></li>
+          </ul>`,
+      },
+      {
+        title: 'Configure TWS for API Access',
+        body: `
+          <ul class="bwiz-steps-list">
+            <li><span class="bwiz-num">1</span><span>Open TWS and log in with your IBKR credentials</span></li>
+            <li><span class="bwiz-num">2</span><span>Go to <strong>File → Global Configuration → API → Settings</strong></span></li>
+            <li><span class="bwiz-num">3</span><span>Tick <strong>"Enable ActiveX and Socket Clients"</strong></span></li>
+            <li><span class="bwiz-num">4</span><span>Set the <strong>Socket Port</strong>: use <strong>7497</strong> for paper, <strong>7496</strong> for live</span></li>
+            <li><span class="bwiz-num">5</span><span>Untick "Read-Only API" if you want DALIOS to place orders</span></li>
+            <li><span class="bwiz-num">6</span><span>Click <strong>Apply → OK</strong> and restart TWS</span></li>
+          </ul>
+          <div class="bwiz-note">⚠ TWS must stay open in the background while DALIOS is running. IB Gateway uses fewer resources if you prefer.</div>`,
+      },
+      {
+        title: 'Connection Settings',
+        body: `
+          <div class="bwiz-field-row"><label class="bwiz-label">TWS HOST (usually 127.0.0.1)</label><input class="bwiz-input" id="bwizIbkrHost" value="127.0.0.1"/></div>
+          <div class="bwiz-field-row"><label class="bwiz-label">PORT (7497 = paper, 7496 = live)</label><input class="bwiz-input" type="number" id="bwizIbkrPort" value="7497"/></div>
+          <div class="bwiz-field-row"><label class="bwiz-label">CLIENT ID (any number, e.g. 1)</label><input class="bwiz-input" type="number" id="bwizIbkrClientId" value="1"/></div>
+          <div class="bwiz-note info">Make sure TWS is running and logged in before clicking Connect.</div>`,
+        onConnect: () => {
+          const host = el('bwizIbkrHost')?.value || '127.0.0.1';
+          const port = parseInt(el('bwizIbkrPort')?.value || '7497');
+          const cid  = parseInt(el('bwizIbkrClientId')?.value || '1');
+          el('ibkrHost').value = host;
+          el('ibkrPort').value = port;
+          el('ibkrClientId').value = cid;
+          el('brokerSelect').value = 'ibkr';
+          onBrokerSelect('ibkr');
+          return { broker:'ibkr', host, port, client_id:cid };
+        },
+      },
+    ],
+  },
+
+  binance: {
+    label: 'BINANCE',
+    color: '#ffcc00',
+    steps: ['OVERVIEW', 'GET KEYS', 'CONNECT'],
+    pages: [
+      {
+        title: 'About Binance',
+        body: `
+          <p class="bwiz-intro">Binance is the world's largest crypto exchange by volume. DALIOS connects via the Binance Spot API to place market and limit orders on crypto pairs.</p>
+          <div class="bwiz-note info">✓ 350+ crypto trading pairs<br>✓ Testnet available for paper trading crypto<br>✓ DALIOS uses USDT-quoted pairs (BTC-USD → BTCUSDT)</div>
+          <ul class="bwiz-steps-list">
+            <li><span class="bwiz-num">1</span><span>Sign up or log in at <strong>binance.com</strong> (or binance.com.au for Australia)</span></li>
+            <li><span class="bwiz-num">2</span><span>Complete identity verification (KYC) to enable trading</span></li>
+            <li><span class="bwiz-num">3</span><span>For testing: use the <strong>Binance Testnet</strong> at testnet.binance.vision — free test funds</span></li>
+          </ul>`,
+      },
+      {
+        title: 'Creating API Keys',
+        body: `
+          <ul class="bwiz-steps-list">
+            <li><span class="bwiz-num">1</span><span>Log in → click your <strong>Profile icon</strong> (top right) → <strong>API Management</strong></span></li>
+            <li><span class="bwiz-num">2</span><span>Click <strong>Create API</strong> → choose <strong>System generated</strong> → enter a label like "DALIOS"</span></li>
+            <li><span class="bwiz-num">3</span><span>Complete 2FA verification</span></li>
+            <li><span class="bwiz-num">4</span><span>Click <strong>Edit Restrictions</strong> → enable <strong>Spot & Margin Trading</strong></span></li>
+            <li><span class="bwiz-num">5</span><span>Optionally restrict to your IP address for security</span></li>
+            <li><span class="bwiz-num">6</span><span>Copy the <strong>API Key</strong> and <strong>Secret Key</strong> — secret shown once only!</span></li>
+          </ul>
+          <div class="bwiz-note">⚠ Never enable "Enable Withdrawals" — DALIOS only needs Spot Trading permission.</div>`,
+      },
+      {
+        title: 'Enter Your Credentials',
+        body: `
+          <div class="bwiz-field-row"><label class="bwiz-label">API KEY</label><input class="bwiz-input" id="bwizBinanceKey" placeholder="Binance API key" autocomplete="off"/></div>
+          <div class="bwiz-field-row"><label class="bwiz-label">API SECRET</label><input class="bwiz-input" type="password" id="bwizBinanceSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
+          <div class="bwiz-field-row"><label class="bwiz-label">MODE</label>
+            <select class="bwiz-select" id="bwizBinanceTestnet">
+              <option value="false">Live (Real Funds)</option>
+              <option value="true">Testnet (Free Test Funds)</option>
+            </select>
+          </div>`,
+        onConnect: () => {
+          const key = el('bwizBinanceKey')?.value?.trim();
+          const sec = el('bwizBinanceSecret')?.value?.trim();
+          const tn  = el('bwizBinanceTestnet')?.value === 'true';
+          if (!key || !sec) return null;
+          el('binanceKey').value = key;
+          el('binanceSecret').value = sec;
+          el('binanceTestnet').value = String(tn);
+          el('brokerSelect').value = 'binance';
+          onBrokerSelect('binance');
+          return { broker:'binance', api_key:key, api_secret:sec, testnet:tn };
+        },
+      },
+    ],
+  },
+
+  coinspot: {
+    label: 'COINSPOT',
+    color: '#00ff88',
+    steps: ['OVERVIEW', 'GET KEYS', 'CONNECT'],
+    pages: [
+      {
+        title: 'About CoinSpot',
+        body: `
+          <p class="bwiz-intro">CoinSpot is Australia's most popular crypto exchange, trading in AUD. DALIOS connects via the CoinSpot API v2 to buy and sell crypto directly from your AUD wallet.</p>
+          <div class="bwiz-note info">✓ AUD-denominated — no USD conversion needed<br>✓ 300+ coins including BTC, ETH, SOL, XRP<br>✓ Instant buy/sell at market rates<br>✓ Trusted by 2.5M+ Australians</div>
+          <ul class="bwiz-steps-list">
+            <li><span class="bwiz-num">1</span><span>Sign up or log in at <strong>coinspot.com.au</strong></span></li>
+            <li><span class="bwiz-num">2</span><span>Complete identity verification (required for trading)</span></li>
+            <li><span class="bwiz-num">3</span><span>Deposit AUD via PayID, BPAY, or bank transfer</span></li>
+          </ul>`,
+      },
+      {
+        title: 'Creating API Keys',
+        body: `
+          <ul class="bwiz-steps-list">
+            <li><span class="bwiz-num">1</span><span>Log in to coinspot.com.au</span></li>
+            <li><span class="bwiz-num">2</span><span>Click your name (top right) → <strong>My Account</strong></span></li>
+            <li><span class="bwiz-num">3</span><span>Go to <strong>API Keys</strong> in the left menu</span></li>
+            <li><span class="bwiz-num">4</span><span>Click <strong>Add New Key</strong> → enter a label like "DALIOS"</span></li>
+            <li><span class="bwiz-num">5</span><span>Enable: <strong>Read Access</strong> ✓ and <strong>Trade Access</strong> ✓</span></li>
+            <li><span class="bwiz-num">6</span><span>Click <strong>Save</strong> — copy both the <strong>Key</strong> and <strong>Secret</strong></span></li>
+          </ul>
+          <div class="bwiz-note">⚠ Do NOT enable "Withdraw" access — DALIOS only needs trade permissions.</div>`,
+      },
+      {
+        title: 'Enter Your Credentials',
+        body: `
+          <div class="bwiz-field-row"><label class="bwiz-label">API KEY</label><input class="bwiz-input" id="bwizCoinspotKey" placeholder="CoinSpot API key" autocomplete="off"/></div>
+          <div class="bwiz-field-row"><label class="bwiz-label">API SECRET</label><input class="bwiz-input" type="password" id="bwizCoinspotSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
+          <div class="bwiz-note info">DALIOS trades your CoinSpot AUD balance. Ensure you have AUD deposited before placing buy orders.</div>`,
+        onConnect: () => {
+          const key = el('bwizCoinspotKey')?.value?.trim();
+          const sec = el('bwizCoinspotSecret')?.value?.trim();
+          if (!key || !sec) return null;
+          el('coinspotKey').value = key;
+          el('coinspotSecret').value = sec;
+          el('brokerSelect').value = 'coinspot';
+          onBrokerSelect('coinspot');
+          return { broker:'coinspot', api_key:key, api_secret:sec };
+        },
+      },
+    ],
+  },
+
+  coinbase: {
+    label: 'COINBASE',
+    color: '#0052ff',
+    steps: ['OVERVIEW', 'GET KEYS', 'CONNECT'],
+    pages: [
+      {
+        title: 'About Coinbase Advanced Trade',
+        body: `
+          <p class="bwiz-intro">Coinbase is the leading US crypto exchange. DALIOS uses the Advanced Trade API (CDP keys), which is separate from the older Pro API.</p>
+          <div class="bwiz-note info">✓ Advanced Trade API — real-time order placement<br>✓ Supports spot market and limit orders<br>✓ USD-denominated trading pairs</div>
+          <ul class="bwiz-steps-list">
+            <li><span class="bwiz-num">1</span><span>Sign up or log in at <strong>coinbase.com</strong></span></li>
+            <li><span class="bwiz-num">2</span><span>Complete identity verification</span></li>
+            <li><span class="bwiz-num">3</span><span>You must use the <strong>Advanced Trade</strong> interface (not the basic Coinbase app)</span></li>
+          </ul>`,
+      },
+      {
+        title: 'Creating CDP API Keys',
+        body: `
+          <ul class="bwiz-steps-list">
+            <li><span class="bwiz-num">1</span><span>Log in → go to <strong>Settings → API</strong> (or visit developer.coinbase.com)</span></li>
+            <li><span class="bwiz-num">2</span><span>Click <strong>New API Key</strong> under <strong>Coinbase Developer Platform</strong></span></li>
+            <li><span class="bwiz-num">3</span><span>Select your portfolio → enable <strong>Trade</strong> permission</span></li>
+            <li><span class="bwiz-num">4</span><span>Copy the <strong>Key Name</strong> (format: organizations/.../apiKeys/...)</span></li>
+            <li><span class="bwiz-num">5</span><span>Copy the <strong>Private Key</strong> (EC format, begins with -----BEGIN EC PRIVATE KEY-----)</span></li>
+          </ul>
+          <div class="bwiz-note">⚠ These are CDP keys — different from the old Coinbase Pro API keys.</div>`,
+      },
+      {
+        title: 'Enter Your Credentials',
+        body: `
+          <div class="bwiz-field-row"><label class="bwiz-label">KEY NAME (organizations/…/apiKeys/…)</label><input class="bwiz-input" id="bwizCoinbaseKey" placeholder="organizations/xxx/apiKeys/xxx" autocomplete="off"/></div>
+          <div class="bwiz-field-row"><label class="bwiz-label">PRIVATE KEY (EC format)</label><textarea class="bwiz-input bwiz-textarea" id="bwizCoinbaseSecret" placeholder="-----BEGIN EC PRIVATE KEY-----&#10;...&#10;-----END EC PRIVATE KEY-----" autocomplete="off"></textarea></div>`,
+        onConnect: () => {
+          const key = el('bwizCoinbaseKey')?.value?.trim();
+          const sec = el('bwizCoinbaseSecret')?.value?.trim();
+          if (!key || !sec) return null;
+          el('coinbaseKey').value = key;
+          el('coinbaseSecret').value = sec;
+          el('brokerSelect').value = 'coinbase';
+          onBrokerSelect('coinbase');
+          return { broker:'coinbase', api_key:key, api_secret:sec };
+        },
+      },
+    ],
+  },
+};
+
+let _bwizBroker = null;
+let _bwizStep   = 0;
+
+function openBrokerWizard() {
+  const broker = el('brokerSelect')?.value;
+  if (!broker || !_BWIZ_CONFIG[broker]) return;
+  _bwizBroker = broker;
+  _bwizStep   = 0;
+  _renderBwiz();
+  el('bwizOverlay')?.classList.remove('hidden');
+}
+
+function closeBrokerWizard(e) {
+  if (e && e.target !== el('bwizOverlay')) return;
+  el('bwizOverlay')?.classList.add('hidden');
+  setEl('bwizResult', '');
+}
+
+function bwizBack() {
+  if (_bwizStep > 0) { _bwizStep--; _renderBwiz(); }
+  else closeBrokerWizard();
+}
+
+async function bwizNext() {
+  const cfg   = _BWIZ_CONFIG[_bwizBroker];
+  const pages = cfg.pages;
+  const isLast = _bwizStep === pages.length - 1;
+
+  if (isLast) {
+    // Attempt connection
+    const page = pages[_bwizStep];
+    const payload = page.onConnect ? page.onConnect() : null;
+    if (!payload) {
+      setEl('bwizResult', '<span style="color:var(--red)">⚠ Fill in all required fields</span>');
+      return;
+    }
+    const btn = el('bwizNextBtn');
+    if (btn) { btn.textContent = '⌛ CONNECTING...'; btn.disabled = true; }
+    setEl('bwizResult', '');
+    try {
+      const d = await postJSON('/api/broker/connect', payload);
+      el('bwizOverlay')?.classList.add('hidden');
+      pushAlert('BROKER', `${d.broker.toUpperCase()} connected`, 'info');
+      playOrderBeep();
+      await loadBrokerStatus();
+      await loadRealPortfolio();
+      const res = el('brokerConnectResult');
+      if (res) res.innerHTML = `<span style="color:var(--green)">✓ ${d.broker.toUpperCase()} connected via setup wizard</span>`;
+    } catch (e) {
+      setEl('bwizResult', `<span style="color:var(--red)">✗ ${e.message || 'Connection failed'}</span>`);
+    } finally {
+      if (btn) { btn.textContent = '▶ CONNECT'; btn.disabled = false; }
+    }
+  } else {
+    _bwizStep++;
+    _renderBwiz();
+  }
+}
+
+function _renderBwiz() {
+  const cfg   = _BWIZ_CONFIG[_bwizBroker];
+  if (!cfg) return;
+  const pages  = cfg.pages;
+  const page   = pages[_bwizStep];
+  const isLast = _bwizStep === pages.length - 1;
+
+  // Header broker tag
+  setEl('bwizBrokerTag', cfg.label);
+  const tag = el('bwizBrokerTag');
+  if (tag) tag.style.color = cfg.color;
+
+  // Step indicators
+  const stepsEl = el('bwizSteps');
+  if (stepsEl) {
+    stepsEl.innerHTML = cfg.steps.map((s, i) => `
+      <div class="bwiz-step ${i === _bwizStep ? 'active' : i < _bwizStep ? 'done' : ''}">
+        <span class="bwiz-step-num">${i < _bwizStep ? '✓' : i + 1}</span>${s}
+      </div>`).join('');
+  }
+
+  // Body
+  const bodyEl = el('bwizBody');
+  if (bodyEl) {
+    bodyEl.innerHTML = `<div class="bwiz-section-title">${page.title}</div>${page.body}`;
+  }
+
+  // Back button
+  const backBtn = el('bwizBackBtn');
+  if (backBtn) backBtn.textContent = _bwizStep === 0 ? '✕ CANCEL' : '← BACK';
+
+  // Next button
+  const nextBtn = el('bwizNextBtn');
+  if (nextBtn) {
+    nextBtn.textContent = isLast ? '▶ CONNECT NOW' : 'NEXT →';
+    nextBtn.className   = isLast ? 'bwiz-next connect' : 'bwiz-next';
+  }
+
+  setEl('bwizResult', '');
 }
 
 async function connectBroker() {
