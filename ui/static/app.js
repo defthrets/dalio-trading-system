@@ -448,6 +448,109 @@ function fmtSignalPrice(s) {
   return '$' + s.price.toFixed(s.price < 1 ? 4 : 2);
 }
 
+// ─── RSI Gauge SVG ────────────────────────────────────────
+function rsiGaugeSVG(rsi) {
+  const W = 80, H = 40, R = 30;
+  const cX = W / 2, cY = H;
+  const angle = Math.PI - (rsi / 100) * Math.PI; // left=0, right=100
+  const nX = cX + R * Math.cos(angle);
+  const nY = cY - R * Math.sin(angle);
+  const col = rsi < 30 ? 'var(--green)' : rsi > 70 ? 'var(--red)' : 'var(--cyan)';
+  return `<svg viewBox="0 0 ${W} ${H}" width="80" height="40" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:2px auto 0">
+    <path d="M ${cX-R} ${cY} A ${R} ${R} 0 0 1 ${cX+R} ${cY}" fill="none" stroke="#1a1a1a" stroke-width="5"/>
+    <path d="M ${cX-R} ${cY} A ${R} ${R} 0 0 1 ${cX} ${cY-R}" fill="none" stroke="var(--green)" stroke-width="3" opacity="0.3"/>
+    <path d="M ${cX-R*0.5} ${cY-R*0.87} A ${R} ${R} 0 0 1 ${cX+R*0.5} ${cY-R*0.87}" fill="none" stroke="var(--cyan)" stroke-width="3" opacity="0.3"/>
+    <path d="M ${cX} ${cY-R} A ${R} ${R} 0 0 1 ${cX+R} ${cY}" fill="none" stroke="var(--red)" stroke-width="3" opacity="0.3"/>
+    <line x1="${cX}" y1="${cY}" x2="${nX.toFixed(1)}" y2="${nY.toFixed(1)}" stroke="${col}" stroke-width="2"/>
+    <circle cx="${cX}" cy="${cY}" r="2" fill="${col}"/>
+    <text x="${cX}" y="${cY-4}" text-anchor="middle" fill="${col}" font-size="9" font-family="monospace">${rsi.toFixed(0)}</text>
+  </svg>`;
+}
+
+// ─── Multi-scenario prediction SVG (for justification panel) ──
+function scenarioPredictionSVG(s) {
+  const W = 320, H = 100;
+  const history = s.price_history;
+  if (!history || history.length < 2) return '<div style="color:var(--text-2);font-size:9px;text-align:center;padding:8px">No price data available</div>';
+
+  const curr = s.price || history[history.length - 1];
+  const tp   = s.take_profit ?? curr * 1.05;
+  const sl   = s.stop_loss ?? curr * 0.97;
+  const nProj = 10;
+
+  // Three scenarios
+  const bull = [], base = [], bear = [];
+  for (let i = 1; i <= nProj; i++) {
+    const t = i / nProj;
+    bull.push(curr + (tp - curr) * 1.2 * Math.sqrt(t));
+    base.push(curr + (tp - curr) * 0.7 * Math.sqrt(t));
+    bear.push(curr + (sl - curr) * 0.6 * Math.sqrt(t));
+  }
+
+  const allPts = [...history, ...bull, ...bear];
+  const lo = Math.min(sl * 0.99, ...allPts);
+  const hi = Math.max(tp * 1.01, ...allPts);
+  const range = hi - lo || 1;
+  const totalLen = history.length + nProj;
+
+  const xS = (i) => ((i / (totalLen - 1)) * W).toFixed(1);
+  const yS = (v) => (H - 6 - ((v - lo) / range) * (H - 12)).toFixed(1);
+
+  const histPts = history.map((v, i) => `${xS(i)},${yS(v)}`).join(' ');
+  const lastHX = +xS(history.length - 1);
+  const lastHY = +yS(curr);
+
+  const mkProj = (arr) => arr.map((v, i) => `${xS(history.length + i)},${yS(v)}`).join(' ');
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" xmlns="http://www.w3.org/2000/svg" style="display:block">
+    <rect x="0" y="0" width="${W}" height="${H}" fill="rgba(0,0,0,0.3)" rx="4"/>
+    <line x1="0" y1="${yS(tp)}" x2="${W}" y2="${yS(tp)}" stroke="rgba(0,204,68,0.2)" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="0" y1="${yS(sl)}" x2="${W}" y2="${yS(sl)}" stroke="rgba(255,34,34,0.2)" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="${lastHX}" y1="0" x2="${lastHX}" y2="${H}" stroke="rgba(255,140,0,0.15)" stroke-width="1" stroke-dasharray="2,4"/>
+    <polyline points="${histPts}" fill="none" stroke="#ff8c00" stroke-width="1.5" opacity="0.85"/>
+    <polyline points="${lastHX},${lastHY} ${mkProj(bull)}" fill="none" stroke="#00cc44" stroke-width="1.2" stroke-dasharray="4,3" opacity="0.7"/>
+    <polyline points="${lastHX},${lastHY} ${mkProj(base)}" fill="none" stroke="#00d4ff" stroke-width="1.2" stroke-dasharray="4,3" opacity="0.5"/>
+    <polyline points="${lastHX},${lastHY} ${mkProj(bear)}" fill="none" stroke="#ff2222" stroke-width="1.2" stroke-dasharray="4,3" opacity="0.5"/>
+    <circle cx="${lastHX}" cy="${lastHY}" r="3" fill="#ff8c00"/>
+    <text x="${W-4}" y="${+yS(tp)-3}" text-anchor="end" fill="#00cc44" font-size="7" font-family="monospace">BULL</text>
+    <text x="${W-4}" y="${+yS(curr)+3}" text-anchor="end" fill="#00d4ff" font-size="7" font-family="monospace">BASE</text>
+    <text x="${W-4}" y="${+yS(sl)+10}" text-anchor="end" fill="#ff2222" font-size="7" font-family="monospace">BEAR</text>
+    <text x="4" y="${+yS(tp)-3}" fill="rgba(0,204,68,0.5)" font-size="7" font-family="monospace">TP $${(+tp).toFixed(2)}</text>
+    <text x="4" y="${+yS(sl)+10}" fill="rgba(255,34,34,0.5)" font-size="7" font-family="monospace">SL $${(+sl).toFixed(2)}</text>
+    <text x="${lastHX}" y="8" text-anchor="middle" fill="rgba(255,140,0,0.4)" font-size="6" font-family="monospace">NOW</text>
+  </svg>`;
+}
+
+// ─── Momentum histogram SVG (for justification panel) ─────
+function momentumHistogramSVG(s) {
+  const history = s.price_history;
+  if (!history || history.length < 5) return '';
+
+  const W = 320, H = 50;
+  const changes = [];
+  for (let i = 1; i < history.length; i++) {
+    changes.push(((history[i] - history[i-1]) / history[i-1]) * 100);
+  }
+  const maxAbs = Math.max(...changes.map(Math.abs), 0.5);
+  const barW = (W / changes.length) * 0.8;
+  const gap = (W / changes.length) * 0.2;
+
+  const bars = changes.map((c, i) => {
+    const x = i * (barW + gap);
+    const h = (Math.abs(c) / maxAbs) * (H / 2 - 4);
+    const y = c >= 0 ? H / 2 - h : H / 2;
+    const col = c >= 0 ? 'rgba(0,204,68,0.6)' : 'rgba(255,34,34,0.6)';
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="${col}" rx="1"/>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" xmlns="http://www.w3.org/2000/svg" style="display:block">
+    <rect x="0" y="0" width="${W}" height="${H}" fill="rgba(0,0,0,0.3)" rx="4"/>
+    <line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+    ${bars}
+    <text x="4" y="10" fill="var(--text-2)" font-size="7" font-family="monospace">DAILY MOMENTUM %</text>
+  </svg>`;
+}
+
 // ─── Prediction sparkline SVG ─────────────────────────────
 function sparklineSVG(s) {
   const W = 200, H = 46;
@@ -545,7 +648,12 @@ function signalCardHTML(s) {
         <span title="Reward:Risk ratio — how much you gain vs risk">R:R <strong style="color:${rrColor}">${rrNum.toFixed(2)} ${rrLabel}</strong></span>
         <span title="Suggested portfolio weight">Size: <strong>${psPct}% of portfolio</strong></span>
       </div>
-      <span class="sc-fit ${s.quadrant_fit}">${s.quadrant_fit?.toUpperCase()} DALIO FIT</span>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+        <span class="sc-fit ${s.quadrant_fit}">${s.quadrant_fit?.toUpperCase()} DALIO FIT</span>
+        <div style="flex:1" title="RSI Gauge — Green zone=oversold(buy), Red zone=overbought(sell), Cyan=neutral">
+          ${rsiGaugeSVG(rsiVal)}
+        </div>
+      </div>
       ${s.options_strategy ? `<div style="font-size:9px;color:var(--cyan);margin-top:4px">⚙ Options: ${s.options_strategy}</div>` : ''}
       <div class="sc-prediction">
         <div class="sc-pred-header">
@@ -631,6 +739,7 @@ function renderOpportunities(opps, meta = {}) {
 function showJustification(s) {
   const j = s.dalio_justification || {};
   const qMeta = QUADRANT_META[j.quadrant] || {};
+  const rsiVal = s.rsi ?? 50;
   el('justContent').innerHTML = `
     <div class="just-grid">
       <div>
@@ -657,6 +766,35 @@ function showJustification(s) {
         <ul class="just-reasons">
           ${(j.reasons||['No reasons available']).map(r => `<li>${r}</li>`).join('')}
         </ul>
+      </div>
+    </div>
+    <div style="margin-top:12px;border-top:1px solid rgba(255,140,0,0.1);padding-top:10px">
+      <div class="just-section-title" style="margin-bottom:6px">▶ PRICE SCENARIOS — BULL / BASE / BEAR</div>
+      <div style="font-size:9px;color:var(--text-2);margin-bottom:6px">
+        Three projected paths based on current momentum. Green=bull case (above target), Cyan=base case, Red=bear case (hits stop-loss).
+      </div>
+      ${scenarioPredictionSVG(s)}
+    </div>
+    <div style="margin-top:10px;border-top:1px solid rgba(255,140,0,0.1);padding-top:10px">
+      <div class="just-section-title" style="margin-bottom:6px">▶ MOMENTUM PROFILE</div>
+      <div style="font-size:9px;color:var(--text-2);margin-bottom:6px">
+        Recent daily price changes. Consistent green bars = strong upward momentum. Mixed = choppy / uncertain.
+      </div>
+      ${momentumHistogramSVG(s)}
+    </div>
+    <div style="margin-top:10px;display:flex;gap:16px;align-items:center;border-top:1px solid rgba(255,140,0,0.1);padding-top:10px">
+      <div style="flex:0 0 100px">
+        <div class="just-section-title" style="margin-bottom:2px">▶ RSI GAUGE</div>
+        ${rsiGaugeSVG(rsiVal)}
+        <div style="font-size:8px;color:var(--text-2);text-align:center;margin-top:2px">
+          ${rsiVal < 30 ? 'OVERSOLD — potential bounce' : rsiVal > 70 ? 'OVERBOUGHT — potential pullback' : 'NEUTRAL RANGE'}
+        </div>
+      </div>
+      <div style="flex:1;font-size:9px;color:var(--text-2);line-height:1.5">
+        <strong style="color:var(--primary)">How to read:</strong> RSI measures speed of price changes (0-100).
+        Below 30 = oversold (often a buying opportunity).
+        Above 70 = overbought (may pull back).
+        30-70 = normal trading range.
       </div>
     </div>`;
 }
@@ -873,22 +1011,43 @@ function renderAllocTable(tickers, matrix) {
 
 // ─── Backtest ─────────────────────────────────────────────
 async function loadBacktest() {
+  const runBtn = document.querySelector('.panel--wf-chart .btn-ghost');
+  if (runBtn) { runBtn.textContent = '⟳ RUNNING…'; runBtn.disabled = true; }
   try {
+    // Lazy-init chart if not yet created (canvas hidden on first load)
+    if (!charts.wf) {
+      const wfctx = el('wfChart')?.getContext('2d');
+      if (wfctx) {
+        charts.wf = new Chart(wfctx, {
+          type: 'bar',
+          data: { labels: [], datasets: [{ label: 'Period Return %', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
+          options: { ...CHART_DEFAULTS, maintainAspectRatio: false, plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false } } },
+        });
+      }
+    }
     const d = await fetchJSON('/api/backtest/latest');
     STATE.backtest = d;
     applyBacktest(d);
-  } catch {}
+  } catch (e) {
+    console.error('Backtest load error:', e);
+    setEl('bt-totalRet', 'ERR');
+  } finally {
+    if (runBtn) { runBtn.textContent = '↻ RUN BACKTEST'; runBtn.disabled = false; }
+  }
 }
 
 function applyBacktest(d) {
-  setEl('bt-totalRet', (d.total_return_pct >= 0 ? '+' : '') + d.total_return_pct?.toFixed(1) + '%');
-  setEl('bt-sharpe',   d.sharpe_ratio?.toFixed(2) ?? '--');
-  setEl('bt-sortino',  d.sortino_ratio?.toFixed(2) ?? '--');
-  setEl('bt-calmar',   d.calmar_ratio?.toFixed(2) ?? '--');
-  setEl('bt-maxdd',    d.max_drawdown_pct?.toFixed(2) + '%' ?? '--');
-  setEl('bt-winrate',  d.win_rate_pct?.toFixed(1) + '%' ?? '--');
+  const fmt = (v, dec) => v != null ? (+v).toFixed(dec) : '--';
+  const pct = (v, dec) => v != null ? ((+v >= 0 ? '+' : '') + (+v).toFixed(dec) + '%') : '--';
+
+  setEl('bt-totalRet', pct(d.total_return_pct, 1));
+  setEl('bt-sharpe',   fmt(d.sharpe_ratio, 2));
+  setEl('bt-sortino',  fmt(d.sortino_ratio, 2));
+  setEl('bt-calmar',   fmt(d.calmar_ratio, 2));
+  setEl('bt-maxdd',    d.max_drawdown_pct != null ? (+d.max_drawdown_pct).toFixed(2) + '%' : '--');
+  setEl('bt-winrate',  d.win_rate_pct != null ? (+d.win_rate_pct).toFixed(1) + '%' : '--');
   setEl('bt-periods',  d.periods ?? '--');
-  setEl('bt-annRet',   (d.annualised_return_pct >= 0 ? '+' : '') + d.annualised_return_pct?.toFixed(1) + '%');
+  setEl('bt-annRet',   pct(d.annualised_return_pct, 1));
 
   const sortino = d.sortino_ratio ?? 0;
   const winRate = d.win_rate_pct ?? 0;
@@ -906,15 +1065,16 @@ function renderPeriodTable(periods) {
   const body = el('periodTableBody');
   if (!body) return;
   body.innerHTML = periods.map(p => {
-    const retClass = p.return_pct >= 0 ? 'td-green' : 'td-red';
+    const ret = p.return_pct ?? 0;
+    const retClass = ret >= 0 ? 'td-green' : 'td-red';
     return `<tr>
-      <td>${p.period}</td>
+      <td>${p.period ?? '--'}</td>
       <td>${p.train_start || '--'}</td>
-      <td class="${retClass}">${p.return_pct >= 0 ? '+' : ''}${p.return_pct.toFixed(2)}%</td>
-      <td class="td-cyan">${p.sharpe.toFixed(2)}</td>
-      <td class="td-red">${p.max_drawdown.toFixed(2)}%</td>
-      <td>${p.win_rate.toFixed(1)}%</td>
-      <td>${p.trades}</td>
+      <td class="${retClass}">${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%</td>
+      <td class="td-cyan">${(p.sharpe ?? 0).toFixed(2)}</td>
+      <td class="td-red">${(p.max_drawdown ?? 0).toFixed(2)}%</td>
+      <td>${(p.win_rate ?? 0).toFixed(1)}%</td>
+      <td>${p.trades ?? 0}</td>
     </tr>`;
   }).join('');
 }

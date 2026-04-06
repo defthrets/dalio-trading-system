@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260406m" />
+  <link rel="stylesheet" href="/static/style.css?v=20260406n" />
 </head>
 <body>
   <!-- Scanline overlay -->
@@ -123,7 +123,7 @@
       <span class="tab-icon">⚙</span> SETTINGS
     </button>
     <button class="tab-help-btn" id="helpBtn" title="Show tutorial for this page" onclick="openCurrentTutorial()">?</button>
-    <button class="search-nav-btn" onclick="openSearch()" title="Search all assets (Ctrl+K)">🔍 SEARCH 71 ASSETS <span style="opacity:0.5;font-size:11px;margin-left:4px">Ctrl+K</span></button>
+    <button class="search-nav-btn" onclick="openSearch()" title="Search all assets (Ctrl+K)">◎ SEARCH 71 ASSETS <span style="opacity:0.5;font-size:11px;margin-left:4px">Ctrl+K</span></button>
   </nav>
 
   <!-- ═══════════════════════════════════════════════
@@ -800,48 +800,54 @@
         <!-- Backtest Summary -->
         <div class="panel panel--bt-summary">
           <div class="panel-header">
-            <span class="panel-title">WALK-FORWARD OPTIMIZATION</span>
+            <span class="panel-title">STRATEGY PERFORMANCE SUMMARY</span>
             <span class="panel-tag">TRAIN: 12M  TEST: 3M</span>
+          </div>
+          <div class="bt-tab-desc" style="padding:8px 14px 0;font-size:11px;color:var(--text-2);line-height:1.5">
+            How well would this strategy have performed on historical data? These metrics show overall results across all test periods.
           </div>
           <div class="bt-summary-content">
             <div class="bt-stat-grid">
-              <div class="bt-stat">
+              <div class="bt-stat" title="Total profit/loss across all test periods combined">
                 <div class="bt-stat-val" id="bt-totalRet">--</div>
                 <div class="bt-stat-label">TOTAL RETURN</div>
               </div>
-              <div class="bt-stat">
+              <div class="bt-stat" title="Risk-adjusted return — higher is better, >1.5 is good">
                 <div class="bt-stat-val accent" id="bt-sharpe">--</div>
                 <div class="bt-stat-label">SHARPE RATIO</div>
               </div>
-              <div class="bt-stat">
+              <div class="bt-stat" title="Like Sharpe but only penalises downside volatility — higher is better">
                 <div class="bt-stat-val accent" id="bt-sortino">--</div>
                 <div class="bt-stat-label">SORTINO</div>
               </div>
-              <div class="bt-stat">
+              <div class="bt-stat" title="Return divided by worst drawdown — higher means better recovery">
                 <div class="bt-stat-val accent" id="bt-calmar">--</div>
                 <div class="bt-stat-label">CALMAR</div>
               </div>
-              <div class="bt-stat">
+              <div class="bt-stat" title="Largest peak-to-trough loss — the worst dip you would have experienced">
                 <div class="bt-stat-val danger" id="bt-maxdd">--</div>
                 <div class="bt-stat-label">MAX DRAWDOWN</div>
               </div>
-              <div class="bt-stat">
+              <div class="bt-stat" title="Percentage of trades that were profitable — >55% shows a statistical edge">
                 <div class="bt-stat-val" id="bt-winrate">--</div>
                 <div class="bt-stat-label">WIN RATE</div>
               </div>
-              <div class="bt-stat">
+              <div class="bt-stat" title="Number of independent test windows used in the backtest">
                 <div class="bt-stat-val" id="bt-periods">--</div>
                 <div class="bt-stat-label">PERIODS</div>
               </div>
-              <div class="bt-stat">
+              <div class="bt-stat" title="Projected yearly return based on the backtest results">
                 <div class="bt-stat-val" id="bt-annRet">--</div>
                 <div class="bt-stat-label">ANN. RETURN</div>
               </div>
             </div>
             <div class="bt-method-note">
               <span class="method-icon">◈</span>
-              <strong>Walk-Forward Backtesting:</strong> The strategy is trained on 12 months of data, then tested on the following 3 months it has never seen. This repeats across 8 windows to prevent overfitting.<br><br>
-              <strong>Sharpe &gt;1.5</strong> = acceptable | <strong>Max DD &lt;10%</strong> = within circuit breaker | <strong>Win Rate &gt;55%</strong> = statistical edge
+              <strong>How it works:</strong> The AI trains on 12 months of market data, then trades the next 3 months it has never seen. This repeats across 8 windows so results reflect real-world performance, not overfitting.<br><br>
+              <span style="color:var(--green)">GREEN = good</span> &nbsp;|&nbsp;
+              <strong>Sharpe &gt;1.5</strong> = solid risk/reward &nbsp;|&nbsp;
+              <strong>Max DD &lt;10%</strong> = safe drawdown &nbsp;|&nbsp;
+              <strong>Win Rate &gt;55%</strong> = statistical edge
             </div>
           </div>
         </div>
@@ -849,8 +855,11 @@
         <!-- Walk-Forward Period Chart -->
         <div class="panel panel--wf-chart">
           <div class="panel-header">
-            <span class="panel-title">WALK-FORWARD PERIOD RETURNS</span>
+            <span class="panel-title">PERIOD-BY-PERIOD RETURNS</span>
             <button class="btn-ghost btn--sm" onclick="loadBacktest()">↻ RUN BACKTEST</button>
+          </div>
+          <div style="padding:4px 14px 0;font-size:11px;color:var(--text-2)">
+            Each bar is one 3-month test window. Green = profitable, red = loss. Consistent green bars = reliable strategy.
           </div>
           <div class="chart-container">
             <canvas id="wfChart"></canvas>
@@ -860,18 +869,21 @@
         <!-- Period Table -->
         <div class="panel panel--period-table">
           <div class="panel-header">
-            <span class="panel-title">PERIOD BREAKDOWN</span>
+            <span class="panel-title">DETAILED PERIOD BREAKDOWN</span>
+          </div>
+          <div style="padding:4px 14px 0;font-size:11px;color:var(--text-2)">
+            Drill into each test window to see individual performance. Look for consistency across periods.
           </div>
           <table class="data-table" id="periodTable">
             <thead>
               <tr>
-                <th>PERIOD</th>
-                <th>TRAIN</th>
-                <th>RETURN</th>
-                <th>SHARPE</th>
-                <th>MAX DD</th>
-                <th>WIN%</th>
-                <th>TRADES</th>
+                <th title="Test window number">PERIOD</th>
+                <th title="When the training data started">TRAIN</th>
+                <th title="Profit/loss for this test window">RETURN</th>
+                <th title="Risk-adjusted return for this period">SHARPE</th>
+                <th title="Worst dip during this period">MAX DD</th>
+                <th title="% of trades that were profitable">WIN%</th>
+                <th title="Number of trades executed">TRADES</th>
               </tr>
             </thead>
             <tbody id="periodTableBody"></tbody>
@@ -2184,7 +2196,7 @@
        STATUS BAR
   ═══════════════════════════════════════════════ -->
 
-  <script src="/static/app.js?v=20260406m"></script>
+  <script src="/static/app.js?v=20260406n"></script>
 
   <!-- ═══════════════════════════════════════════════
        SPEECH BUBBLE SPOTLIGHT TOOLTIP
@@ -2211,7 +2223,7 @@
   <div id="searchModal" class="search-modal hidden" role="dialog" aria-label="Asset Search" aria-hidden="true">
     <div class="search-box">
       <div class="search-header">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon">◎</span>
         <input type="text" id="searchInput" placeholder="Search ASX, crypto, commodities..." oninput="onSearchInput(this.value)" autocomplete="off" spellcheck="false"/>
         <span class="search-kbd">ESC</span>
         <button class="search-close-btn" onclick="closeSearch()">✕</button>
