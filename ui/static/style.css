@@ -2156,7 +2156,7 @@ canvas { display: block; max-width: 100%; }
   display: flex; align-items: center; justify-content: center;
 }
 .welcome-mascot {
-  width: 160px;
+  width: 320px;
   height: auto;
   filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
   animation: mascotBounce 2s ease-in-out infinite;
@@ -2240,24 +2240,25 @@ canvas { display: block; max-width: 100%; }
 }
 .spot-bubble.hidden { display: none; }
 
-/* Mascot alongside bubble */
+/* Mascot behind bubble */
 .spot-mascot {
   position: absolute;
-  width: 400px;
+  width: 800px;
   height: auto;
-  bottom: -40px;
+  bottom: -120px;
   pointer-events: none;
   filter: drop-shadow(0 3px 10px rgba(0,0,0,0.6));
   transition: transform 0.3s ease;
-  z-index: 1;
+  z-index: -1;
+  opacity: 0.45;
 }
 .spot-mascot.mascot-left {
-  right: calc(100% + 6px);
+  right: 20px;
   left: auto;
   transform: scaleX(1);
 }
 .spot-mascot.mascot-right {
-  left: calc(100% + 6px);
+  left: 20px;
   right: auto;
   transform: scaleX(-1);
 }

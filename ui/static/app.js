@@ -2000,9 +2000,18 @@ function toggleTutorials(btn) {
 
 function resetAllTutorials() {
   Object.keys(localStorage).filter(k => k.startsWith('dalios_spot_')).forEach(k => localStorage.removeItem(k));
+  localStorage.removeItem('dalios_welcome_done');
+  localStorage.removeItem('dalios_welcome_never');
   _saveSetting('tutorials_off', false);
   const btn = el('settTutorialBtn'); if (btn) { btn.textContent = 'ON'; btn.classList.add('on'); }
-  pushAlert('SETTINGS', 'All tutorials reset — they will show again on next tab visit', 'info');
+  // Show the G'DAY welcome overlay
+  const overlay = el('welcomeOverlay');
+  if (overlay) {
+    overlay.classList.remove('hidden');
+    const neverCb = el('welcomeNeverAgain');
+    if (neverCb) neverCb.checked = false;
+  }
+  pushAlert('SETTINGS', 'All tutorials reset — starting from the beginning', 'info');
 }
 
 // Patch showTutorial to respect the setting
@@ -5564,10 +5573,13 @@ function restartGuidedTour() {
   localStorage.removeItem('dalios_welcome_done');
   localStorage.removeItem('dalios_welcome_never');
 
-  // Switch to command center and start
-  _guidedMode = true;
-  const ccBtn = document.querySelector('[data-tab="command-center"]');
-  if (ccBtn) ccBtn.click();
-  setTimeout(() => showTutorial('command-center', true), 400);
-  pushAlert('TUTORIAL', 'Guided tour restarted', 'info');
+  // Show the welcome G'DAY overlay first
+  const overlay = el('welcomeOverlay');
+  if (overlay) {
+    overlay.classList.remove('hidden');
+    // Uncheck the "don't show again" checkbox
+    const neverCb = el('welcomeNeverAgain');
+    if (neverCb) neverCb.checked = false;
+  }
+  pushAlert('TUTORIAL', 'Guided tour restarted from the beginning', 'info');
 }
