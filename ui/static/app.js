@@ -902,6 +902,61 @@ function applySentiment(d) {
   const domStats = d.quadrant_sentiment?.[dom] || {};
   setEl('bullishPct',  (domStats.bullish_pct ?? '--') + '%');
   setEl('bearishPct',  domStats.bullish_pct !== undefined ? (100 - domStats.bullish_pct).toFixed(1) + '%' : '--');
+
+  // ── Update Intel Overview on Command Center ──
+  updateIntelOverview(d, dom, domMeta, domStats);
+}
+
+function updateIntelOverview(d, dom, domMeta, domStats) {
+  // Geo risk
+  const geoScore = d.conflict_risk_articles ?? '--';
+  const geoElevated = d.conflict_risk_elevated;
+  setEl('intelOvGeoScore', geoScore);
+  const geoRing = el('intelOvGeoRing');
+  if (geoRing) {
+    geoRing.className = 'intel-ov-ring' + (geoElevated ? ' danger' : '');
+  }
+  setEl('intelOvGeoStatus', geoElevated ? '⚠ RISK ELEVATED' : '■ NOMINAL');
+
+  // Sentiment
+  const totalArts = d.total_articles || 0;
+  const bullPct = domStats.bullish_pct;
+  const sentLabel = bullPct !== undefined
+    ? (bullPct > 60 ? 'BULLISH' : bullPct < 40 ? 'BEARISH' : 'NEUTRAL')
+    : '--';
+  const sentEl = el('intelOvSentiment');
+  if (sentEl) {
+    sentEl.textContent = sentLabel;
+    sentEl.className = 'intel-ov-val' + (sentLabel === 'BEARISH' ? ' danger' : sentLabel === 'NEUTRAL' ? ' neutral' : '');
+  }
+  setEl('intelOvSentSub', `${totalArts} articles analysed`);
+
+  // News quadrant signal
+  const qLabel = (domMeta.label || dom || '--').replace(/_/g, ' ').toUpperCase();
+  const qEl = el('intelOvQuadrant');
+  if (qEl) {
+    qEl.textContent = qLabel;
+    if (domMeta.color) qEl.style.color = domMeta.color;
+  }
+  const bPct = bullPct !== undefined ? bullPct.toFixed(0) : '--';
+  const brPct = bullPct !== undefined ? (100 - bullPct).toFixed(0) : '--';
+  setEl('intelOvQuadSub', `Bullish ${bPct}% · Bearish ${brPct}%`);
+
+  // Latest headlines (top 3)
+  const hlEl = el('intelOvHeadlines');
+  if (hlEl) {
+    const arts = (d.top_headlines || []).slice(0, 3);
+    if (arts.length === 0) {
+      hlEl.innerHTML = '<div style="color:var(--text-muted)">No headlines</div>';
+    } else {
+      hlEl.innerHTML = arts.map(a => {
+        const sentColor = a.sentiment === 'positive' ? 'var(--green)' : a.sentiment === 'negative' ? 'var(--red)' : 'var(--text-muted)';
+        const dot = `<span style="color:${sentColor}">●</span>`;
+        const title = (a.title || '').length > 50 ? a.title.substring(0, 50) + '…' : (a.title || '--');
+        return `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${dot} ${title}</div>`;
+      }).join('');
+    }
+  }
 }
 
 function filterNewsArticles() {

@@ -285,7 +285,53 @@
           </div>
         </div>
 
-        <!-- ROW 2 COL 3: Quadrant -->
+        <!-- ROW 2 COL 3: Intel Center Overview -->
+        <div class="panel panel--cc-intel-overview">
+          <div class="panel-header">
+            <span class="panel-title">◈ INTEL OVERVIEW</span>
+            <span class="pulse-dot" id="intelOvPulse"></span>
+          </div>
+          <div class="intel-ov-body">
+            <!-- Geopolitical Risk -->
+            <div class="intel-ov-row">
+              <div class="intel-ov-ring" id="intelOvGeoRing">
+                <span class="intel-ov-val" id="intelOvGeoScore" style="font-size:13px">--</span>
+              </div>
+              <div class="intel-ov-info">
+                <div class="intel-ov-label">GEOPOLITICAL RISK</div>
+                <div class="intel-ov-sub" id="intelOvGeoStatus">Scanning...</div>
+              </div>
+            </div>
+            <!-- Sentiment -->
+            <div class="intel-ov-row">
+              <div class="intel-ov-icon">📊</div>
+              <div class="intel-ov-info">
+                <div class="intel-ov-label">MARKET SENTIMENT</div>
+                <div class="intel-ov-val" id="intelOvSentiment">--</div>
+                <div class="intel-ov-sub" id="intelOvSentSub">-- articles analysed</div>
+              </div>
+            </div>
+            <!-- News Quadrant Signal -->
+            <div class="intel-ov-row">
+              <div class="intel-ov-icon">◎</div>
+              <div class="intel-ov-info">
+                <div class="intel-ov-label">NEWS QUADRANT SIGNAL</div>
+                <div class="intel-ov-val" id="intelOvQuadrant">--</div>
+                <div class="intel-ov-sub" id="intelOvQuadSub">Bullish --% · Bearish --%</div>
+              </div>
+            </div>
+            <!-- Latest Headlines -->
+            <div class="intel-ov-row" style="flex-direction:column;align-items:stretch;gap:3px">
+              <div class="intel-ov-label">LATEST HEADLINES</div>
+              <div id="intelOvHeadlines" style="font-size:10px;color:var(--text-2);line-height:1.5">
+                <div style="color:var(--text-muted)">Loading...</div>
+              </div>
+            </div>
+          </div>
+          <div class="intel-ov-link" onclick="document.querySelector('[data-tab=intel-center]').click()">VIEW FULL INTEL CENTER →</div>
+        </div>
+
+        <!-- ROW 2 COL 4: Quadrant (compact) -->
         <div class="panel panel--cc-quadrant" id="quadrantPanel">
           <div class="panel-header">
             <span class="panel-title">ECONOMIC QUADRANT</span>
