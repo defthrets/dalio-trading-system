@@ -410,7 +410,7 @@ function renderSignalGrid(signals) {
     return;
   }
 
-  el('signalGrid').innerHTML = filtered.map(s => signalCardHTML(s)).join('');
+  el('signalGrid').innerHTML = filtered.map(s => { try { return signalCardHTML(s); } catch(e) { return `<div class="signal-card" style="padding:14px;color:var(--red)">Error rendering ${s.ticker}: ${e.message}</div>`; } }).join('');
 
   // Check for strong signals (fires fixed banner + in-page bar)
   checkStrongSignals(filtered);
@@ -505,8 +505,9 @@ function sellDateStr(days) {
 }
 
 function signalCardHTML(s) {
-  const confPct   = Math.min(s.confidence, 100);
-  const confColor = s.confidence >= 80 ? 'var(--green)' : s.confidence >= 65 ? 'var(--amber)' : 'var(--red)';
+  const conf      = s.confidence ?? 0;
+  const confPct   = Math.min(conf, 100);
+  const confColor = conf >= 80 ? 'var(--green)' : conf >= 65 ? 'var(--amber)' : 'var(--red)';
   const overview  = s.dalio_justification?.ai_overview ?? '';
   const srcBadge  = s.data_source === 'LIVE'
     ? `<span style="font-size:8px;color:var(--green);letter-spacing:1px">● LIVE</span>`
@@ -514,6 +515,8 @@ function signalCardHTML(s) {
   const rrNum     = s.rr_ratio ?? 0;
   const rrLabel   = rrNum >= 2.5 ? '★ EXCELLENT' : rrNum >= 1.5 ? '✓ GOOD' : '⚠ LOW';
   const rrColor   = rrNum >= 2.5 ? 'var(--green)' : rrNum >= 1.5 ? 'var(--amber)' : 'var(--red)';
+  const rsiVal    = s.rsi ?? 50;
+  const psPct     = s.position_size_pct ?? 0;
 
   return `
     <div class="signal-card ${s.action}" data-ticker="${s.ticker}">
@@ -527,20 +530,20 @@ function signalCardHTML(s) {
         &nbsp;<span style="color:var(--text-2);font-size:9px">entry price</span>
       </div>
       <div class="sc-price" style="margin-top:2px">
-        <span style="color:var(--red);font-size:9px">⬇ Stop Loss ${s.stop_loss ? '$'+s.stop_loss.toFixed(2) : '--'}</span>
+        <span style="color:var(--red);font-size:9px">⬇ Stop Loss ${s.stop_loss != null ? '$'+(+s.stop_loss).toFixed(2) : '--'}</span>
         &nbsp;&nbsp;
-        <span style="color:var(--green);font-size:9px">⬆ Take Profit ${s.take_profit ? '$'+s.take_profit.toFixed(2) : '--'}</span>
+        <span style="color:var(--green);font-size:9px">⬆ Take Profit ${s.take_profit != null ? '$'+(+s.take_profit).toFixed(2) : '--'}</span>
       </div>
       <div class="sc-conf" style="margin-top:6px">
         <span class="sc-conf-label">CONFIDENCE</span>
         <div class="sc-conf-bar"><div class="sc-conf-fill" style="width:${confPct}%;background:${confColor}"></div></div>
-        <span class="sc-conf-val" style="color:${confColor}">${s.confidence.toFixed(1)}%</span>
+        <span class="sc-conf-val" style="color:${confColor}">${conf.toFixed(1)}%</span>
       </div>
       <div class="sc-meta" style="margin-top:5px">
-        <span title="Relative Strength Index — measures overbought/oversold">RSI: <strong>${rsiLabel(s.rsi ?? 50)}</strong></span>
+        <span title="Relative Strength Index — measures overbought/oversold">RSI: <strong>${rsiLabel(rsiVal)}</strong></span>
         <span title="Trend direction vs 20-day average">Trend: <strong>${trendLabel(s.trend)}</strong></span>
         <span title="Reward:Risk ratio — how much you gain vs risk">R:R <strong style="color:${rrColor}">${rrNum.toFixed(2)} ${rrLabel}</strong></span>
-        <span title="Suggested portfolio weight">Size: <strong>${s.position_size_pct}% of portfolio</strong></span>
+        <span title="Suggested portfolio weight">Size: <strong>${psPct}% of portfolio</strong></span>
       </div>
       <span class="sc-fit ${s.quadrant_fit}">${s.quadrant_fit?.toUpperCase()} DALIO FIT</span>
       ${s.options_strategy ? `<div style="font-size:9px;color:var(--cyan);margin-top:4px">⚙ Options: ${s.options_strategy}</div>` : ''}
@@ -551,9 +554,9 @@ function signalCardHTML(s) {
         </div>
         ${sparklineSVG(s)}
         <div class="sc-pred-levels">
-          <span style="color:var(--red)">SL $${s.stop_loss?.toFixed(2) ?? '--'}</span>
+          <span style="color:var(--red)">SL $${s.stop_loss != null ? (+s.stop_loss).toFixed(2) : '--'}</span>
           <span style="color:var(--text-2)">NOW $${fmtSignalPrice(s).replace('$','')}</span>
-          <span style="color:var(--green)">TP $${s.take_profit?.toFixed(2) ?? '--'}</span>
+          <span style="color:var(--green)">TP $${s.take_profit != null ? (+s.take_profit).toFixed(2) : '--'}</span>
         </div>
       </div>
       ${overview ? `<div class="sc-ai-overview"><span class="sc-ai-label">◈ AI ANALYSIS</span>${overview}</div>` : ''}
