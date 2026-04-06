@@ -1116,9 +1116,8 @@ function renderTickerStrip(items) {
   function fmtPrice(item) {
     const p = item.price;
     if (p === null || p === undefined) return '---';
-    // Crypto: show 2 decimals; indices: commas; fx: 4 decimals
     if (item.category === 'crypto' && p > 1000) return '$' + p.toLocaleString('en-US', { maximumFractionDigits: 0 });
-    if (item.category === 'crypto') return '$' + p.toFixed(4);
+    if (item.category === 'crypto') return '$' + p.toFixed(p < 1 ? 4 : 2);
     if (item.category === 'fx') return p.toFixed(4);
     if (item.category === 'index') return p.toLocaleString('en-US', { maximumFractionDigits: 0 });
     return '$' + p.toFixed(2);
@@ -1144,10 +1143,14 @@ function renderTickerStrip(items) {
   // Duplicate content for seamless infinite loop.
   // Animation goes 0 → -50% (first copy scrolls away, second copy takes its place).
   inner.innerHTML = html + html;   // two identical copies side-by-side
-  // Reset animation cleanly
+
+  // Calculate duration based on content width for consistent scroll speed (~60px/s)
   inner.style.animation = 'none';
-  void inner.offsetWidth;          // force reflow so reset registers
-  inner.style.animation = '';      // re-enable ticker-scroll from CSS
+  void inner.offsetWidth;
+  const halfWidth = inner.scrollWidth / 2;
+  const pxPerSec = 60;
+  const duration = Math.max(30, halfWidth / pxPerSec);
+  inner.style.animation = `ticker-scroll ${duration.toFixed(1)}s linear infinite`;
 }
 
 function pushAlert(type, message, level = 'info') {

@@ -422,7 +422,7 @@ a:hover { color: var(--primary); text-decoration: underline; }
   height: 100%;
   gap: 0;
   will-change: transform;
-  animation: ticker-scroll 55s linear infinite;
+  animation: ticker-scroll 90s linear infinite;   /* fallback; JS overrides with content-aware duration */
 }
 .ticker-strip:hover .ticker-inner { animation-play-state: paused; }
 
