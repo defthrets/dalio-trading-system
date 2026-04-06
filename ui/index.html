@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260406d" />
+  <link rel="stylesheet" href="/static/style.css?v=20260406e" />
 </head>
 <body>
   <!-- Scanline overlay -->
@@ -124,7 +124,7 @@
       <span class="tab-icon">⚙</span> SETTINGS
     </button>
     <button class="tab-help-btn" id="helpBtn" title="Show tutorial for this page" onclick="openCurrentTutorial()">?</button>
-    <button class="search-nav-btn" onclick="openSearch()" title="Search all assets (Ctrl+K)">🔍 SEARCH 71 ASSETS <span style="opacity:0.5;font-size:8px;margin-left:4px">Ctrl+K</span></button>
+    <button class="search-nav-btn" onclick="openSearch()" title="Search all assets (Ctrl+K)">🔍 SEARCH 71 ASSETS <span style="opacity:0.5;font-size:11px;margin-left:4px">Ctrl+K</span></button>
   </nav>
 
   <!-- ═══════════════════════════════════════════════
@@ -188,7 +188,7 @@
             <div class="cc-sb-divider"></div>
             <div class="cc-sb-stat">
               <div class="cc-sb-label">REGIME</div>
-              <div class="cc-sb-val acc" id="ccRegimeBadge" style="font-size:8px">--</div>
+              <div class="cc-sb-val acc" id="ccRegimeBadge" style="font-size:11px">--</div>
             </div>
           </div>
         </div>
@@ -225,7 +225,7 @@
               <span class="po-cash-val" id="ccQtCash">$--</span>
             </div>
             <button class="btn-primary btn--full" onclick="ccQtSubmit()" style="margin-top:8px">▶ EXECUTE TRADE</button>
-            <div id="ccQtResult" style="margin-top:6px;font-size:9px"></div>
+            <div id="ccQtResult" style="margin-top:6px;font-size:11px"></div>
           </div>
         </div>
 
@@ -292,7 +292,7 @@
             <button class="btn-ghost btn--sm" onclick="loadCcRecommendations()" style="margin-left:auto">↻ ANALYSE</button>
           </div>
           <div class="cc-recs-list" id="ccRecsList">
-            <div style="padding:14px;color:var(--text-muted);font-size:10px">Click ANALYSE to generate AI trade recommendations…</div>
+            <div style="padding:14px;color:var(--text-muted);font-size:11px">Click ANALYSE to generate AI trade recommendations…</div>
           </div>
         </div>
 
@@ -548,14 +548,14 @@
           </div>
           <div class="news-filter-bar">
             <label class="news-filter-label">SHOW:</label>
-            <select class="ctrl-select" id="newsTimeFilter" onchange="filterNewsArticles()" style="font-size:9px;padding:2px 6px">
+            <select class="ctrl-select" id="newsTimeFilter" onchange="filterNewsArticles()" style="font-size:11px;padding:2px 6px">
               <option value="24">Last 24 hours</option>
               <option value="48">Last 48 hours</option>
               <option value="168">Last 7 days</option>
               <option value="0">All available</option>
             </select>
             <label class="news-filter-label" style="margin-left:8px">SENTIMENT:</label>
-            <select class="ctrl-select" id="newsSentFilter" onchange="filterNewsArticles()" style="font-size:9px;padding:2px 6px">
+            <select class="ctrl-select" id="newsSentFilter" onchange="filterNewsArticles()" style="font-size:11px;padding:2px 6px">
               <option value="ALL">ALL</option>
               <option value="positive">BULLISH</option>
               <option value="negative">BEARISH</option>
@@ -645,7 +645,7 @@
         <div class="panel panel--heatmap">
           <div class="panel-header">
             <span class="panel-title">CORRELATION MATRIX — ASX UNIVERSE</span>
-            <span id="corrDataSource" style="font-size:9px;letter-spacing:1px;font-family:var(--font-mono)">● LOADING</span>
+            <span id="corrDataSource" style="font-size:11px;letter-spacing:1px;font-family:var(--font-mono)">● LOADING</span>
             <button class="btn-ghost btn--sm" onclick="loadCorrelation()">↻ REFRESH</button>
           </div>
           <div class="heatmap-wrap" id="heatmapWrap">
@@ -1100,7 +1100,7 @@
 
           <!-- Open Positions table -->
           <div class="panel-header" style="margin-top:12px;border-top:1px solid var(--border)">
-            <span class="panel-title" style="font-size:9px">OPEN POSITIONS</span>
+            <span class="panel-title" style="font-size:11px">OPEN POSITIONS</span>
             <button class="btn-ghost btn--sm" onclick="loadPaperPortfolio()">↻ REFRESH</button>
           </div>
           <div class="paper-positions-wrap">
@@ -1127,7 +1127,7 @@
             <button class="btn-ghost btn--sm" onclick="loadPaperSignals()">↻ REFRESH</button>
           </div>
           <div class="paper-signal-grid" id="paperSignalList">
-            <div style="padding:14px;color:var(--text-muted);font-size:10px">Loading signals...</div>
+            <div style="padding:14px;color:var(--text-muted);font-size:11px">Loading signals...</div>
           </div>
         </div>
 
@@ -1263,7 +1263,7 @@
               </div>
               <div class="po-row">
                 <label class="po-label">PRIVATE KEY</label>
-                <textarea id="coinbaseSecret" class="po-input" rows="3" placeholder="-----BEGIN EC PRIVATE KEY-----&#10;..." style="resize:vertical;font-size:9px;" autocomplete="off"></textarea>
+                <textarea id="coinbaseSecret" class="po-input" rows="3" placeholder="-----BEGIN EC PRIVATE KEY-----&#10;..." style="resize:vertical;font-size:11px;" autocomplete="off"></textarea>
               </div>
               <div class="broker-hint">
                 Use <strong>Coinbase Advanced Trade API</strong> (CDP keys). Generate at<br>
@@ -1375,7 +1375,7 @@
 
           <!-- Positions table -->
           <div class="panel-header" style="margin-top:12px;border-top:1px solid var(--border)">
-            <span class="panel-title" style="font-size:9px">OPEN POSITIONS</span>
+            <span class="panel-title" style="font-size:11px">OPEN POSITIONS</span>
           </div>
           <div class="paper-positions-wrap">
             <table class="data-table">
@@ -1447,7 +1447,7 @@
             <div class="broker-card featured" data-broker="coinspot">
               <div class="broker-logo api-glow">CS</div>
               <div class="broker-info">
-                <div class="broker-name">CoinSpot <span class="btag api-tag" style="font-size:9px">FULL API</span></div>
+                <div class="broker-name">CoinSpot <span class="btag api-tag" style="font-size:11px">FULL API</span></div>
                 <div class="broker-desc">Australia's most popular crypto exchange. 300+ coins. AUD deposits. AUSTRAC registered.</div>
                 <div class="broker-tags"><span class="btag">300+ Coins</span><span class="btag">AUD</span><span class="btag api-tag">API</span></div>
               </div>
@@ -1473,7 +1473,7 @@
             <div class="broker-card featured" data-broker="selfwealth">
               <div class="broker-logo api-glow">SW</div>
               <div class="broker-info">
-                <div class="broker-name">SelfWealth <span class="btag api-tag" style="font-size:9px">API</span></div>
+                <div class="broker-name">SelfWealth <span class="btag api-tag" style="font-size:11px">API</span></div>
                 <div class="broker-desc">Flat $9.50/trade. ASX & US markets. Has REST API.</div>
                 <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span><span class="btag api-tag">API</span></div>
               </div>
@@ -1534,7 +1534,7 @@
             <div class="broker-card featured" data-broker="ig">
               <div class="broker-logo api-glow">IG</div>
               <div class="broker-info">
-                <div class="broker-name">IG Markets AU <span class="btag api-tag" style="font-size:9px">API</span></div>
+                <div class="broker-name">IG Markets AU <span class="btag api-tag" style="font-size:11px">API</span></div>
                 <div class="broker-desc">CFDs, FX, indices, options. Shorting supported. Has REST API.</div>
                 <div class="broker-tags"><span class="btag">CFD</span><span class="btag">FX</span><span class="btag api-tag">API</span></div>
               </div>
@@ -1560,7 +1560,7 @@
             <div class="broker-card featured" data-broker="cmc">
               <div class="broker-logo api-glow">CMC</div>
               <div class="broker-info">
-                <div class="broker-name">CMC Markets <span class="btag api-tag" style="font-size:9px">API</span></div>
+                <div class="broker-name">CMC Markets <span class="btag api-tag" style="font-size:11px">API</span></div>
                 <div class="broker-desc">Stockbroking & CFDs. $0 on ETFs. Has trading API.</div>
                 <div class="broker-tags"><span class="btag">ASX</span><span class="btag">CFD</span><span class="btag api-tag">API</span></div>
               </div>
@@ -1602,7 +1602,7 @@
             <div class="broker-card" data-broker="ibkr">
               <div class="broker-logo api-glow">IB</div>
               <div class="broker-info">
-                <div class="broker-name">Interactive Brokers <span class="btag api-tag" style="font-size:9px">API</span></div>
+                <div class="broker-name">Interactive Brokers <span class="btag api-tag" style="font-size:11px">API</span></div>
                 <div class="broker-desc">Professional-grade. Stocks, options, futures, FX, bonds. TWS & REST API. ASX access available.</div>
                 <div class="broker-tags"><span class="btag">Global</span><span class="btag">Options</span><span class="btag api-tag">API</span></div>
               </div>
@@ -1629,7 +1629,7 @@
             <div class="broker-card featured" data-broker="schwab">
               <div class="broker-logo api-glow">SCH</div>
               <div class="broker-info">
-                <div class="broker-name">Charles Schwab <span class="btag api-tag" style="font-size:9px">API</span></div>
+                <div class="broker-name">Charles Schwab <span class="btag api-tag" style="font-size:11px">API</span></div>
                 <div class="broker-desc">$0 commissions. Stocks, ETFs, options, futures. Schwab API (thinkorswim).</div>
                 <div class="broker-tags"><span class="btag">US</span><span class="btag">Options</span><span class="btag api-tag">API</span></div>
               </div>
@@ -1678,7 +1678,7 @@
             <div class="broker-card featured" data-broker="alpaca">
               <div class="broker-logo api-glow">ALP</div>
               <div class="broker-info">
-                <div class="broker-name">Alpaca <span class="btag api-tag" style="font-size:9px">FULL API</span></div>
+                <div class="broker-name">Alpaca <span class="btag api-tag" style="font-size:11px">FULL API</span></div>
                 <div class="broker-desc">Commission-free US stocks & crypto. Free paper trading. Full REST + WebSocket API. Best for automation.</div>
                 <div class="broker-tags"><span class="btag">US Stocks</span><span class="btag">Crypto</span><span class="btag api-tag">Paper Trading</span></div>
               </div>
@@ -1714,7 +1714,7 @@
             <div class="broker-card featured" data-broker="binance">
               <div class="broker-logo api-glow">BNB</div>
               <div class="broker-info">
-                <div class="broker-name">Binance <span class="btag api-tag" style="font-size:9px">FULL API</span></div>
+                <div class="broker-name">Binance <span class="btag api-tag" style="font-size:11px">FULL API</span></div>
                 <div class="broker-desc">World's largest crypto exchange by volume. 350+ coins. Spot, futures, margin. Full REST + WebSocket API.</div>
                 <div class="broker-tags"><span class="btag">350+ Coins</span><span class="btag">Futures</span><span class="btag api-tag">API</span></div>
               </div>
@@ -1746,7 +1746,7 @@
             <div class="broker-card featured" data-broker="coinbase">
               <div class="broker-logo api-glow">CB</div>
               <div class="broker-info">
-                <div class="broker-name">Coinbase Advanced <span class="btag api-tag" style="font-size:9px">API</span></div>
+                <div class="broker-name">Coinbase Advanced <span class="btag api-tag" style="font-size:11px">API</span></div>
                 <div class="broker-desc">US-regulated. 250+ coins. Most trusted in US. Advanced Trade API available.</div>
                 <div class="broker-tags"><span class="btag">250+ Coins</span><span class="btag">US Regulated</span><span class="btag api-tag">API</span></div>
               </div>
@@ -1761,7 +1761,7 @@
               <div class="bcfg-desc">Use CDP keys from Settings → API. Key name format: organizations/.../apiKeys/... Requires Trade permission.</div>
               <div class="bcfg-fields">
                 <div class="bcfg-field"><label>KEY NAME</label><input type="text" class="form-input form-input--sm" id="settCoinbaseKey" placeholder="organizations/xxx/apiKeys/xxx" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>PRIVATE KEY (EC)</label><textarea class="form-input form-input--sm" id="settCoinbaseSecret" rows="3" placeholder="-----BEGIN EC PRIVATE KEY-----&#10;..." style="resize:vertical;font-size:9px;" autocomplete="off"></textarea></div>
+                <div class="bcfg-field"><label>PRIVATE KEY (EC)</label><textarea class="form-input form-input--sm" id="settCoinbaseSecret" rows="3" placeholder="-----BEGIN EC PRIVATE KEY-----&#10;..." style="resize:vertical;font-size:11px;" autocomplete="off"></textarea></div>
               </div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('coinbase')">⚡ TEST</button>
@@ -1993,7 +1993,7 @@
             <button class="btn-primary btn--full" style="margin-top:14px" onclick="saveGeneralSettings()">💾 SAVE GENERAL SETTINGS</button>
 
             <div class="sett-section-label" style="margin-top:16px">PAPER PORTFOLIO RESET</div>
-            <div style="color:var(--text-muted);font-size:9px;margin-bottom:8px">Changes starting cash above, then reset to apply it to your paper portfolio.</div>
+            <div style="color:var(--text-muted);font-size:11px;margin-bottom:8px">Changes starting cash above, then reset to apply it to your paper portfolio.</div>
             <button class="btn-ghost btn--full" onclick="resetPaperPortfolio()" style="border-color:var(--amber);color:var(--amber)">↺ RESET PAPER PORTFOLIO TO STARTING CASH</button>
           </div>
         </div>
@@ -2132,7 +2132,7 @@
     <span class="sb-version">DALIOS v1.0.0 — RAY DALIO ALL WEATHER FRAMEWORK</span>
   </footer>
 
-  <script src="/static/app.js?v=20260406d"></script>
+  <script src="/static/app.js?v=20260406e"></script>
 
   <!-- ═══════════════════════════════════════════════
        SPEECH BUBBLE SPOTLIGHT TOOLTIP
@@ -2220,7 +2220,7 @@
       </div>
     </div>
     <div class="quick-pos-body" id="quickPosBody">
-      <div style="padding:14px;color:var(--text-muted);font-size:10px">Loading positions…</div>
+      <div style="padding:14px;color:var(--text-muted);font-size:11px">Loading positions…</div>
     </div>
   </div>
 

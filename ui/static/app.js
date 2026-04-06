@@ -26,10 +26,10 @@ const STATE = {
 
 // ─── Quadrant metadata ────────────────────────────────────
 const QUADRANT_META = {
-  rising_growth:    { label: 'RISING GROWTH',    color: '#00ff88', icon: '▲', cssClass: '' },
+  rising_growth:    { label: 'RISING GROWTH',    color: '#00cc44', icon: '▲', cssClass: '' },
   falling_growth:   { label: 'FALLING GROWTH',   color: '#ff3355', icon: '▼', cssClass: 'red' },
   rising_inflation: { label: 'RISING INFLATION', color: '#ffcc00', icon: '↑', cssClass: 'amber' },
-  falling_inflation:{ label: 'FALLING INFLATION',color: '#00d4ff', icon: '↓', cssClass: 'cyan' },
+  falling_inflation:{ label: 'FALLING INFLATION',color: '#00cc44', icon: '↓', cssClass: 'cyan' },
 };
 
 // ─── Animation helper ─────────────────────────────────────
@@ -493,11 +493,11 @@ function sparklineSVG(s) {
   const isBuy   = ['BUY','LONG'].includes(s.action);
   const isSell  = ['SELL','SHORT'].includes(s.action);
   const histCol = isBuy ? '#ff8c00' : isSell ? '#ff4444' : '#7a6040';
-  const projCol = isBuy ? '#00ff41' : '#ff2222';
+  const projCol = isBuy ? '#00cc44' : '#ff2222';
 
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" xmlns="http://www.w3.org/2000/svg" style="display:block">
     <line x1="0" y1="${slY}" x2="${W}" y2="${slY}" stroke="rgba(255,34,34,0.25)" stroke-width="1" stroke-dasharray="3,3"/>
-    <line x1="0" y1="${tpY}" x2="${W}" y2="${tpY}" stroke="rgba(0,255,65,0.25)" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="0" y1="${tpY}" x2="${W}" y2="${tpY}" stroke="rgba(0,204,68,0.25)" stroke-width="1" stroke-dasharray="3,3"/>
     <polyline points="${histPts}" fill="none" stroke="${histCol}" stroke-width="1.5" opacity="0.85"/>
     <polyline points="${lastHX},${lastHY} ${projPts}" fill="none" stroke="${projCol}" stroke-width="1.2" stroke-dasharray="4,3" opacity="0.75"/>
     <circle cx="${lastHX}" cy="${lastHY}" r="2.5" fill="${histCol}"/>
@@ -820,7 +820,7 @@ function drawCorrelationHeatmap(tickers, matrix) {
       ctx.fillRect(labelW + j * cellSz, labelW + i * cellSz, cellSz - 1, cellSz - 1);
       // Only draw text if cells are large enough to fit it
       if (cellSz >= 20) {
-        ctx.fillStyle = Math.abs(v) > 0.5 ? '#030c08' : 'rgba(0,255,65,0.85)';
+        ctx.fillStyle = Math.abs(v) > 0.5 ? '#030c08' : 'rgba(0,204,68,0.85)';
         ctx.font = `bold ${Math.max(7, Math.floor(cellSz * 0.28))}px JetBrains Mono, monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -846,8 +846,8 @@ function drawCorrelationHeatmap(tickers, matrix) {
 
 function corrColor(v) {
   // -1 → dark red   0 → dark bg   +1 → bright green
-  if (v >= 0.8) return '#00ff41';
-  if (v >= 0.5) return '#00cc33';
+  if (v >= 0.8) return '#00cc44';
+  if (v >= 0.5) return '#009933';
   if (v >= 0.3) return '#ffb300';
   if (v >= 0.1) return '#1a4028';
   if (v >= -0.1) return '#0a1018';
@@ -1031,7 +1031,7 @@ function renderPositionTable(positions) {
 const CHART_DEFAULTS = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0d1520', borderColor: '#00ff41', borderWidth: 1, titleColor: '#00ff41', bodyColor: '#b0ffc0', padding: 8 } },
+  plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0d1520', borderColor: '#00cc44', borderWidth: 1, titleColor: '#00cc44', bodyColor: '#a0dda8', padding: 8 } },
   scales: {
     x: { ticks: { color: '#5a8a65', font: { family: 'JetBrains Mono', size: 9 }, maxRotation: 30 }, grid: { color: 'rgba(10,24,16,0.8)' } },
     y: { ticks: { color: '#5a8a65', font: { family: 'JetBrains Mono', size: 9 } }, grid: { color: 'rgba(10,24,16,0.8)' } },
@@ -1047,7 +1047,7 @@ function initCharts() {
   if (ectx) {
     charts.equity = new Chart(ectx, {
       type: 'line',
-      data: { labels: [], datasets: [{ label: 'NAV', data: [], borderColor: '#00ff41', borderWidth: 2, fill: true, backgroundColor: 'rgba(0,255,65,0.06)', tension: 0.3, pointRadius: 0 }] },
+      data: { labels: [], datasets: [{ label: 'NAV', data: [], borderColor: '#00cc44', borderWidth: 2, fill: true, backgroundColor: 'rgba(0,204,68,0.06)', tension: 0.3, pointRadius: 0 }] },
       options: { ...CHART_DEFAULTS, maintainAspectRatio: false },
     });
   }
@@ -1061,8 +1061,8 @@ function initCharts() {
         labels: ['RISING GROWTH','FALLING GROWTH','RISING INFLATION','FALLING INFLATION'],
         datasets: [{
           data: [0,0,0,0],
-          backgroundColor: ['rgba(0,255,65,0.5)','rgba(255,34,34,0.5)','rgba(255,179,0,0.5)','rgba(0,229,255,0.5)'],
-          borderColor:      ['#00ff41','#ff2222','#ffb300','#00e5ff'],
+          backgroundColor: ['rgba(0,204,68,0.5)','rgba(255,34,34,0.5)','rgba(255,179,0,0.5)','rgba(0,229,255,0.5)'],
+          borderColor:      ['#00cc44','#ff2222','#ffb300','#00cc44'],
           borderWidth: 1,
         }],
       },
@@ -1103,8 +1103,8 @@ function initCharts() {
         labels: pnlData.map((_, i) => `D-${30-i}`),
         datasets: [{
           data: pnlData,
-          backgroundColor: pnlData.map(v => v >= 0 ? 'rgba(0,255,65,0.6)' : 'rgba(255,34,34,0.6)'),
-          borderColor:      pnlData.map(v => v >= 0 ? '#00ff41' : '#ff2222'),
+          backgroundColor: pnlData.map(v => v >= 0 ? 'rgba(0,204,68,0.6)' : 'rgba(255,34,34,0.6)'),
+          borderColor:      pnlData.map(v => v >= 0 ? '#00cc44' : '#ff2222'),
           borderWidth: 1,
         }],
       },
@@ -1150,8 +1150,8 @@ function updateWFChart(periods) {
   if (!charts.wf || !periods.length) return;
   charts.wf.data.labels = periods.map(p => `P${p.period}`);
   charts.wf.data.datasets[0].data = periods.map(p => p.return_pct);
-  charts.wf.data.datasets[0].backgroundColor = periods.map(p => p.return_pct >= 0 ? 'rgba(0,255,65,0.6)' : 'rgba(255,34,34,0.6)');
-  charts.wf.data.datasets[0].borderColor      = periods.map(p => p.return_pct >= 0 ? '#00ff41' : '#ff2222');
+  charts.wf.data.datasets[0].backgroundColor = periods.map(p => p.return_pct >= 0 ? 'rgba(0,204,68,0.6)' : 'rgba(255,34,34,0.6)');
+  charts.wf.data.datasets[0].borderColor      = periods.map(p => p.return_pct >= 0 ? '#00cc44' : '#ff2222');
   charts.wf.update('none');
 }
 
@@ -1159,7 +1159,7 @@ function updateWeightsChart(weights) {
   if (!charts.weights) return;
   const keys = Object.keys(weights).slice(0, 15);
   const vals = keys.map(k => +(weights[k] * 100).toFixed(2));
-  const palette = ['#00ff41','#00cc33','#00aa27','#008820','#006818','#00e5ff','#00b8cc','#ffb300','#cc8c00','#ff6b00','#ff2222','#cc1a1a','#00ff99','#ff00ff','#8800ff'];
+  const palette = ['#00cc44','#009933','#008820','#008820','#006818','#00cc44','#009933','#ffb300','#cc8c00','#ff6b00','#ff2222','#cc1a1a','#00cc44','#ff00ff','#8800ff'];
   charts.weights.data.labels = keys.map(k => k.replace('.AX',''));
   charts.weights.data.datasets[0].data = vals;
   charts.weights.data.datasets[0].backgroundColor = palette.slice(0, keys.length);
@@ -1584,10 +1584,10 @@ function requestNotificationPermission() {
 
 // ─── Theme switcher ────────────────────────────────────────
 const _THEMES = {
-  cyber:  { primary: '#00d4ff', green: '#00ff88', red: '#ff3355', amber: '#ffb000', bg0: '#04080e' },
-  matrix: { primary: '#00ff41', green: '#00ff41', red: '#ff3355', amber: '#ccff00', bg0: '#000d02' },
+  cyber:  { primary: '#00cc44', green: '#00cc44', red: '#ff3355', amber: '#ffb000', bg0: '#04080e' },
+  matrix: { primary: '#00cc44', green: '#00cc44', red: '#ff3355', amber: '#ccff00', bg0: '#000d02' },
   void:   { primary: '#c084fc', green: '#a3e635', red: '#f87171', amber: '#fbbf24', bg0: '#06020f' },
-  amber:  { primary: '#ffb000', green: '#00d4ff', red: '#ff3355', amber: '#ffb000', bg0: '#0c0700' },
+  amber:  { primary: '#ffb000', green: '#00cc44', red: '#ff3355', amber: '#ffb000', bg0: '#0c0700' },
 };
 
 function setTheme(name, btn) {
@@ -2370,7 +2370,7 @@ function initEquityChart(canvasId, chartRef, multiAsset = false) {
   if (chartRef) { chartRef.destroy(); }
   const isPaper = canvasId === 'paperEquityChart';
   const datasets = [{
-    label: 'Portfolio', data: [], borderColor: '#00d4ff',
+    label: 'Portfolio', data: [], borderColor: '#00cc44',
     backgroundColor: 'rgba(0,212,255,0.06)', borderWidth: 2,
     pointRadius: 0, tension: 0.3, fill: !multiAsset, yAxisID: 'y',
   }];
@@ -2384,7 +2384,7 @@ function initEquityChart(canvasId, chartRef, multiAsset = false) {
       plugins: {
         legend: { display: multiAsset, labels: { color: '#3a6882', font: { size: 9 }, boxWidth: 8 } },
         tooltip: {
-          backgroundColor: '#070c14', borderColor: '#00d4ff', borderWidth: 1,
+          backgroundColor: '#070c14', borderColor: '#00cc44', borderWidth: 1,
           titleColor: '#3a6882', bodyColor: '#b8dcf0',
           callbacks: {
             label: ctx => {
@@ -2448,7 +2448,7 @@ async function loadPaperEquityCurve() {
     // Portfolio equity line (absolute $)
     const ds0 = _paperEquityChart.data.datasets[0];
     ds0.data            = pts.map(p => p.v);
-    ds0.borderColor     = last >= startCash ? '#00d4ff' : '#ff3355';
+    ds0.borderColor     = last >= startCash ? '#00cc44' : '#ff3355';
     ds0.backgroundColor = last >= startCash ? 'rgba(0,212,255,0.06)' : 'rgba(255,51,85,0.05)';
     ds0.yAxisID         = 'y';
 
