@@ -1519,6 +1519,10 @@ async function _loadSavedBrokerCreds() {
       kucoin:   { api_key: 'settKucoinKey', api_secret: 'settKucoinSecret', passphrase: 'settKucoinPassphrase' },
       bitget:   { api_key: 'settBitgetKey', api_secret: 'settBitgetSecret', passphrase: 'settBitgetPassphrase' },
       independentreserve: { api_key: 'settIndependentreserveKey', api_secret: 'settIndependentreserveSecret' },
+      selfwealth: { api_key: 'settSelfwealthKey', api_secret: 'settSelfwealthSecret' },
+      ig:         { api_key: 'settIgKey', api_secret: 'settIgSecret', passphrase: 'settIgPassphrase' },
+      cmc:        { api_key: 'settCmcKey', api_secret: 'settCmcSecret', passphrase: 'settCmcPassphrase' },
+      schwab:     { api_key: 'settSchwabKey', api_secret: 'settSchwabSecret' },
     };
     for (const [broker, creds] of Object.entries(saved)) {
       const map = fieldMap[broker];
@@ -2645,6 +2649,24 @@ async function connectBrokerFromSettings(broker) {
     payload.api_key    = el('settIndependentreserveKey')?.value?.trim();
     payload.api_secret = el('settIndependentreserveSecret')?.value?.trim();
     if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
+  } else if (broker === 'selfwealth') {
+    payload.api_key    = el('settSelfwealthKey')?.value?.trim();
+    payload.api_secret = el('settSelfwealthSecret')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
+  } else if (broker === 'ig') {
+    payload.api_key    = el('settIgKey')?.value?.trim();
+    payload.api_secret = el('settIgSecret')?.value?.trim();
+    payload.passphrase = el('settIgPassphrase')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret || !payload.passphrase) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key, account ID, and password required</span>'; return; }
+  } else if (broker === 'cmc') {
+    payload.api_key    = el('settCmcKey')?.value?.trim();
+    payload.api_secret = el('settCmcSecret')?.value?.trim();
+    payload.passphrase = el('settCmcPassphrase')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
+  } else if (broker === 'schwab') {
+    payload.api_key    = el('settSchwabKey')?.value?.trim();
+    payload.api_secret = el('settSchwabSecret')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">App key and secret required</span>'; return; }
   }
 
   try {
@@ -2676,6 +2698,10 @@ function _getBrokerPayload(broker) {
     kucoin:   () => ({ api_key: _f('settKucoinKey'), api_secret: _f('settKucoinSecret'), passphrase: _f('settKucoinPassphrase') }),
     bitget:   () => ({ api_key: _f('settBitgetKey'), api_secret: _f('settBitgetSecret'), passphrase: _f('settBitgetPassphrase') }),
     independentreserve: () => ({ api_key: _f('settIndependentreserveKey'), api_secret: _f('settIndependentreserveSecret') }),
+    selfwealth: () => ({ api_key: _f('settSelfwealthKey'), api_secret: _f('settSelfwealthSecret') }),
+    ig:         () => ({ api_key: _f('settIgKey'), api_secret: _f('settIgSecret'), passphrase: _f('settIgPassphrase') }),
+    cmc:        () => ({ api_key: _f('settCmcKey'), api_secret: _f('settCmcSecret'), passphrase: _f('settCmcPassphrase') }),
+    schwab:     () => ({ api_key: _f('settSchwabKey'), api_secret: _f('settSchwabSecret') }),
   };
   return map[broker] ? map[broker]() : {};
 }

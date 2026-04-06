@@ -21,18 +21,18 @@
   --primary-glow:rgba(255,140,0,0.12);
 
   /* ── Semantic: kept distinct ── */
-  --green:       #00e676;   /* profit / BUY / success */
-  --green-dim:   #00b85c;
-  --green-dark:  #0a1a10;
-  --green-glow:  rgba(0,230,118,0.10);
+  --green:       #00cc44;   /* profit / BUY / success — hacker green */
+  --green-dim:   #009933;
+  --green-dark:  #081a0c;
+  --green-glow:  rgba(0,204,68,0.10);
   --amber:       #ffc107;   /* warning / caution */
   --amber-dim:   #cc9a00;
   --amber-glow:  rgba(255,193,7,0.10);
   --red:         #ff1744;   /* loss / SELL / danger */
   --red-dim:     #d50032;
   --red-glow:    rgba(255,23,68,0.12);
-  --cyan:        #00e676;   /* data / info — green accent */
-  --cyan-glow:   rgba(0,230,118,0.10);
+  --cyan:        #00cc44;   /* data / info — hacker green accent */
+  --cyan-glow:   rgba(0,204,68,0.10);
 
   /* ── Text: warm white/gray for readability on black ── */
   --text-primary:#f0e8e0;
@@ -443,7 +443,7 @@ a:hover { color: var(--primary); text-decoration: underline; }
   transition: background var(--transition);
 }
 .ticker-item:hover { background: var(--bg-2); }
-.ticker-name  { color: var(--text-2); letter-spacing: 1px; font-size: 13px; }
+.ticker-name  { color: var(--green); letter-spacing: 1px; font-size: 13px; }
 .ticker-price { color: var(--text-1); font-weight: 700; }
 .ticker-chg   { font-size: 13px; font-weight: 700; }
 .ticker-chg.up   { color: var(--green); }

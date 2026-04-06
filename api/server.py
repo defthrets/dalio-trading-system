@@ -941,6 +941,23 @@ class IndependentReserveBroker(GenericCryptoBroker):
     _BASE = "https://api.independentreserve.com"
 
 
+class SelfWealthBroker(GenericCryptoBroker):
+    name = "selfwealth"
+    _BASE = "https://api.selfwealth.com.au"
+
+class IGBroker(GenericCryptoBroker):
+    name = "ig"
+    _BASE = "https://api.ig.com/gateway/deal"
+
+class CMCBroker(GenericCryptoBroker):
+    name = "cmc"
+    _BASE = "https://ciapi.cityindex.com/TradingAPI"
+
+class SchwabBroker(GenericCryptoBroker):
+    name = "schwab"
+    _BASE = "https://api.schwabapi.com/trader/v1"
+
+
 class StakeBroker(BrokerBase):
     name = "stake"
     def is_connected(self) -> bool: return False
@@ -3544,7 +3561,9 @@ async def broker_connect(payload: dict):
                    "coinbase": CoinbaseBroker, "coinspot": CoinSpotBroker,
                    "kraken": KrakenBroker, "bybit": BybitBroker, "okx": OKXBroker,
                    "kucoin": KuCoinBroker, "bitget": BitgetBroker,
-                   "independentreserve": IndependentReserveBroker, "stake": StakeBroker}
+                   "independentreserve": IndependentReserveBroker, "stake": StakeBroker,
+                   "selfwealth": SelfWealthBroker, "ig": IGBroker,
+                   "cmc": CMCBroker, "schwab": SchwabBroker}
     if broker_name not in _BROKER_MAP:
         raise HTTPException(400, f"broker must be one of: {', '.join(_BROKER_MAP)}")
     broker: BrokerBase = _BROKER_MAP[broker_name]()
