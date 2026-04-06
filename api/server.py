@@ -978,6 +978,14 @@ class NabtradeBroker(GenericCryptoBroker):
     name = "nabtrade"
     _BASE = "https://api.nabtrade.com.au/v1"
 
+class RobinhoodBroker(GenericCryptoBroker):
+    name = "robinhood"
+    _BASE = "https://trading.robinhood.com/api/v1"
+
+class WebullBroker(GenericCryptoBroker):
+    name = "webull"
+    _BASE = "https://userapi.webull.com/api"
+
 
 ACTIVE_BROKER: Optional[BrokerBase] = None
 TRADING_MODE:  str = "paper"           # "paper" | "live"
@@ -3572,7 +3580,8 @@ async def broker_connect(payload: dict):
                    "selfwealth": SelfWealthBroker, "ig": IGBroker,
                    "cmc": CMCBroker, "schwab": SchwabBroker,
                    "commsec": CommsecBroker, "moomoo": MomooBroker,
-                   "superhero": SuperheroBroker, "nabtrade": NabtradeBroker}
+                   "superhero": SuperheroBroker, "nabtrade": NabtradeBroker,
+                   "robinhood": RobinhoodBroker, "webull": WebullBroker}
     if broker_name not in _BROKER_MAP:
         raise HTTPException(400, f"broker must be one of: {', '.join(_BROKER_MAP)}")
     broker: BrokerBase = _BROKER_MAP[broker_name]()

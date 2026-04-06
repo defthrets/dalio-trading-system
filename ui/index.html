@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260406j" />
+  <link rel="stylesheet" href="/static/style.css?v=20260406k" />
 </head>
 <body>
   <!-- Scanline overlay -->
@@ -1431,30 +1431,16 @@
 
           <!-- AU Brokers -->
           <div class="broker-grid" id="bcat-au">
-            <div class="broker-card featured" data-broker="commsec">
-              <div class="broker-logo api-glow">CBA</div>
+            <div class="broker-card" data-broker="commsec">
+              <div class="broker-logo">CBA</div>
               <div class="broker-info">
-                <div class="broker-name">CommSec <span class="btag api-tag" style="font-size:11px">API</span></div>
-                <div class="broker-desc">Australia's #1 broker. ASX, ETFs, options. CBA-backed.</div>
-                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">ETF</span><span class="btag api-tag">API</span></div>
+                <div class="broker-name">CommSec</div>
+                <div class="broker-desc">Australia's #1 broker. ASX, ETFs, options. CBA-backed. No public API — manual execution only.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">ETF</span><span class="btag">Options</span></div>
               </div>
               <div class="broker-actions">
-                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('commsec')">⚙ CONFIGURE</button>
+                <span class="broker-status offline">● Manual Only</span>
                 <a class="broker-link" href="https://www.commsec.com.au" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-config-panel hidden" id="brokerCfg-commsec">
-              <div class="bcfg-title">⚡ COMMSEC — API CONFIGURATION</div>
-              <div class="bcfg-desc">Generate API credentials at commsec.com.au → Settings → API Access.</div>
-              <div class="bcfg-fields">
-                <div class="bcfg-field"><label>CLIENT ID</label><input type="text" class="form-input form-input--sm" id="settCommsecKey" placeholder="CommSec client ID" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settCommsecSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>ACCOUNT NUMBER</label><input type="text" class="form-input form-input--sm" id="settCommsecPassphrase" placeholder="Account number" autocomplete="off"/></div>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('commsec')">⚡ TEST</button>
-                <button class="btn-ghost" onclick="saveBrokerCreds('commsec')">💾 SAVE</button>
-                <span class="bcfg-result" id="bcfgResult-commsec"></span>
               </div>
             </div>
             <div class="broker-card featured" data-broker="coinspot">
@@ -1471,8 +1457,8 @@
             </div>
             <!-- CoinSpot inline config -->
             <div class="broker-config-panel hidden" id="brokerCfg-coinspot">
-              <div class="bcfg-title">⚡ COINSPOT — API CONFIGURATION</div>
-              <div class="bcfg-desc">Generate keys at coinspot.com.au → My Account → API Keys. Enable Read + Trade permissions.</div>
+              <div class="bcfg-title">⚡ COINSPOT — HMAC-SHA512 API</div>
+              <div class="bcfg-desc">Generate keys at coinspot.com.au → My Account → API Keys. Enable Read + Trade permissions. Uses HMAC-SHA512 signed requests. V2 API recommended.</div>
               <div class="bcfg-fields">
                 <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settCoinspotKey" placeholder="CoinSpot API key" autocomplete="off"/></div>
                 <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settCoinspotSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
@@ -1483,37 +1469,24 @@
                 <span class="bcfg-result" id="bcfgResult-coinspot"></span>
               </div>
             </div>
-            <div class="broker-card featured" data-broker="selfwealth">
-              <div class="broker-logo api-glow">SW</div>
+            <div class="broker-card" data-broker="selfwealth">
+              <div class="broker-logo">SW</div>
               <div class="broker-info">
-                <div class="broker-name">SelfWealth <span class="btag api-tag" style="font-size:11px">API</span></div>
-                <div class="broker-desc">Flat $9.50/trade. ASX & US markets. Has REST API.</div>
-                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span><span class="btag api-tag">API</span></div>
+                <div class="broker-name">SelfWealth</div>
+                <div class="broker-desc">Flat $9.50/trade. ASX & US markets. No public API — manual execution only.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span></div>
               </div>
               <div class="broker-actions">
-                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('selfwealth')">⚙ CONFIGURE</button>
+                <span class="broker-status offline">● Manual Only</span>
                 <a class="broker-link" href="https://www.selfwealth.com.au" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-config-panel hidden" id="brokerCfg-selfwealth">
-              <div class="bcfg-title">⚡ SELFWEALTH — API CONFIGURATION</div>
-              <div class="bcfg-desc">Generate API keys at selfwealth.com.au → Settings → API Access. Enable trading permissions.</div>
-              <div class="bcfg-fields">
-                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settSelfwealthKey" placeholder="SelfWealth API key" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settSelfwealthSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('selfwealth')">⚡ TEST</button>
-                <button class="btn-ghost" onclick="saveBrokerCreds('selfwealth')">💾 SAVE</button>
-                <span class="bcfg-result" id="bcfgResult-selfwealth"></span>
               </div>
             </div>
             <div class="broker-card featured" data-broker="stake">
               <div class="broker-logo api-glow">STK</div>
               <div class="broker-info">
-                <div class="broker-name">Stake <span class="btag api-tag" style="font-size:11px">API</span></div>
-                <div class="broker-desc">US & ASX stocks. $0 brokerage on US. Popular with younger investors.</div>
-                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span><span class="btag api-tag">API</span></div>
+                <div class="broker-name">Stake <span class="btag api-tag" style="font-size:11px">UNOFFICIAL</span></div>
+                <div class="broker-desc">US & ASX stocks. $0 brokerage on US. Unofficial API via session token from browser dev tools.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span><span class="btag api-tag">Session</span></div>
               </div>
               <div class="broker-actions">
                 <button class="broker-cfg-btn" onclick="toggleBrokerConfig('stake')">⚙ CONFIGURE</button>
@@ -1521,11 +1494,10 @@
               </div>
             </div>
             <div class="broker-config-panel hidden" id="brokerCfg-stake">
-              <div class="bcfg-title">⚡ STAKE — API CONFIGURATION</div>
-              <div class="bcfg-desc">Access API at hellostake.com → Settings → Developer. Generate API key and secret.</div>
+              <div class="bcfg-title">⚡ STAKE — SESSION TOKEN (UNOFFICIAL)</div>
+              <div class="bcfg-desc">No official API. Extract your session token: Log into Stake → Open browser DevTools (F12) → Network tab → Copy the "Stake-Session-Token" header from any request.</div>
               <div class="bcfg-fields">
-                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settStakeKey" placeholder="Stake API key" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settStakeSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>SESSION TOKEN</label><input type="password" class="form-input form-input--sm" id="settStakeKey" placeholder="Stake-Session-Token from browser" autocomplete="off"/></div>
               </div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('stake')">⚡ TEST</button>
@@ -1546,11 +1518,11 @@
               </div>
             </div>
             <div class="broker-config-panel hidden" id="brokerCfg-moomoo">
-              <div class="bcfg-title">⚡ MOOMOO — OPENAPI CONFIGURATION</div>
-              <div class="bcfg-desc">Generate API credentials at moomoo.com → OpenAPI → Key Management.</div>
+              <div class="bcfg-title">⚡ MOOMOO — OPENAPI VIA OPEND GATEWAY</div>
+              <div class="bcfg-desc">Requires moomoo OpenD gateway running locally. Download from openapi.moomoo.com. Log in with your moomoo account, then connect DALIOS to the local gateway.</div>
               <div class="bcfg-fields">
-                <div class="bcfg-field"><label>APP ID</label><input type="text" class="form-input form-input--sm" id="settMoomooKey" placeholder="moomoo App ID" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>APP SECRET</label><input type="password" class="form-input form-input--sm" id="settMoomooSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>OPEND HOST</label><input type="text" class="form-input form-input--sm" id="settMoomooKey" value="127.0.0.1" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>OPEND PORT</label><input type="number" class="form-input form-input--sm" id="settMoomooSecret" value="11111" autocomplete="off"/></div>
               </div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('moomoo')">⚡ TEST</button>
@@ -1558,29 +1530,16 @@
                 <span class="bcfg-result" id="bcfgResult-moomoo"></span>
               </div>
             </div>
-            <div class="broker-card featured" data-broker="superhero">
-              <div class="broker-logo api-glow">SH</div>
+            <div class="broker-card" data-broker="superhero">
+              <div class="broker-logo">SH</div>
               <div class="broker-info">
-                <div class="broker-name">Superhero <span class="btag api-tag" style="font-size:11px">API</span></div>
-                <div class="broker-desc">$0 ETF brokerage. $2 ASX trades. CHESS-sponsored.</div>
-                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">ETF</span><span class="btag api-tag">API</span></div>
+                <div class="broker-name">Superhero</div>
+                <div class="broker-desc">$0 ETF brokerage. $2 ASX trades. CHESS-sponsored. No public API — manual execution only.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">ETF</span></div>
               </div>
               <div class="broker-actions">
-                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('superhero')">⚙ CONFIGURE</button>
+                <span class="broker-status offline">● Manual Only</span>
                 <a class="broker-link" href="https://www.superhero.com.au" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-config-panel hidden" id="brokerCfg-superhero">
-              <div class="bcfg-title">⚡ SUPERHERO — API CONFIGURATION</div>
-              <div class="bcfg-desc">Access API settings at superhero.com.au → Account → Developer Settings.</div>
-              <div class="bcfg-fields">
-                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settSuperheroKey" placeholder="Superhero API key" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settSuperheroSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('superhero')">⚡ TEST</button>
-                <button class="btn-ghost" onclick="saveBrokerCreds('superhero')">💾 SAVE</button>
-                <span class="bcfg-result" id="bcfgResult-superhero"></span>
               </div>
             </div>
             <div class="broker-card featured" data-broker="ig">
@@ -1596,12 +1555,18 @@
               </div>
             </div>
             <div class="broker-config-panel hidden" id="brokerCfg-ig">
-              <div class="bcfg-title">⚡ IG MARKETS — REST API CONFIGURATION</div>
-              <div class="bcfg-desc">Generate API key at ig.com/au → My IG → Settings → API. You need your account ID and API key.</div>
+              <div class="bcfg-title">⚡ IG MARKETS — REST API SESSION</div>
+              <div class="bcfg-desc">Generate API key at ig.com/au → My IG → Settings → API. Session tokens (CST + X-SECURITY-TOKEN) are obtained automatically via login. Demo API key works on demo.ig.com.</div>
               <div class="bcfg-fields">
-                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settIgKey" placeholder="IG API key" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>ACCOUNT ID</label><input type="text" class="form-input form-input--sm" id="settIgSecret" placeholder="Account identifier" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settIgKey" placeholder="IG REST API key" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>USERNAME</label><input type="text" class="form-input form-input--sm" id="settIgSecret" placeholder="IG account username" autocomplete="off"/></div>
                 <div class="bcfg-field"><label>PASSWORD</label><input type="password" class="form-input form-input--sm" id="settIgPassphrase" placeholder="IG account password" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>ENVIRONMENT</label>
+                  <select class="ctrl-select" id="settIgEnv">
+                    <option value="demo">Demo (Practice)</option>
+                    <option value="live">Live (Real Funds)</option>
+                  </select>
+                </div>
               </div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('ig')">⚡ TEST</button>
@@ -1622,12 +1587,12 @@
               </div>
             </div>
             <div class="broker-config-panel hidden" id="brokerCfg-cmc">
-              <div class="bcfg-title">⚡ CMC MARKETS — API CONFIGURATION</div>
-              <div class="bcfg-desc">Access API settings at cmcmarkets.com → Platform → Settings → API. Enable trading permissions.</div>
+              <div class="bcfg-title">⚡ CMC MARKETS — REST API CONFIGURATION</div>
+              <div class="bcfg-desc">CMC Markets uses session-based auth. Log in at cmcmarkets.com → Platform. Your credentials create a trading session automatically.</div>
               <div class="bcfg-fields">
-                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settCmcKey" placeholder="CMC API key" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settCmcSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>ACCOUNT ID</label><input type="text" class="form-input form-input--sm" id="settCmcPassphrase" placeholder="Account number" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>USERNAME</label><input type="text" class="form-input form-input--sm" id="settCmcKey" placeholder="CMC account username" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>PASSWORD</label><input type="password" class="form-input form-input--sm" id="settCmcSecret" placeholder="CMC account password" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>ACCOUNT ID</label><input type="text" class="form-input form-input--sm" id="settCmcPassphrase" placeholder="Trading account number" autocomplete="off"/></div>
               </div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('cmc')">⚡ TEST</button>
@@ -1635,30 +1600,16 @@
                 <span class="bcfg-result" id="bcfgResult-cmc"></span>
               </div>
             </div>
-            <div class="broker-card featured" data-broker="nabtrade">
-              <div class="broker-logo api-glow">NAB</div>
+            <div class="broker-card" data-broker="nabtrade">
+              <div class="broker-logo">NAB</div>
               <div class="broker-info">
-                <div class="broker-name">nabtrade <span class="btag api-tag" style="font-size:11px">API</span></div>
-                <div class="broker-desc">NAB's investing platform. ASX, US, bonds, managed funds.</div>
-                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span><span class="btag">Bonds</span><span class="btag api-tag">API</span></div>
+                <div class="broker-name">nabtrade</div>
+                <div class="broker-desc">NAB's investing platform. ASX, US, bonds, managed funds. No public trading API — manual execution only.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span><span class="btag">Bonds</span></div>
               </div>
               <div class="broker-actions">
-                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('nabtrade')">⚙ CONFIGURE</button>
+                <span class="broker-status offline">● Manual Only</span>
                 <a class="broker-link" href="https://www.nabtrade.com.au" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-config-panel hidden" id="brokerCfg-nabtrade">
-              <div class="bcfg-title">⚡ NABTRADE — API CONFIGURATION</div>
-              <div class="bcfg-desc">Access API settings at nabtrade.com.au → Account → API Settings.</div>
-              <div class="bcfg-fields">
-                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settNabtradeKey" placeholder="nabtrade API key" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settNabtradeSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>ACCOUNT ID</label><input type="text" class="form-input form-input--sm" id="settNabtradePassphrase" placeholder="Account number" autocomplete="off"/></div>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('nabtrade')">⚡ TEST</button>
-                <button class="btn-ghost" onclick="saveBrokerCreds('nabtrade')">💾 SAVE</button>
-                <span class="bcfg-result" id="bcfgResult-nabtrade"></span>
               </div>
             </div>
           </div>
@@ -1705,11 +1656,12 @@
               </div>
             </div>
             <div class="broker-config-panel hidden" id="brokerCfg-schwab">
-              <div class="bcfg-title">⚡ CHARLES SCHWAB — API CONFIGURATION</div>
-              <div class="bcfg-desc">Register an app at developer.schwab.com to get API credentials. Enable Account Access + Trading.</div>
+              <div class="bcfg-title">⚡ CHARLES SCHWAB — OAUTH 2.0 API</div>
+              <div class="bcfg-desc">Register app at developer.schwab.com → Enable Account Access + Trading. App approval takes several days. Tokens refresh every 30min, re-auth needed every 7 days.</div>
               <div class="bcfg-fields">
-                <div class="bcfg-field"><label>APP KEY</label><input type="text" class="form-input form-input--sm" id="settSchwabKey" placeholder="Schwab app key" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>APP KEY (Consumer ID)</label><input type="text" class="form-input form-input--sm" id="settSchwabKey" placeholder="Schwab app key / consumer ID" autocomplete="off"/></div>
                 <div class="bcfg-field"><label>APP SECRET</label><input type="password" class="form-input form-input--sm" id="settSchwabSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>CALLBACK URL</label><input type="text" class="form-input form-input--sm" id="settSchwabPassphrase" value="https://127.0.0.1:8182" autocomplete="off"/></div>
               </div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('schwab')">⚡ TEST</button>
@@ -1717,28 +1669,54 @@
                 <span class="bcfg-result" id="bcfgResult-schwab"></span>
               </div>
             </div>
-            <div class="broker-card" data-broker="robinhood">
-              <div class="broker-logo">RH</div>
+            <div class="broker-card featured" data-broker="robinhood">
+              <div class="broker-logo api-glow">RH</div>
               <div class="broker-info">
-                <div class="broker-name">Robinhood</div>
-                <div class="broker-desc">$0 commissions. Stocks, options, crypto. Simple interface, limited API access.</div>
-                <div class="broker-tags"><span class="btag">US</span><span class="btag">Options</span><span class="btag">Crypto</span></div>
+                <div class="broker-name">Robinhood <span class="btag api-tag" style="font-size:11px">CRYPTO API</span></div>
+                <div class="broker-desc">$0 commissions. Crypto API available (stocks/options require manual execution). OAuth 2.0 auth.</div>
+                <div class="broker-tags"><span class="btag">Crypto</span><span class="btag api-tag">API</span></div>
               </div>
               <div class="broker-actions">
-                <span class="broker-status offline">● Manual</span>
+                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('robinhood')">⚙ CONFIGURE</button>
                 <a class="broker-link" href="https://robinhood.com" target="_blank">Open →</a>
               </div>
             </div>
-            <div class="broker-card" data-broker="webull">
-              <div class="broker-logo">WB</div>
+            <div class="broker-config-panel hidden" id="brokerCfg-robinhood">
+              <div class="bcfg-title">⚡ ROBINHOOD — CRYPTO TRADING API</div>
+              <div class="bcfg-desc">Crypto only. Generate API key at robinhood.com (web classic) → Account → API Settings. 2FA required. Stocks/options not available via API.</div>
+              <div class="bcfg-fields">
+                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settRobinhoodKey" placeholder="Robinhood API key" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>PRIVATE KEY (PEM)</label><textarea class="form-input form-input--sm" id="settRobinhoodSecret" rows="3" placeholder="-----BEGIN ED25519 PRIVATE KEY-----&#10;..." style="resize:vertical;font-size:11px;" autocomplete="off"></textarea></div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('robinhood')">⚡ TEST</button>
+                <button class="btn-ghost" onclick="saveBrokerCreds('robinhood')">💾 SAVE</button>
+                <span class="bcfg-result" id="bcfgResult-robinhood"></span>
+              </div>
+            </div>
+            <div class="broker-card featured" data-broker="webull">
+              <div class="broker-logo api-glow">WB</div>
               <div class="broker-info">
-                <div class="broker-name">Webull</div>
-                <div class="broker-desc">Advanced charts, extended hours, fractional shares. Paper trading available.</div>
-                <div class="broker-tags"><span class="btag">US</span><span class="btag">Options</span><span class="btag">Paper</span></div>
+                <div class="broker-name">Webull <span class="btag api-tag" style="font-size:11px">API</span></div>
+                <div class="broker-desc">Advanced charts, extended hours, fractional shares. OpenAPI with HMAC + OAuth authentication.</div>
+                <div class="broker-tags"><span class="btag">US</span><span class="btag">Options</span><span class="btag api-tag">API</span></div>
               </div>
               <div class="broker-actions">
-                <span class="broker-status offline">● Manual</span>
+                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('webull')">⚙ CONFIGURE</button>
                 <a class="broker-link" href="https://www.webull.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-config-panel hidden" id="brokerCfg-webull">
+              <div class="bcfg-title">⚡ WEBULL — OPENAPI CONFIGURATION</div>
+              <div class="bcfg-desc">Register at developer.webull.com → Create an app to get credentials. HMAC signature-based auth with OAuth user authorization.</div>
+              <div class="bcfg-fields">
+                <div class="bcfg-field"><label>APP KEY</label><input type="text" class="form-input form-input--sm" id="settWebullKey" placeholder="Webull App Key" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>APP SECRET</label><input type="password" class="form-input form-input--sm" id="settWebullSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('webull')">⚡ TEST</button>
+                <button class="btn-ghost" onclick="saveBrokerCreds('webull')">💾 SAVE</button>
+                <span class="bcfg-result" id="bcfgResult-webull"></span>
               </div>
             </div>
             <div class="broker-card featured" data-broker="alpaca">
@@ -1823,8 +1801,8 @@
             </div>
             <!-- Coinbase inline config -->
             <div class="broker-config-panel hidden" id="brokerCfg-coinbase">
-              <div class="bcfg-title">⚡ COINBASE — ADVANCED TRADE API</div>
-              <div class="bcfg-desc">Use CDP keys from Settings → API. Key name format: organizations/.../apiKeys/... Requires Trade permission.</div>
+              <div class="bcfg-title">⚡ COINBASE — ADVANCED TRADE API (JWT / ES256)</div>
+              <div class="bcfg-desc">Generate CDP keys at coinbase.com → Settings → API. Key format: organizations/{org}/apiKeys/{id}. Private key must be ECDSA (ES256) — Ed25519 will NOT work. Enable Trade permission.</div>
               <div class="bcfg-fields">
                 <div class="bcfg-field"><label>KEY NAME</label><input type="text" class="form-input form-input--sm" id="settCoinbaseKey" placeholder="organizations/xxx/apiKeys/xxx" autocomplete="off"/></div>
                 <div class="bcfg-field"><label>PRIVATE KEY (EC)</label><textarea class="form-input form-input--sm" id="settCoinbaseSecret" rows="3" placeholder="-----BEGIN EC PRIVATE KEY-----&#10;..." style="resize:vertical;font-size:11px;" autocomplete="off"></textarea></div>
@@ -1848,8 +1826,8 @@
               </div>
             </div>
             <div class="broker-config-panel hidden" id="brokerCfg-kraken">
-              <div class="bcfg-title">⚡ KRAKEN — API CONFIGURATION</div>
-              <div class="bcfg-desc">Generate keys at kraken.com → Security → API. Enable Query Funds + Create/Modify Orders.</div>
+              <div class="bcfg-title">⚡ KRAKEN — HMAC-SHA512 API</div>
+              <div class="bcfg-desc">Generate keys at kraken.com → Security → API. Enable Query Funds + Create/Modify Orders. Uses nonce-based HMAC-SHA512 signing. Optional 2FA supported.</div>
               <div class="bcfg-fields">
                 <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settKrakenKey" placeholder="Kraken API key" autocomplete="off"/></div>
                 <div class="bcfg-field"><label>PRIVATE KEY (Secret)</label><input type="password" class="form-input form-input--sm" id="settKrakenSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
@@ -2190,7 +2168,7 @@
        STATUS BAR
   ═══════════════════════════════════════════════ -->
 
-  <script src="/static/app.js?v=20260406j"></script>
+  <script src="/static/app.js?v=20260406k"></script>
 
   <!-- ═══════════════════════════════════════════════
        SPEECH BUBBLE SPOTLIGHT TOOLTIP

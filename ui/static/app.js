@@ -1515,12 +1515,11 @@ async function _loadSavedBrokerCreds() {
       selfwealth: { api_key: 'settSelfwealthKey', api_secret: 'settSelfwealthSecret' },
       ig:         { api_key: 'settIgKey', api_secret: 'settIgSecret', passphrase: 'settIgPassphrase' },
       cmc:        { api_key: 'settCmcKey', api_secret: 'settCmcSecret', passphrase: 'settCmcPassphrase' },
-      schwab:     { api_key: 'settSchwabKey', api_secret: 'settSchwabSecret' },
-      commsec:    { api_key: 'settCommsecKey', api_secret: 'settCommsecSecret', passphrase: 'settCommsecPassphrase' },
-      stake:      { api_key: 'settStakeKey', api_secret: 'settStakeSecret' },
+      schwab:     { api_key: 'settSchwabKey', api_secret: 'settSchwabSecret', passphrase: 'settSchwabPassphrase' },
+      stake:      { api_key: 'settStakeKey' },
       moomoo:     { api_key: 'settMoomooKey', api_secret: 'settMoomooSecret' },
-      superhero:  { api_key: 'settSuperheroKey', api_secret: 'settSuperheroSecret' },
-      nabtrade:   { api_key: 'settNabtradeKey', api_secret: 'settNabtradeSecret', passphrase: 'settNabtradePassphrase' },
+      robinhood:  { api_key: 'settRobinhoodKey', api_secret: 'settRobinhoodSecret' },
+      webull:     { api_key: 'settWebullKey', api_secret: 'settWebullSecret' },
     };
     for (const [broker, creds] of Object.entries(saved)) {
       const map = fieldMap[broker];
@@ -2665,28 +2664,21 @@ async function connectBrokerFromSettings(broker) {
     payload.api_key    = el('settSchwabKey')?.value?.trim();
     payload.api_secret = el('settSchwabSecret')?.value?.trim();
     if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">App key and secret required</span>'; return; }
-  } else if (broker === 'commsec') {
-    payload.api_key    = el('settCommsecKey')?.value?.trim();
-    payload.api_secret = el('settCommsecSecret')?.value?.trim();
-    payload.passphrase = el('settCommsecPassphrase')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">Client ID and secret required</span>'; return; }
   } else if (broker === 'stake') {
     payload.api_key    = el('settStakeKey')?.value?.trim();
-    payload.api_secret = el('settStakeSecret')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
+    if (!payload.api_key) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">Session token required</span>'; return; }
   } else if (broker === 'moomoo') {
     payload.api_key    = el('settMoomooKey')?.value?.trim();
     payload.api_secret = el('settMoomooSecret')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">App ID and secret required</span>'; return; }
-  } else if (broker === 'superhero') {
-    payload.api_key    = el('settSuperheroKey')?.value?.trim();
-    payload.api_secret = el('settSuperheroSecret')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
-  } else if (broker === 'nabtrade') {
-    payload.api_key    = el('settNabtradeKey')?.value?.trim();
-    payload.api_secret = el('settNabtradeSecret')?.value?.trim();
-    payload.passphrase = el('settNabtradePassphrase')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">OpenD host and port required</span>'; return; }
+  } else if (broker === 'robinhood') {
+    payload.api_key    = el('settRobinhoodKey')?.value?.trim();
+    payload.api_secret = el('settRobinhoodSecret')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and private key required</span>'; return; }
+  } else if (broker === 'webull') {
+    payload.api_key    = el('settWebullKey')?.value?.trim();
+    payload.api_secret = el('settWebullSecret')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">App key and secret required</span>'; return; }
   }
 
   try {
@@ -2721,12 +2713,11 @@ function _getBrokerPayload(broker) {
     selfwealth: () => ({ api_key: _f('settSelfwealthKey'), api_secret: _f('settSelfwealthSecret') }),
     ig:         () => ({ api_key: _f('settIgKey'), api_secret: _f('settIgSecret'), passphrase: _f('settIgPassphrase') }),
     cmc:        () => ({ api_key: _f('settCmcKey'), api_secret: _f('settCmcSecret'), passphrase: _f('settCmcPassphrase') }),
-    schwab:     () => ({ api_key: _f('settSchwabKey'), api_secret: _f('settSchwabSecret') }),
-    commsec:    () => ({ api_key: _f('settCommsecKey'), api_secret: _f('settCommsecSecret'), passphrase: _f('settCommsecPassphrase') }),
-    stake:      () => ({ api_key: _f('settStakeKey'), api_secret: _f('settStakeSecret') }),
+    schwab:     () => ({ api_key: _f('settSchwabKey'), api_secret: _f('settSchwabSecret'), passphrase: _f('settSchwabPassphrase') }),
+    stake:      () => ({ api_key: _f('settStakeKey') }),
     moomoo:     () => ({ api_key: _f('settMoomooKey'), api_secret: _f('settMoomooSecret') }),
-    superhero:  () => ({ api_key: _f('settSuperheroKey'), api_secret: _f('settSuperheroSecret') }),
-    nabtrade:   () => ({ api_key: _f('settNabtradeKey'), api_secret: _f('settNabtradeSecret'), passphrase: _f('settNabtradePassphrase') }),
+    robinhood:  () => ({ api_key: _f('settRobinhoodKey'), api_secret: _f('settRobinhoodSecret') }),
+    webull:     () => ({ api_key: _f('settWebullKey'), api_secret: _f('settWebullSecret') }),
   };
   return map[broker] ? map[broker]() : {};
 }
