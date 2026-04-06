@@ -1021,16 +1021,16 @@ canvas { display: block; max-width: 100%; }
   transition: border-color 0.5s, box-shadow 0.5s;
 }
 .conflict-ring.elevated { border-color: var(--red); box-shadow: 0 0 20px var(--red-glow), inset 0 0 20px var(--red-glow); animation: ringPulse 1s infinite; }
-.conflict-ring.normal   { border-color: var(--green-dim); box-shadow: 0 0 10px var(--green-glow); }
+.conflict-ring.normal   { border-color: var(--cyan); box-shadow: 0 0 10px var(--cyan-glow); }
 @keyframes ringPulse {
   0%, 100% { box-shadow: 0 0 15px var(--red-glow); }
   50%       { box-shadow: 0 0 30px var(--red-glow), 0 0 50px var(--red-glow); }
 }
 .conflict-inner { text-align: center; }
-.conflict-val { font-family: var(--font-hud); font-size: 28px; font-weight: 900; color: var(--green); }
+.conflict-val { font-family: var(--font-hud); font-size: 28px; font-weight: 900; color: var(--cyan); }
 .conflict-ring.elevated .conflict-val { color: var(--red); text-shadow: 0 0 12px var(--red); }
 .conflict-label { font-family: var(--font-hud); font-size: 11px; letter-spacing: 1px; color: var(--text-muted); }
-.conflict-status { font-family: var(--font-hud); font-size: 13px; letter-spacing: 2px; color: var(--green); }
+.conflict-status { font-family: var(--font-hud); font-size: 13px; letter-spacing: 2px; color: var(--cyan); }
 .conflict-status.elevated { color: var(--red); text-shadow: 0 0 8px var(--red); }
 .conflict-keywords { padding: 0 14px 14px; }
 .kw-title { font-family: var(--font-hud); font-size: 11px; letter-spacing: 2px; color: var(--text-muted); margin-bottom: 6px; }
@@ -1149,9 +1149,9 @@ canvas { display: block; max-width: 100%; }
 
 .cb-display { padding: 14px; }
 .cb-status { text-align: center; margin-bottom: 16px; }
-.cb-icon { font-size: 40px; color: var(--green); text-shadow: 0 0 15px var(--green); margin-bottom: 4px; transition: all 0.5s; }
+.cb-icon { font-size: 40px; color: var(--cyan); text-shadow: 0 0 15px var(--cyan); margin-bottom: 4px; transition: all 0.5s; }
 .cb-icon.halted { color: var(--red); text-shadow: 0 0 20px var(--red); animation: ringPulse 0.8s infinite; }
-.cb-label { font-family: var(--font-hud); font-size: 16px; font-weight: 900; color: var(--green); letter-spacing: 3px; }
+.cb-label { font-family: var(--font-hud); font-size: 16px; font-weight: 900; color: var(--cyan); letter-spacing: 3px; }
 .cb-label.halted { color: var(--red); }
 .cb-sublabel { font-size: 11px; color: var(--text-2); }
 .cb-limits { display: flex; flex-direction: column; gap: 12px; }

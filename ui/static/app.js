@@ -273,7 +273,7 @@ function applyHealth(d) {
   if (cbLabel) { cbLabel.textContent = halted ? 'HALTED'   : 'ARMED';           cbLabel.className = halted ? 'cb-label halted' : 'cb-label'; }
   if (cbSub)   cbSub.textContent    = halted ? 'Trading SUSPENDED — limit hit' : 'Trading permitted';
   const cbBadge = el('circuitBreakerBadge');
-  if (cbBadge) { cbBadge.textContent = halted ? 'CB: TRIGGERED' : 'CB: ARMED'; cbBadge.className = halted ? 'badge badge--red' : 'badge badge--green'; }
+  if (cbBadge) { cbBadge.textContent = halted ? 'CB: TRIGGERED' : 'CB: ARMED'; cbBadge.className = halted ? 'badge badge--red' : 'badge badge--cyan'; }
   setEl('cbDailyUsed',    `Used: ${Math.abs(dailyPct).toFixed(2)}% / 2.0%`);
   setEl('cbDrawdownUsed', `Used: ${ddPct.toFixed(2)}% / 10.0%`);
   setWidth('cbDailyBar',    Math.min(Math.abs(dailyPct) / 2 * 100, 100));
@@ -841,7 +841,7 @@ function corrColor(v) {
   // -1 → dark red   0 → dark bg   +1 → bright green
   if (v >= 0.8) return '#00cc44';
   if (v >= 0.5) return '#009933';
-  if (v >= 0.3) return '#ffb300';
+  if (v >= 0.3) return '#3a3a3a';
   if (v >= 0.1) return '#1a4028';
   if (v >= -0.1) return '#0a1018';
   if (v >= -0.3) return '#3a1010';
