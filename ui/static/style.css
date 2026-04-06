@@ -31,8 +31,8 @@
   --red:         #ff1744;   /* loss / SELL / danger */
   --red-dim:     #d50032;
   --red-glow:    rgba(255,23,68,0.12);
-  --cyan:        #00cc44;   /* data / info — hacker green accent */
-  --cyan-glow:   rgba(0,204,68,0.10);
+  --cyan:        #00d4ff;   /* data / info — cyan accent */
+  --cyan-glow:   rgba(0,212,255,0.10);
 
   /* ── Text: warm white/gray for readability on black ── */
   --text-primary:#f0e8e0;

@@ -29,7 +29,7 @@ const QUADRANT_META = {
   rising_growth:    { label: 'RISING GROWTH',    color: '#00cc44', icon: '▲', cssClass: '' },
   falling_growth:   { label: 'FALLING GROWTH',   color: '#ff3355', icon: '▼', cssClass: 'red' },
   rising_inflation: { label: 'RISING INFLATION', color: '#ffcc00', icon: '↑', cssClass: 'amber' },
-  falling_inflation:{ label: 'FALLING INFLATION',color: '#00cc44', icon: '↓', cssClass: 'cyan' },
+  falling_inflation:{ label: 'FALLING INFLATION',color: '#00d4ff', icon: '↓', cssClass: 'cyan' },
 };
 
 // ─── Animation helper ─────────────────────────────────────
@@ -1024,7 +1024,7 @@ function renderPositionTable(positions) {
 const CHART_DEFAULTS = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0d1520', borderColor: '#00cc44', borderWidth: 1, titleColor: '#00cc44', bodyColor: '#a0dda8', padding: 8 } },
+  plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0d1520', borderColor: '#00d4ff', borderWidth: 1, titleColor: '#00d4ff', bodyColor: '#b8dcf0', padding: 8 } },
   scales: {
     x: { ticks: { color: '#5a8a65', font: { family: 'JetBrains Mono', size: 9 }, maxRotation: 30 }, grid: { color: 'rgba(10,24,16,0.8)' } },
     y: { ticks: { color: '#5a8a65', font: { family: 'JetBrains Mono', size: 9 } }, grid: { color: 'rgba(10,24,16,0.8)' } },
@@ -1054,8 +1054,8 @@ function initCharts() {
         labels: ['RISING GROWTH','FALLING GROWTH','RISING INFLATION','FALLING INFLATION'],
         datasets: [{
           data: [0,0,0,0],
-          backgroundColor: ['rgba(0,204,68,0.5)','rgba(255,34,34,0.5)','rgba(255,179,0,0.5)','rgba(0,229,255,0.5)'],
-          borderColor:      ['#00cc44','#ff2222','#ffb300','#00cc44'],
+          backgroundColor: ['rgba(0,204,68,0.5)','rgba(255,34,34,0.5)','rgba(255,179,0,0.5)','rgba(0,212,255,0.5)'],
+          borderColor:      ['#00cc44','#ff2222','#ffb300','#00d4ff'],
           borderWidth: 1,
         }],
       },
@@ -1152,7 +1152,7 @@ function updateWeightsChart(weights) {
   if (!charts.weights) return;
   const keys = Object.keys(weights).slice(0, 15);
   const vals = keys.map(k => +(weights[k] * 100).toFixed(2));
-  const palette = ['#00cc44','#009933','#008820','#008820','#006818','#00cc44','#009933','#ffb300','#cc8c00','#ff6b00','#ff2222','#cc1a1a','#00cc44','#ff00ff','#8800ff'];
+  const palette = ['#00cc44','#009933','#008820','#00d4ff','#006818','#00cc44','#0099cc','#ffb300','#cc8c00','#ff6b00','#ff2222','#cc1a1a','#00d4ff','#ff00ff','#8800ff'];
   charts.weights.data.labels = keys.map(k => k.replace('.AX',''));
   charts.weights.data.datasets[0].data = vals;
   charts.weights.data.datasets[0].backgroundColor = palette.slice(0, keys.length);
@@ -1577,7 +1577,7 @@ function requestNotificationPermission() {
 
 // ─── Theme switcher ────────────────────────────────────────
 const _THEMES = {
-  cyber:  { primary: '#00cc44', green: '#00cc44', red: '#ff3355', amber: '#ffb000', bg0: '#04080e' },
+  cyber:  { primary: '#00d4ff', green: '#00cc44', red: '#ff3355', amber: '#ffb000', bg0: '#04080e' },
   matrix: { primary: '#00cc44', green: '#00cc44', red: '#ff3355', amber: '#ccff00', bg0: '#000d02' },
   void:   { primary: '#c084fc', green: '#a3e635', red: '#f87171', amber: '#fbbf24', bg0: '#06020f' },
   amber:  { primary: '#ffb000', green: '#00cc44', red: '#ff3355', amber: '#ffb000', bg0: '#0c0700' },
@@ -2363,7 +2363,7 @@ function initEquityChart(canvasId, chartRef, multiAsset = false) {
   if (chartRef) { chartRef.destroy(); }
   const isPaper = canvasId === 'paperEquityChart';
   const datasets = [{
-    label: 'Portfolio', data: [], borderColor: '#00cc44',
+    label: 'Portfolio', data: [], borderColor: '#00d4ff',
     backgroundColor: 'rgba(0,212,255,0.06)', borderWidth: 2,
     pointRadius: 0, tension: 0.3, fill: !multiAsset, yAxisID: 'y',
   }];
@@ -2377,7 +2377,7 @@ function initEquityChart(canvasId, chartRef, multiAsset = false) {
       plugins: {
         legend: { display: multiAsset, labels: { color: '#3a6882', font: { size: 9 }, boxWidth: 8 } },
         tooltip: {
-          backgroundColor: '#070c14', borderColor: '#00cc44', borderWidth: 1,
+          backgroundColor: '#070c14', borderColor: '#00d4ff', borderWidth: 1,
           titleColor: '#3a6882', bodyColor: '#b8dcf0',
           callbacks: {
             label: ctx => {
