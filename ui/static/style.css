@@ -2306,6 +2306,19 @@ canvas { display: block; max-width: 100%; }
   transition: all var(--transition);
 }
 .spot-btn-next:hover { background: rgba(255,140,0,0.18); }
+.spot-btn-prev {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 3px 7px;
+  cursor: pointer;
+  border-radius: 2px;
+  font-family: var(--font-hud);
+  letter-spacing: 1px;
+  transition: all var(--transition);
+}
+.spot-btn-prev:hover { border-color: var(--cyan); color: var(--cyan); }
 /* Arrow variations */
 .spot-arrow {
   position: absolute;

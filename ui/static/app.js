@@ -1502,6 +1502,10 @@ function _showSpot(idx) {
   el('spotText').textContent  = spot.text;
   el('spotCount').textContent = `${idx + 1} / ${_spotQueue.length}`;
 
+  // Show/hide prev button — show when not on first spot
+  const prevBtn = el('spotPrevBtn');
+  if (prevBtn) prevBtn.style.display = idx > 0 ? '' : 'none';
+
   // In guided mode: auto-advance spots, show "NEXT TAB" on last spot
   if (_guidedMode) {
     const isLastSpot = idx === _spotQueue.length - 1;
@@ -1516,7 +1520,7 @@ function _showSpot(idx) {
       el('spotNextBtn').textContent = '';
     }
 
-    // Auto-advance after 5s unless it's the last spot on this tab
+    // Auto-advance after 10s unless it's the last spot on this tab
     if (!isLastSpot) {
       _spotAutoTimer = setTimeout(() => _guidedAdvanceSpot(), 10000);
     }
@@ -1632,6 +1636,13 @@ function nextSpot() {
     if (_guidedMode) _guidedNextTab();
     return;
   }
+  _showSpot(_spotIdx);
+}
+
+function prevSpot() {
+  clearTimeout(_spotAutoTimer);
+  if (!_spotQueue.length || _spotIdx <= 0) return;
+  _spotIdx--;
   _showSpot(_spotIdx);
 }
 
