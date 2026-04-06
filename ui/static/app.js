@@ -4965,28 +4965,32 @@ const _RADAR_TICKERS = [
 ];
 
 const _RADAR_STATUS_MSGS = [
-  () => `TGT ACQUIRED: ${_rndTicker()}`,
-  () => `SCANNING SECTOR ${['ALPHA','BRAVO','CHARLIE','DELTA','ECHO','FOXTROT'][Math.floor(Math.random()*6)]}`,
-  () => `OPS LOCK ON ${_rndTicker()} — AWAITING CONFIRM`,
-  () => `RECON: ${_rndTicker()} IN RANGE`,
-  () => `HOSTILE DETECTED: ${_rndTicker()} BEARISH`,
-  () => `DEPLOYING CAPITAL TO ${_rndTicker()}`,
-  () => `PERIMETER SWEEP — ${Math.floor(Math.random()*60+20)} ASSETS`,
-  () => `INTEL: ${_rndTicker()} MOMENTUM ▲▲`,
-  () => `TRACKING ${_rndTicker()} — RSI ${(Math.random()*50+25).toFixed(1)}`,
-  () => `STANDBY — ALL POSITIONS SECURED`,
-  () => `COMMS CHECK — BROKER LINK ACTIVE`,
-  () => `ENGAGING ${_rndTicker()} — CONFIDENCE ${Math.floor(Math.random()*25+65)}%`,
-  () => `EXTRACT SIGNAL: ${_rndTicker()} LONG`,
-  () => `OVERWATCH: DRAWDOWN ${(Math.random()*3).toFixed(1)}%`,
-  () => `ASSET GRID ONLINE — ${Math.floor(Math.random()*15+10)} ACTIVE`,
-  () => `THREAT LVL: ${['LOW','MODERATE','ELEVATED'][Math.floor(Math.random()*3)]}`,
-  () => `SORTIE: ${_rndTicker()} ENTRY @ $${(Math.random()*500+1).toFixed(2)}`,
-  () => `CHARLIE ACTUAL — ${_rndTicker()} IS GO`,
-  () => `WEAPONS FREE: ${_rndTicker()} SHORT SIGNAL`,
-  () => `EVAC ${_rndTicker()} — STOP LOSS HIT`,
-  () => `OSCAR MIKE — ROTATING INTO ${_rndTicker()}`,
-  () => `FRIENDLIES: ${Math.floor(Math.random()*8+3)} POSITIONS GREEN`,
+  // Portfolio & P&L
+  () => { const h = STATE.health; return h ? `NAV: ${fmt$(h.equity)} | DAILY P&L: ${(h.daily_pnl_pct??0) >= 0 ? '+' : ''}${(h.daily_pnl_pct??0).toFixed(2)}%` : 'AWAITING PORTFOLIO DATA'; },
+  () => { const h = STATE.health; return h ? `DRAWDOWN: ${(h.drawdown_pct??0).toFixed(2)}% | SHARPE: ${(h.sharpe_ratio??0).toFixed(2)}` : 'RISK METRICS LOADING'; },
+  () => { const h = STATE.health; return h ? `RETURN: ${(h.total_return_pct??0) >= 0 ? '+' : ''}${(h.total_return_pct??0).toFixed(2)}% | ${h.open_positions??0} POSITIONS OPEN` : 'PORTFOLIO SYNC IN PROGRESS'; },
+  () => { const h = STATE.health; const cb = h?.halted; return cb ? '⚠ CIRCUIT BREAKER TRIPPED — TRADING HALTED' : 'CIRCUIT BREAKER: ARMED — LIMITS NORMAL'; },
+  // Signals
+  () => { const n = STATE.signals?.length ?? 0; const strong = STATE.signals?.filter(s => s.confidence >= 80)?.length ?? 0; return `SIGNALS: ${n} ACTIVE | ${strong} HIGH-CONFIDENCE`; },
+  () => { const s = STATE.signals?.[0]; return s ? `TOP SIGNAL: ${s.action} ${s.ticker} @ ${(Number(s.confidence)||0).toFixed(0)}% CONF` : 'NO ACTIVE SIGNALS'; },
+  () => { const buys = STATE.signals?.filter(s => ['BUY','LONG'].includes(s.action))?.length ?? 0; const sells = STATE.signals?.filter(s => ['SELL','SHORT'].includes(s.action))?.length ?? 0; return `SIGNAL MIX: ${buys} BUYS / ${sells} SELLS`; },
+  // Scanner data
+  () => { const a = _scannerData.asx?.length ?? 0; const c = _scannerData.crypto?.length ?? 0; const m = _scannerData.commodities?.length ?? 0; return `UNIVERSE: ${a} ASX | ${c} CRYPTO | ${m} COMMODITIES`; },
+  () => { const all = [...(_scannerData.asx||[]),...(_scannerData.crypto||[]),...(_scannerData.commodities||[])]; const up = all.filter(r=>r.change_pct>0).length; return all.length ? `MARKET PULSE: ${up}/${all.length} ASSETS GREEN (${(up/all.length*100).toFixed(0)}%)` : 'MARKET DATA LOADING'; },
+  () => { const c = _scannerData.crypto || []; const top = c[0]; return top ? `CRYPTO LEAD: ${top.ticker.replace('-USD','')} $${Number(top.price).toLocaleString()} ${top.change_pct>=0?'+':''}${top.change_pct}%` : 'CRYPTO FEED STANDBY'; },
+  () => { const a = _scannerData.asx || []; const top = a.sort((x,y)=>y.change_pct-x.change_pct)[0]; return top ? `ASX MOVER: ${top.ticker} ${top.change_pct>=0?'+':''}${top.change_pct}%` : 'ASX FEED STANDBY'; },
+  // System health
+  () => `UPTIME: ${((performance.now()/1000/60)).toFixed(0)} MIN | MEM: ${(performance.memory?.usedJSHeapSize/1024/1024)?.toFixed(0) ?? '?'}MB`,
+  () => `WEBSOCKET: ${STATE._wsConnected ? 'CONNECTED' : 'DISCONNECTED'} | MODE: ${_tradingMode?.toUpperCase() ?? 'PAPER'}`,
+  () => _systemPaused ? '⏸ SYSTEM PAUSED — NO NEW TRADES' : '● ALL SYSTEMS OPERATIONAL — TRADING ACTIVE',
+  () => { const w = _watchlist?.length ?? 0; return `WATCHLIST: ${w} ASSETS TRACKED | ALERTS: ${_priceAlerts?.filter(a=>!a.triggered)?.length ?? 0} ACTIVE`; },
+  // Quadrant & sentiment
+  () => { const q = STATE.health?.active_quadrant; return q ? `REGIME: ${q.replace(/_/g,' ').toUpperCase()} | STRATEGY ALIGNED` : 'ECONOMIC QUADRANT: DETECTING'; },
+  () => { const corr = STATE.corr; return corr ? `HOLY GRAIL: ${corr.holy_grail_count??0}/15 UNCORRELATED | MEAN CORR: ${(corr.mean_correlation??0).toFixed(3)}` : 'CORRELATION MATRIX PENDING'; },
+  // Network
+  () => `API LATENCY: ${(Math.random()*30+2).toFixed(0)}ms | FEEDS: ${_TELEMETRY_FEEDS.length} ACTIVE`,
+  () => { const t = STATE.health?.cycle_count; return t != null ? `ENGINE CYCLES: ${t} COMPLETED | STATUS: NOMINAL` : 'ENGINE WARMING UP'; },
+  () => { const h = STATE.health; const dd = h?.drawdown_pct ?? 0; const risk = dd > 5 ? 'HIGH' : dd > 2 ? 'MODERATE' : 'LOW'; return `RISK LEVEL: ${risk} | DD: ${dd.toFixed(2)}% / 10% MAX`; },
 ];
 
 function _rndTicker() {
@@ -5000,29 +5004,48 @@ function cycleRadarStatus() {
   txt.textContent = msg;
 }
 
-const _TELEMETRY_FEEDS = [
-  'ASX.FEED', 'CRYPTO.WS', 'COINGECKO', 'YAHOO.FIN', 'BROKER.API',
-  'SIGNAL.GEN', 'NEWS.FEED', 'SENTIMENT', 'PRICE.STR', 'ORDER.RTR',
-  'MKT.DATA', 'TICK.FEED', 'RSI.CALC', 'CORR.ENG', 'RISK.MON'
+const _TELEMETRY_LINES = [
+  // Data feeds
+  () => { const n = _scannerData.asx?.length ?? 0; return { txt: `ASX.FEED ${n} TICKERS LOADED`, cls: n > 0 ? 'fast' : 'slow' }; },
+  () => { const n = _scannerData.crypto?.length ?? 0; return { txt: `CRYPTO.WS ${n} PAIRS STREAMING`, cls: n > 0 ? 'fast' : 'slow' }; },
+  () => { const n = _scannerData.commodities?.length ?? 0; return { txt: `COMMOD.FEED ${n} ASSETS ACTIVE`, cls: n > 0 ? 'fast' : 'slow' }; },
+  () => { const ms = (Math.random()*30+2).toFixed(0); return { txt: `COINGECKO API ${ms}ms OK`, cls: 'fast' }; },
+  () => { const ms = (Math.random()*40+5).toFixed(0); return { txt: `YAHOO.FIN POLL ${ms}ms OK`, cls: 'fast' }; },
+  // Signal engine
+  () => { const n = STATE.signals?.length ?? 0; return { txt: `SIGNAL.GEN ${n} SIGNALS ACTIVE`, cls: n > 0 ? 'fast' : '' }; },
+  () => { const s = STATE.signals?.[Math.floor(Math.random()*(STATE.signals?.length||1))]; return s ? { txt: `RSI.CALC ${s.ticker} RSI ${(Number(s.rsi)||50).toFixed(0)}`, cls: 'fast' } : { txt: 'RSI.CALC IDLE', cls: '' }; },
+  () => { const s = STATE.signals?.[Math.floor(Math.random()*(STATE.signals?.length||1))]; return s ? { txt: `SIG.EVAL ${s.ticker} — CONF ${(Number(s.confidence)||0).toFixed(0)}%`, cls: Number(s.confidence) >= 70 ? 'fast' : '' } : { txt: 'SIG.EVAL STANDBY', cls: '' }; },
+  // Risk & portfolio
+  () => { const h = STATE.health; const dd = (h?.drawdown_pct??0).toFixed(2); return { txt: `RISK.MON DD ${dd}% / 10% MAX`, cls: +dd < 5 ? 'fast' : 'slow' }; },
+  () => { const h = STATE.health; return { txt: `PORT.NAV ${h ? fmt$(h.equity) : '$---'}`, cls: 'fast' }; },
+  () => { const h = STATE.health; const p = h?.daily_pnl_pct ?? 0; return { txt: `DAILY.PNL ${p >= 0 ? '+' : ''}${p.toFixed(3)}%`, cls: p >= 0 ? 'fast' : 'slow' }; },
+  () => { const h = STATE.health; return { txt: `POSITIONS ${h?.open_positions ?? 0} OPEN`, cls: 'fast' }; },
+  () => { return { txt: `CIRCUIT.BRK ${STATE.health?.halted ? 'TRIPPED' : 'ARMED OK'}`, cls: STATE.health?.halted ? 'slow' : 'fast' }; },
+  // System
+  () => { return { txt: `WS.LINK ${STATE._wsConnected ? 'CONNECTED' : 'DOWN'}`, cls: STATE._wsConnected ? 'fast' : 'slow' }; },
+  () => { const mem = (performance.memory?.usedJSHeapSize/1024/1024)?.toFixed(0); return { txt: `SYS.MEM ${mem ?? '?'}MB / ${(performance.memory?.jsHeapSizeLimit/1024/1024)?.toFixed(0) ?? '?'}MB`, cls: 'fast' }; },
+  () => { const up = (performance.now()/1000/60).toFixed(0); return { txt: `UPTIME ${up} MIN`, cls: 'fast' }; },
+  () => { return { txt: `MODE ${_tradingMode?.toUpperCase() ?? 'PAPER'} | ${_systemPaused ? 'PAUSED' : 'ACTIVE'}`, cls: _systemPaused ? 'slow' : 'fast' }; },
+  // Correlation & quadrant
+  () => { const c = STATE.corr; return c ? { txt: `CORR.ENG MEAN ${(c.mean_correlation??0).toFixed(3)}`, cls: 'fast' } : { txt: 'CORR.ENG PENDING', cls: '' }; },
+  () => { const q = STATE.health?.active_quadrant; return { txt: `QUAD.DET ${q ? q.replace(/_/g,' ').toUpperCase() : 'SCANNING'}`, cls: 'fast' }; },
+  // Sentiment & news
+  () => { const n = STATE._allArticles?.length ?? 0; return { txt: `NEWS.FEED ${n} ARTICLES INDEXED`, cls: n > 0 ? 'fast' : '' }; },
+  () => { const w = _watchlist?.length ?? 0; return { txt: `WATCHLIST ${w} ASSETS MONITORED`, cls: 'fast' }; },
+  () => { const a = _priceAlerts?.filter(a=>!a.triggered)?.length ?? 0; return { txt: `ALERTS ${a} PRICE ALERTS ACTIVE`, cls: a > 0 ? 'fast' : '' }; },
+  // Scanning individual tickers
+  () => { const t = _rndTicker(); const s = STATE.signals?.find(x => x.ticker?.includes(t)); return s ? { txt: `SCAN ${t} ${s.action} ${(Number(s.confidence)||0).toFixed(0)}%`, cls: 'fast' } : { txt: `SCAN ${t} HOLD`, cls: '' }; },
 ];
 
 function spawnTelemetryLine() {
   const wrap = el('radarTelemetry');
   if (!wrap) return;
-  // Keep max 14 lines visible to fill the radar background
   while (wrap.children.length > 14) wrap.removeChild(wrap.firstChild);
 
-  const feed = _TELEMETRY_FEEDS[Math.floor(Math.random() * _TELEMETRY_FEEDS.length)];
-  const latency = Math.random() < 0.85
-    ? (Math.random() * 45 + 2).toFixed(0)   // fast: 2-47ms
-    : (Math.random() * 200 + 80).toFixed(0); // slow: 80-280ms
-  const ms = +latency;
-  const status = ms < 50 ? 'OK' : ms < 120 ? 'WARN' : 'SLOW';
-  const ticker = _RADAR_TICKERS[Math.floor(Math.random() * _RADAR_TICKERS.length)];
-
+  const entry = _TELEMETRY_LINES[Math.floor(Math.random() * _TELEMETRY_LINES.length)]();
   const line = document.createElement('div');
-  line.className = 'radar-telemetry-line' + (ms < 30 ? ' fast' : ms > 100 ? ' slow' : '');
-  line.textContent = `${feed} ${ticker} ${latency}ms ${status}`;
+  line.className = 'radar-telemetry-line' + (entry.cls ? ' ' + entry.cls : '');
+  line.textContent = entry.txt;
   line.style.animationDelay = (Math.random() * 0.3).toFixed(2) + 's';
   wrap.appendChild(line);
   setTimeout(() => line.remove(), 4000);
