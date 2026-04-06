@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260406u" />
+  <link rel="stylesheet" href="/static/style.css?v=20260406v" />
 </head>
 <body>
   <!-- Scanline overlay -->
@@ -140,96 +140,82 @@
       </div>
       <div class="panel-grid panel-grid--cc-hub">
 
-        <!-- ROW 1: Full-width portfolio stats bar -->
+        <!-- ROW 1: Prediction Growth Chart (slim, full width) -->
         <div class="panel panel--cc-statsbar">
-          <div class="panel-hint">Your portfolio snapshot — net asset value, cash, invested amount, unrealised P&L, total return, open positions, win rate, and realised P&L. Updates automatically every cycle.</div>
-          <div class="cc-statsbar-inner">
-            <div class="cc-sb-stat" title="Net Asset Value — total portfolio worth (cash + investments)">
-              <div class="cc-sb-label">TOTAL NAV</div>
-              <div class="cc-sb-val acc" id="ccTotalVal">$1,000.00</div>
-            </div>
-            <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat" title="Available cash not invested in any position">
-              <div class="cc-sb-label">CASH</div>
-              <div class="cc-sb-val" id="ccCash">$1,000.00</div>
-            </div>
-            <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat" title="Total market value of all open positions">
-              <div class="cc-sb-label">INVESTED</div>
-              <div class="cc-sb-val" id="ccInvested">$0.00</div>
-            </div>
-            <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat" title="Profit/loss on positions still open (not yet sold)">
-              <div class="cc-sb-label">UNREALISED P&amp;L</div>
-              <div class="cc-sb-val" id="ccUnrealPnl">$0.00</div>
-            </div>
-            <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat" title="Overall portfolio return as a percentage of starting capital">
-              <div class="cc-sb-label">TOTAL RETURN</div>
-              <div class="cc-sb-val" id="ccReturn">0.00%</div>
-            </div>
-            <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat" title="Number of currently open positions">
-              <div class="cc-sb-label">POSITIONS</div>
-              <div class="cc-sb-val acc" id="ccOpenCount">0</div>
-            </div>
-            <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat" title="Percentage of closed trades that were profitable">
-              <div class="cc-sb-label">WIN RATE</div>
-              <div class="cc-sb-val" id="ccWinRate">--%</div>
-            </div>
-            <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat" title="Total number of completed (closed) trades">
-              <div class="cc-sb-label">TOTAL TRADES</div>
-              <div class="cc-sb-val" id="ccTotalTrades">0</div>
-            </div>
-            <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat" title="Profit/loss from trades that have been closed">
-              <div class="cc-sb-label">REALISED P&amp;L</div>
-              <div class="cc-sb-val" id="ccRealisedPnl">$0.00</div>
-            </div>
-            <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat" title="Current economic regime detected by the AI (e.g. Rising Growth + Rising Inflation)">
-              <div class="cc-sb-label">REGIME</div>
-              <div class="cc-sb-val acc" id="ccRegimeBadge" style="font-size:11px">--</div>
+          <div class="panel-header" style="padding:8px 16px">
+            <span class="panel-title">◈ PORTFOLIO GROWTH PREDICTION</span>
+            <div class="panel-stats">
+              <span class="stat-item">NAV: <strong id="ccTotalVal">$1,000.00</strong></span>
+              <span class="stat-item">PREDICTED: <strong id="ccPredictedVal" style="color:var(--green)">--</strong></span>
+              <span class="stat-item" id="ccReturn" style="font-size:11px">ROI: 0.00%</span>
             </div>
           </div>
+          <div class="panel-hint">AI-predicted portfolio growth based on current positions, signals, and market regime. Solid line = actual equity, dashed line = predicted trajectory. Green zone = confidence band.</div>
+          <div class="chart-container" style="height:100px">
+            <canvas id="predictionChart"></canvas>
+          </div>
+          <!-- Hidden compat elements for stats that JS still writes to -->
+          <span id="ccCash" style="display:none">$1,000.00</span>
+          <span id="ccInvested" style="display:none">$0.00</span>
+          <span id="ccUnrealPnl" style="display:none">$0.00</span>
+          <span id="ccOpenCount" style="display:none">0</span>
+          <span id="ccWinRate" style="display:none">--%</span>
+          <span id="ccTotalTrades" style="display:none">0</span>
+          <span id="ccRealisedPnl" style="display:none">$0.00</span>
+          <span id="ccRegimeBadge" style="display:none">--</span>
         </div>
 
-        <!-- ROW 2 COL 1: Quick Trade -->
-        <div class="panel panel--cc-quicktrade">
+        <!-- ROW 2 COL 1: DALIOS Operations HUD -->
+        <div class="panel panel--cc-quicktrade panel--ops-hud">
           <div class="panel-header">
-            <span class="panel-title">⚡ QUICK TRADE</span>
-            <span class="panel-tag" style="color:var(--amber)">PAPER</span>
+            <span class="panel-title">◎ DALIOS OPS</span>
+            <span class="panel-tag ops-hud-status" id="opsHudStatus">● ONLINE</span>
           </div>
-          <div class="panel-hint">Type any ticker (e.g. BTC, CBA.AX, GLD), pick BUY or SELL, set quantity, then execute. Uses paper money — no real funds.</div>
-          <div class="cc-qt-form">
-            <div class="po-row">
-              <label class="po-label">ASSET</label>
-              <input type="text" id="ccQtTicker" class="po-input po-ticker-input" placeholder="BTC, CBA.AX, GLD…" autocomplete="off" oninput="ccQtLookup(this.value)"/>
-            </div>
-            <div id="ccQtQuote" class="po-quote-result" style="margin-bottom:6px"></div>
-            <div class="po-row">
-              <label class="po-label">SIDE</label>
-              <div class="po-side-btns">
-                <button class="po-side-btn po-buy active" id="ccQtBuyBtn" onclick="setCcQtSide('BUY',this)">▲ BUY</button>
-                <button class="po-side-btn po-sell" id="ccQtSellBtn" onclick="setCcQtSide('SELL',this)">▼ SELL</button>
+          <div class="ops-hud-body">
+            <!-- Radar SVG -->
+            <div class="ops-radar-wrap">
+              <svg class="ops-radar-svg" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                <!-- Concentric rings -->
+                <circle cx="60" cy="60" r="55" fill="none" stroke="rgba(255,140,0,0.08)" stroke-width="0.5"/>
+                <circle cx="60" cy="60" r="40" fill="none" stroke="rgba(255,140,0,0.06)" stroke-width="0.5"/>
+                <circle cx="60" cy="60" r="25" fill="none" stroke="rgba(255,140,0,0.05)" stroke-width="0.5"/>
+                <circle cx="60" cy="60" r="10" fill="none" stroke="rgba(255,140,0,0.04)" stroke-width="0.5"/>
+                <!-- Crosshairs -->
+                <line x1="60" y1="2" x2="60" y2="118" stroke="rgba(255,140,0,0.06)" stroke-width="0.5"/>
+                <line x1="2" y1="60" x2="118" y2="60" stroke="rgba(255,140,0,0.06)" stroke-width="0.5"/>
+                <!-- Sweep beam -->
+                <path class="ops-radar-beam" d="M60,60 L60,5 A55,55 0 0,1 107,35 Z" fill="url(#radarGrad)"/>
+                <!-- Blips (positioned by JS) -->
+                <g id="radarBlips"></g>
+                <!-- Center dot -->
+                <circle cx="60" cy="60" r="2.5" fill="var(--primary)" opacity="0.9"/>
+                <circle cx="60" cy="60" r="4" fill="none" stroke="var(--primary)" stroke-width="0.5" opacity="0.4"/>
+                <defs>
+                  <radialGradient id="radarGrad" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="rgba(255,140,0,0.15)"/>
+                    <stop offset="100%" stop-color="transparent"/>
+                  </radialGradient>
+                </defs>
+              </svg>
+              <div class="ops-radar-label">
+                <span class="ops-radar-status-dot" id="opsRadarDot">●</span>
+                <span id="opsRadarText">SCANNING</span>
               </div>
             </div>
-            <div class="po-row">
-              <label class="po-label">QTY</label>
-              <input type="number" id="ccQtQty" class="po-input" value="1" min="0.0001" step="any" oninput="ccQtEstimate()"/>
+            <!-- Live code terminal -->
+            <div class="ops-terminal">
+              <div class="ops-terminal-header">
+                <span class="ops-term-dot red"></span>
+                <span class="ops-term-dot amber"></span>
+                <span class="ops-term-dot green"></span>
+                <span class="ops-term-title">LIVE OPS LOG</span>
+              </div>
+              <div class="ops-terminal-scroll" id="opsTerminal">
+                <div class="ops-line"><span class="ops-ts">00:00:00</span> <span class="ops-cmd">SYS.BOOT</span> <span class="ops-msg">DALIOS framework initialising...</span></div>
+                <div class="ops-line"><span class="ops-ts">00:00:01</span> <span class="ops-cmd">NET.LINK</span> <span class="ops-msg">WebSocket connected to /ws</span></div>
+                <div class="ops-line"><span class="ops-ts">00:00:02</span> <span class="ops-cmd">MKT.SCAN</span> <span class="ops-msg">Loading 71 assets across 3 markets</span></div>
+              </div>
             </div>
-            <div class="po-estimate" id="ccQtEstimate">
-              <span class="po-est-label">EST. COST</span>
-              <span class="po-est-val" id="ccQtEstVal">—</span>
-            </div>
-            <div class="po-cash-row">
-              <span class="po-cash-label">AVAILABLE CASH</span>
-              <span class="po-cash-val" id="ccQtCash">$--</span>
-            </div>
-            <button class="btn-primary btn--full" onclick="ccQtSubmit()" style="margin-top:8px">▶ EXECUTE TRADE</button>
-            <div id="ccQtResult" style="margin-top:6px;font-size:11px"></div>
           </div>
         </div>
 
@@ -2146,7 +2132,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=20260406u"></script>
+  <script src="/static/app.js?v=20260406v"></script>
 
   <!-- ═══════════════════════════════════════════════
        SPEECH BUBBLE SPOTLIGHT TOOLTIP

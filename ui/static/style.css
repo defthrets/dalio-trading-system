@@ -948,7 +948,7 @@ a:hover { color: var(--primary); text-decoration: underline; }
 }
 .panel-grid--cc-hub {
   grid-template-columns: 280px 1fr 1fr;    /* col 2+3 equal — chart same size as quadrant */
-  grid-template-rows: auto 240px auto auto auto;
+  grid-template-rows: auto 280px auto auto auto;
   gap: 12px;
 }
 /* Row 1: stats bar */
@@ -2024,7 +2024,7 @@ canvas { display: block; max-width: 100%; }
   .panel-grid--cc-hub {
     grid-template-columns: 1fr;
   }
-  .panel--cc-statsbar, .panel--cc-quicktrade, .panel--cc-chart,
+  .panel--cc-statsbar, .panel--cc-quicktrade, .panel--ops-hud, .panel--cc-chart,
   .panel--cc-quadrant, .panel--cc-recs, .panel--cc-livepos,
   .panel--cc-history, .panel--cc-feed, .panel--cc-perf {
     grid-column: 1; grid-row: auto;
@@ -3764,6 +3764,143 @@ body.cli-expanded { padding-bottom: 272px; }
    ═══════════════════════════════════════════════════════════ */
 
 /* Grid placements — defined in panel-grid--cc-hub section above */
+
+/* ═══════════════════════════════════════════════════════════
+   DALIOS OPS HUD — Radar + Live Terminal
+   ═══════════════════════════════════════════════════════════ */
+.panel--ops-hud { overflow: hidden; }
+.ops-hud-body {
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 42px);
+  gap: 0;
+}
+
+/* ── Radar ── */
+.ops-radar-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 0 2px;
+  flex-shrink: 0;
+  height: 110px;
+}
+.ops-radar-svg {
+  width: 100px;
+  height: 100px;
+}
+.ops-radar-beam {
+  transform-origin: 60px 60px;
+  animation: radarBeamSpin 3s linear infinite;
+}
+@keyframes radarBeamSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+/* Blips */
+.ops-radar-blip {
+  fill: var(--green);
+  opacity: 0;
+  animation: blipFade 3s ease infinite;
+}
+.ops-radar-blip.warn { fill: var(--amber); }
+.ops-radar-blip.alert { fill: var(--red); }
+@keyframes blipFade {
+  0%   { opacity: 0; r: 1; }
+  15%  { opacity: 0.9; r: 2.5; }
+  80%  { opacity: 0.3; r: 1.5; }
+  100% { opacity: 0; r: 1; }
+}
+.ops-radar-label {
+  position: absolute;
+  bottom: 2px;
+  left: 0; right: 0;
+  text-align: center;
+  font-family: var(--font-hud);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text-2);
+}
+.ops-radar-status-dot {
+  color: var(--green);
+  animation: dotPulse 2s ease infinite;
+  margin-right: 3px;
+  font-size: 8px;
+}
+.ops-hud-status {
+  font-size: 10px;
+  color: var(--green);
+  animation: dotPulse 2s ease infinite;
+}
+
+/* ── Terminal ── */
+.ops-terminal {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  background: rgba(0,0,0,0.4);
+}
+.ops-terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+.ops-term-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.ops-term-dot.red   { background: var(--red); }
+.ops-term-dot.amber { background: var(--amber); }
+.ops-term-dot.green { background: var(--green); }
+.ops-term-title {
+  font-family: var(--font-hud);
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+.ops-terminal-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1.5;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.ops-terminal-scroll::-webkit-scrollbar { width: 3px; }
+.ops-terminal-scroll::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+.ops-line {
+  white-space: nowrap;
+  overflow: hidden;
+  animation: opsLineSlide 0.3s ease both;
+}
+@keyframes opsLineSlide {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ops-ts {
+  color: var(--text-muted);
+  margin-right: 6px;
+}
+.ops-cmd {
+  color: var(--primary);
+  font-weight: 700;
+  margin-right: 6px;
+}
+.ops-msg {
+  color: var(--green);
+}
+.ops-msg.warn { color: var(--amber); }
+.ops-msg.err  { color: var(--red); }
 
 /* ─── Portfolio Stats Strip ─── */
 .cc-stats-strip {

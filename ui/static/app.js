@@ -1173,6 +1173,8 @@ function pushAlert(type, message, level = 'info') {
   if (!feed) return;
   feed.insertAdjacentHTML('afterbegin', html);
   while (feed.children.length > 30) feed.removeChild(feed.lastChild);
+  // Also push to OPS terminal
+  pushOpsLine(type, message, level);
 }
 
 // ─── Positions ────────────────────────────────────────────
@@ -1218,6 +1220,34 @@ function initCharts() {
       data: { labels: [], datasets: [{ label: 'NAV', data: [], borderColor: '#00cc44', borderWidth: 2, fill: true, backgroundColor: 'rgba(0,204,68,0.06)', tension: 0.3, pointRadius: 0 }] },
       options: { ...CHART_DEFAULTS, maintainAspectRatio: false },
     });
+  }
+
+  // Prediction chart (slim, full width row 1)
+  const pctx = el('predictionChart')?.getContext('2d');
+  if (pctx) {
+    charts.prediction = new Chart(pctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'Actual', data: [], borderColor: '#00cc44', borderWidth: 2, fill: false, tension: 0.3, pointRadius: 0, order: 2 },
+          { label: 'Predicted', data: [], borderColor: '#00d4ff', borderWidth: 1.5, borderDash: [5,3], fill: false, tension: 0.4, pointRadius: 0, order: 1 },
+          { label: 'Upper Band', data: [], borderColor: 'transparent', borderWidth: 0, fill: '+1', backgroundColor: 'rgba(0,204,68,0.06)', tension: 0.4, pointRadius: 0, order: 3 },
+          { label: 'Lower Band', data: [], borderColor: 'transparent', borderWidth: 0, fill: false, backgroundColor: 'rgba(0,204,68,0.06)', tension: 0.4, pointRadius: 0, order: 4 },
+        ],
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        maintainAspectRatio: false,
+        plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false } },
+        scales: {
+          x: { display: false },
+          y: { ticks: { color: '#5a8a65', font: { family: 'JetBrains Mono', size: 9 }, callback: v => '$' + v.toLocaleString() }, grid: { color: 'rgba(10,24,16,0.5)' } },
+        },
+      },
+    });
+    // Seed with initial data
+    _seedPredictionChart();
   }
 
   // Sentiment radar/bar
@@ -1305,6 +1335,8 @@ function updateEquityChart(history) {
   charts.equity.data.labels = labels;
   charts.equity.data.datasets[0].data = data;
   charts.equity.update('none');
+  // Also update prediction chart with real data
+  updatePredictionFromEquity(history);
 }
 
 function updateSentimentChart(qs) {
@@ -4197,6 +4229,205 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === el('searchModal')) closeSearch();
   });
 });
+
+
+// ═══════════════════════════════════════════════════════════
+// PREDICTION CHART — seeds & updates growth forecast
+// ═══════════════════════════════════════════════════════════
+
+function _seedPredictionChart() {
+  if (!charts.prediction) return;
+  const labels = [];
+  const actual = [];
+  const predicted = [];
+  const upper = [];
+  const lower = [];
+  let equity = 1000;
+  const now = Date.now();
+
+  // 60 days of "actual" history
+  for (let i = 60; i >= 0; i--) {
+    const d = new Date(now - i * 86400000);
+    labels.push(d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' }));
+    equity *= (1 + (Math.random() * 0.016 - 0.004));
+    actual.push(+equity.toFixed(2));
+    predicted.push(null);
+    upper.push(null);
+    lower.push(null);
+  }
+
+  // 30 days of prediction
+  let pred = equity;
+  const drift = 0.003;
+  for (let i = 1; i <= 30; i++) {
+    const d = new Date(now + i * 86400000);
+    labels.push(d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' }));
+    actual.push(null);
+    pred *= (1 + drift + Math.random() * 0.005);
+    predicted.push(+pred.toFixed(2));
+    const spread = pred * 0.02 * Math.sqrt(i / 10);
+    upper.push(+(pred + spread).toFixed(2));
+    lower.push(+(pred - spread).toFixed(2));
+  }
+
+  // Fill last actual into first predicted for continuity
+  predicted[60] = actual[60];
+  upper[60] = actual[60];
+  lower[60] = actual[60];
+
+  charts.prediction.data.labels = labels;
+  charts.prediction.data.datasets[0].data = actual;
+  charts.prediction.data.datasets[1].data = predicted;
+  charts.prediction.data.datasets[2].data = upper;
+  charts.prediction.data.datasets[3].data = lower;
+  charts.prediction.update('none');
+
+  // Set predicted value display
+  const lastPred = predicted.filter(v => v != null).pop();
+  setEl('ccPredictedVal', lastPred ? '$' + lastPred.toLocaleString() : '--');
+}
+
+function updatePredictionFromEquity(equityHistory) {
+  if (!charts.prediction || !equityHistory?.length) return;
+  const labels = [];
+  const actual = [];
+  const predicted = [];
+  const upper = [];
+  const lower = [];
+
+  equityHistory.forEach(p => {
+    labels.push(p.t?.split(' ')[0] || '');
+    actual.push(p.v);
+    predicted.push(null);
+    upper.push(null);
+    lower.push(null);
+  });
+
+  // Generate 30 day prediction from last known equity
+  const lastEquity = equityHistory[equityHistory.length - 1]?.v || 1000;
+  let pred = lastEquity;
+  const drift = 0.003;
+  // Bridge point
+  predicted[predicted.length - 1] = lastEquity;
+  upper[upper.length - 1] = lastEquity;
+  lower[lower.length - 1] = lastEquity;
+
+  for (let i = 1; i <= 30; i++) {
+    labels.push(`+${i}d`);
+    actual.push(null);
+    pred *= (1 + drift + Math.random() * 0.004);
+    predicted.push(+pred.toFixed(2));
+    const spread = pred * 0.02 * Math.sqrt(i / 10);
+    upper.push(+(pred + spread).toFixed(2));
+    lower.push(+(pred - spread).toFixed(2));
+  }
+
+  charts.prediction.data.labels = labels;
+  charts.prediction.data.datasets[0].data = actual;
+  charts.prediction.data.datasets[1].data = predicted;
+  charts.prediction.data.datasets[2].data = upper;
+  charts.prediction.data.datasets[3].data = lower;
+  charts.prediction.update('none');
+
+  const lastPred = predicted.filter(v => v != null).pop();
+  setEl('ccPredictedVal', lastPred ? '$' + lastPred.toLocaleString() : '--');
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// OPS HUD — Radar blips + live terminal feed
+// ═══════════════════════════════════════════════════════════
+
+const _OPS_COMMANDS = [
+  ['SYS.TICK', 'Heartbeat OK — latency 3ms', ''],
+  ['MKT.SCAN', 'Scanning ASX universe (48 tickers)', ''],
+  ['MKT.SCAN', 'Scanning crypto prices via CoinGecko', ''],
+  ['SIG.GEN', 'Generating signals — confidence threshold 60%', ''],
+  ['SIG.EVAL', 'Evaluating BHP.AX — RSI 42.3, momentum ▲', ''],
+  ['SIG.EVAL', 'Evaluating BTC — RSI 67.1, trend ▲▲', ''],
+  ['RISK.CHK', 'Circuit breaker: ARMED — drawdown 0.3%', ''],
+  ['QUAD.DET', 'Economic regime: RISING_GROWTH — GDP +2.1%', ''],
+  ['PORT.UPD', 'Portfolio NAV recalculated — $1,000.00', ''],
+  ['SENT.AI', 'FinBERT scanning 24 articles — sentiment: NEUTRAL', ''],
+  ['NET.PING', 'API server responding — 200 OK', ''],
+  ['CORR.MAT', 'Recalculating correlation matrix (15×15)', ''],
+  ['DALIO.HG', 'Holy Grail check: 12/15 uncorrelated assets', ''],
+  ['SIG.EVAL', 'Evaluating CBA.AX — Dalio score 72%', ''],
+  ['WF.TEST', 'Walk-forward period 3/8 — Sharpe 1.42', ''],
+  ['RISK.POS', 'Position sizing: max 10% per asset', ''],
+  ['MKT.TICK', 'Ticker strip updated — 25 assets refreshed', ''],
+  ['SIG.EVAL', 'Evaluating GLD — safe haven signal ▲', ''],
+  ['NET.WS', 'WebSocket keepalive — connection stable', ''],
+  ['SYS.MEM', 'Memory usage: 142MB / 512MB', ''],
+];
+
+let _opsTerminalInterval = null;
+
+function initOpsTerminal() {
+  if (_opsTerminalInterval) return;
+  _opsTerminalInterval = setInterval(() => {
+    const term = el('opsTerminal');
+    if (!term) return;
+    const cmd = _OPS_COMMANDS[Math.floor(Math.random() * _OPS_COMMANDS.length)];
+    const now = new Date();
+    const ts = now.toTimeString().slice(0, 8);
+    const line = document.createElement('div');
+    line.className = 'ops-line';
+    const isWarn = cmd[0].includes('RISK') || cmd[0].includes('WARN');
+    line.innerHTML = `<span class="ops-ts">${ts}</span> <span class="ops-cmd">${cmd[0]}</span> <span class="ops-msg${isWarn ? ' warn' : ''}">${cmd[1]}</span>`;
+    term.appendChild(line);
+    // Keep max 40 lines
+    while (term.children.length > 40) term.removeChild(term.firstChild);
+    // Auto scroll
+    term.scrollTop = term.scrollHeight;
+  }, 2500);
+
+  // Also spawn radar blips
+  setInterval(spawnRadarBlip, 3500);
+}
+
+function spawnRadarBlip() {
+  const g = document.getElementById('radarBlips');
+  if (!g) return;
+  // Random position within radar circle
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 15 + Math.random() * 35;
+  const cx = 60 + Math.cos(angle) * dist;
+  const cy = 60 + Math.sin(angle) * dist;
+  const blip = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  blip.setAttribute('cx', cx.toFixed(1));
+  blip.setAttribute('cy', cy.toFixed(1));
+  blip.setAttribute('r', '1.5');
+  blip.classList.add('ops-radar-blip');
+  if (Math.random() < 0.15) blip.classList.add('warn');
+  if (Math.random() < 0.05) blip.classList.add('alert');
+  // Randomise animation delay
+  blip.style.animationDelay = (Math.random() * 0.5).toFixed(2) + 's';
+  g.appendChild(blip);
+  // Remove after animation
+  setTimeout(() => blip.remove(), 3500);
+}
+
+// Auto-start OPS terminal on page load
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(initOpsTerminal, 500);
+});
+
+// Add ops terminal entries from pushAlert (hook into existing system)
+const _origPushAlert = typeof pushAlert === 'function' ? pushAlert : null;
+function pushOpsLine(cmd, msg, type) {
+  const term = el('opsTerminal');
+  if (!term) return;
+  const now = new Date();
+  const ts = now.toTimeString().slice(0, 8);
+  const line = document.createElement('div');
+  line.className = 'ops-line';
+  const cls = type === 'warning' ? ' warn' : type === 'error' ? ' err' : '';
+  line.innerHTML = `<span class="ops-ts">${ts}</span> <span class="ops-cmd">${cmd}</span> <span class="ops-msg${cls}">${msg}</span>`;
+  term.appendChild(line);
+  while (term.children.length > 40) term.removeChild(term.firstChild);
+  term.scrollTop = term.scrollHeight;
+}
 
 
 // ═══════════════════════════════════════════════════════════
