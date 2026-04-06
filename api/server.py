@@ -247,6 +247,7 @@ class SystemState:
         self.agent = None
         self.booted = False
         self.mode = "PAPER"
+        self.paused = False
         self.start_time = datetime.utcnow()
         self.cycle_count = 0
         self.last_cycle: Optional[dict] = None
@@ -2045,14 +2046,21 @@ async def get_status():
         except Exception:
             pass
     return {
-        "status": "OPERATIONAL",
+        "status": "PAUSED" if getattr(STATE, 'paused', False) else "OPERATIONAL",
         "mode": mode,
         "agent_booted": STATE.booted,
         "cycle_count": STATE.cycle_count,
         "uptime_seconds": STATE.uptime_seconds(),
         "version": "1.0.0",
         "timestamp": datetime.utcnow().isoformat(),
+        "paused": getattr(STATE, 'paused', False),
     }
+
+
+@app.post("/api/system/pause")
+async def toggle_pause(body: dict):
+    STATE.paused = body.get("paused", False)
+    return {"paused": STATE.paused, "status": "PAUSED" if STATE.paused else "OPERATIONAL"}
 
 
 @app.get("/api/portfolio/health")

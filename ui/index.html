@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260406t" />
+  <link rel="stylesheet" href="/static/style.css?v=20260406u" />
 </head>
 <body>
   <!-- Scanline overlay -->
@@ -48,15 +48,15 @@
       </div>
       <div class="header-divider"></div>
       <div class="system-badges">
-        <span class="badge badge--green" id="statusBadge">● OPERATIONAL</span>
+        <span class="badge badge--green" id="statusBadge" onclick="toggleSystemStatus()" title="Click to pause/resume trading">● OPERATIONAL</span>
         <div class="mode-dropdown" id="modeDropdown">
-          <span class="badge badge--red" id="modeBadge" onclick="toggleModeDropdown()" title="Switch trading mode">MODE: LIVE ▾</span>
+          <span class="badge badge--red" id="modeBadge" onclick="toggleModeDropdown()" title="Click to switch LIVE / PAPER trading mode">MODE: LIVE ▾</span>
           <div class="mode-dropdown-menu hidden" id="modeDropdownMenu">
             <button class="mode-drop-opt" id="modeOptPaper" onclick="selectMode('paper')">📄 PAPER</button>
             <button class="mode-drop-opt" id="modeOptLive"  onclick="selectMode('live')">🔴 LIVE</button>
           </div>
         </div>
-        <span class="badge badge--cyan" id="uptimeBadge">UPTIME: --</span>
+        <span class="badge badge--cyan" id="uptimeBadge" style="cursor:default;animation:none">UPTIME: --</span>
       </div>
     </div>
     <div class="header-right">
@@ -836,6 +836,43 @@
     ───────────────────────────────────── -->
     <section id="tab-backtest-lab" class="tab-panel">
       <div class="panel-grid panel-grid--backtest">
+
+        <!-- Backtest Run Status (full width) -->
+        <div class="panel panel--bt-status" style="grid-column: 1 / -1">
+          <div class="panel-header">
+            <span class="panel-title">◈ BACKTEST STATUS</span>
+            <span class="panel-tag" id="btStatusTag">IDLE</span>
+          </div>
+          <div class="panel-hint">Monitor backtest progress — current run status, elapsed time, training window, and total periods processed. Click RUN BACKTEST to start a new analysis. Click RESET to clear results and start fresh.</div>
+          <div class="bt-status-panel">
+            <div class="bt-status-grid">
+              <div class="bt-status-item">
+                <div class="bt-status-val idle" id="btRunStatus">IDLE</div>
+                <div class="bt-status-label">STATUS</div>
+              </div>
+              <div class="bt-status-item">
+                <div class="bt-status-val" id="btRunTime">0:00</div>
+                <div class="bt-status-label">RUN TIME</div>
+              </div>
+              <div class="bt-status-item">
+                <div class="bt-status-val" id="btTrainWindow">12M / 3M</div>
+                <div class="bt-status-label">TRAIN / TEST</div>
+              </div>
+              <div class="bt-status-item">
+                <div class="bt-status-val" id="btPeriodsProcessed">0 / 8</div>
+                <div class="bt-status-label">PERIODS DONE</div>
+              </div>
+            </div>
+            <div class="bt-status-actions">
+              <button class="btn-primary btn--sm" onclick="runBacktestWithStatus()">▶ RUN BACKTEST</button>
+              <button class="btn-ghost btn--sm" onclick="resetBacktest()">↺ RESET</button>
+              <div class="bt-progress-bar">
+                <div class="bt-progress-fill" id="btProgressFill" style="width:0%"></div>
+              </div>
+              <span style="font-size:11px;color:var(--text-2);font-family:var(--font-mono)" id="btProgressPct">0%</span>
+            </div>
+          </div>
+        </div>
 
         <!-- Backtest Summary -->
         <div class="panel panel--bt-summary">
@@ -2109,7 +2146,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=20260406t"></script>
+  <script src="/static/app.js?v=20260406u"></script>
 
   <!-- ═══════════════════════════════════════════════
        SPEECH BUBBLE SPOTLIGHT TOOLTIP

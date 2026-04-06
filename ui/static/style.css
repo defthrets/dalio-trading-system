@@ -52,25 +52,36 @@
 
 /* ─── Micro-animations & effects ─── */
 
-/* Panel sweep: a diagonal light streak sweeps across panels on hover */
+/* Radar scan: a radial sweep that follows the cursor on hovered panels */
 .panel::after {
   content: '';
   position: absolute;
-  top: -60%; left: -80px;
-  width: 50px; height: 200%;
-  background: linear-gradient(90deg, transparent, rgba(255,140,0,0.05), transparent);
-  transform: rotate(15deg);
+  top: 0; left: 0; right: 0; bottom: 0;
   pointer-events: none;
-  transition: none;
   opacity: 0;
+  transition: opacity 0.3s ease;
+  background: conic-gradient(
+    from var(--radar-angle, 0deg) at var(--radar-x, 50%) var(--radar-y, 50%),
+    rgba(255,140,0,0.08) 0deg,
+    rgba(255,140,0,0.03) 30deg,
+    transparent 60deg,
+    transparent 360deg
+  );
+  z-index: 0;
 }
 .panel:hover::after {
   opacity: 1;
-  animation: panelSweep 0.7s ease forwards;
+  animation: radarSpin 2.5s linear infinite;
 }
-@keyframes panelSweep {
-  from { left: -80px; }
-  to   { left: 110%; }
+@keyframes radarSpin {
+  from { --radar-angle: 0deg; }
+  to   { --radar-angle: 360deg; }
+}
+/* Register the custom property so it can be animated */
+@property --radar-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
 }
 
 /* Panel entrance: panels slide+fade in when a tab becomes active */
@@ -655,21 +666,48 @@ a:hover { color: var(--primary); text-decoration: underline; }
   background: var(--border-hi);
 }
 
-.system-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+.system-badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
 .badge {
   font-family: var(--font-hud);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 1.5px;
-  padding: 3px 8px;
-  border-radius: 2px;
+  padding: 6px 12px;
+  border-radius: 3px;
   border: 1px solid;
+  cursor: pointer;
+  user-select: none;
+  min-width: 110px;
+  text-align: center;
+  transition: transform 0.15s ease, box-shadow 0.25s ease, background 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  overflow: hidden;
 }
+.badge:hover {
+  transform: translateY(-1px);
+}
+.badge:active {
+  transform: translateY(0) scale(0.97);
+}
+/* Subtle animated border glow to hint "clickable" */
+@keyframes badgeBorderPulse {
+  0%, 100% { box-shadow: 0 0 4px currentColor; }
+  50%      { box-shadow: 0 0 10px currentColor, 0 0 2px currentColor inset; }
+}
+#statusBadge, #modeBadge { animation: badgeBorderPulse 3s ease infinite; }
+
 .badge--green  { color: var(--green);  border-color: var(--green);  background: var(--green-glow); }
+.badge--green:hover  { background: rgba(0,204,68,0.18); box-shadow: 0 0 14px var(--green-glow); }
 .badge--amber  { color: var(--amber);  border-color: var(--amber);  background: var(--amber-glow); }
+.badge--amber:hover  { background: rgba(255,193,7,0.18); box-shadow: 0 0 14px var(--amber-glow); }
 .badge--red    { color: var(--red);    border-color: var(--red);    background: var(--red-glow); }
+.badge--red:hover    { background: rgba(255,23,68,0.2); box-shadow: 0 0 14px var(--red-glow); }
 .badge--cyan   { color: var(--cyan);   border-color: var(--cyan);   background: var(--cyan-glow); }
+.badge--cyan:hover   { background: rgba(0,212,255,0.18); box-shadow: 0 0 14px var(--cyan-glow); }
+
+/* Paused state for operational badge */
+.badge--paused { color: var(--amber); border-color: var(--amber); background: var(--amber-glow); animation: badgeBorderPulse 1.5s ease infinite; }
 
 /* ── Mode dropdown ─────────────────────────────────── */
 .mode-dropdown {
@@ -884,6 +922,13 @@ a:hover { color: var(--primary); text-decoration: underline; }
 .tab-content { flex: 1; overflow-y: auto; padding: 20px; min-height: calc(100vh - 124px); }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
+
+/* ─── Panel Inline Helper Text ─── */
+.panel-hint {
+  padding: 6px 14px; font-size: 11px; color: var(--text-2);
+  line-height: 1.4; border-bottom: 1px solid var(--border);
+  background: rgba(255,140,0,0.02);
+}
 
 /* ─── Tab Description Banner ─── */
 .tab-desc {
@@ -1599,6 +1644,59 @@ canvas { display: block; max-width: 100%; }
   line-height: 1.6;
 }
 .method-icon { color: var(--green); margin-right: 6px; }
+
+/* ── Backtest Run Status Panel ─── */
+.bt-status-panel { padding: 14px; }
+.bt-status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.bt-status-item {
+  text-align: center;
+  padding: 10px 8px;
+  border: 1px solid var(--border-hi);
+  border-radius: 3px;
+  background: var(--bg-2);
+}
+.bt-status-val {
+  font-family: var(--font-hud);
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--cyan);
+  text-shadow: 0 0 6px var(--cyan-glow);
+}
+.bt-status-val.running { color: var(--green); animation: dotPulse 1.5s ease infinite; }
+.bt-status-val.idle    { color: var(--text-muted); text-shadow: none; }
+.bt-status-label {
+  font-family: var(--font-hud);
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.bt-status-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.bt-progress-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  min-width: 120px;
+}
+.bt-progress-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 6px var(--green-glow);
+}
 
 /* ─── COMMS CONFIG ─── */
 .config-form { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
@@ -3464,6 +3562,78 @@ body.cli-expanded { padding-bottom: 272px; }
 }
 .scanner-table th:hover { color: var(--primary); }
 .scanner-table td { white-space: nowrap; }
+
+/* 2-column scanner card grid (replaces single-column table body) */
+.scanner-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  padding: 0;
+}
+.scanner-card {
+  display: grid;
+  grid-template-columns: 70px 1fr auto auto auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-panel);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+.scanner-card:hover {
+  background: var(--bg-row-hover);
+  transform: translateX(2px);
+}
+.scanner-card .sc-ticker {
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 1px;
+}
+.scanner-card .sc-name {
+  color: var(--text-2);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scanner-card .sc-price {
+  font-weight: 700;
+  color: var(--text-1);
+  min-width: 70px;
+  text-align: right;
+}
+.scanner-card .sc-change {
+  min-width: 65px;
+  text-align: right;
+  font-weight: 700;
+}
+.scanner-card .sc-change.pos { color: var(--green); }
+.scanner-card .sc-change.neg { color: var(--red); }
+.scanner-card .sc-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.scanner-card .sc-star-btn,
+.scanner-card .sc-trade-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.scanner-card .sc-star-btn:hover { color: var(--amber); border-color: var(--amber); }
+.scanner-card .sc-trade-btn { color: var(--green); border-color: var(--green-dim); }
+.scanner-card .sc-trade-btn:hover { background: var(--green-glow); }
+@media (max-width: 1200px) {
+  .scanner-card-grid { grid-template-columns: 1fr; }
+}
 
 .scanner-loading {
   text-align: center;

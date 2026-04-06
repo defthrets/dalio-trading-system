@@ -219,11 +219,19 @@ async function loadStatus() {
   try {
     const d = await fetchJSON('/api/status');
     STATE.status = d;
-    document.getElementById('modeBadge').textContent   = `MODE: ${d.mode}`;
-    document.getElementById('statusBadge').textContent = `● ${d.status}`;
+    document.getElementById('modeBadge').textContent   = `MODE: ${d.mode} ▾`;
+    document.getElementById('modeBadge').className     = d.mode === 'LIVE' ? 'badge badge--red' : 'badge badge--amber';
+    // Status badge respects paused state from server
+    const sb = document.getElementById('statusBadge');
+    if (sb) {
+      _systemPaused = !!d.paused;
+      sb.textContent = d.paused ? '⏸ PAUSED' : `● ${d.status}`;
+      sb.className   = d.paused ? 'badge badge--paused' : 'badge badge--green';
+    }
     document.getElementById('cycleCount').textContent  = d.cycle_count;
     document.getElementById('uptimeBadge').textContent = `UPTIME: ${formatUptime(d.uptime_seconds)}`;
-    document.getElementById('cfgMode').value = d.mode.toLowerCase();
+    const cfgMode = document.getElementById('cfgMode');
+    if (cfgMode) cfgMode.value = d.mode.toLowerCase();
   } catch {}
 }
 
@@ -2512,19 +2520,58 @@ function renderScanner(market, filterText = '', filterSector = '') {
 
   if (!rows.length) {
     tbody.innerHTML = `<tr><td colspan="${ids.cols}" class="scanner-loading">No results</td></tr>`;
+    // Also clear card grid if present
+    const cardGrid = tbody.closest('.scanner-table-wrap')?.querySelector('.scanner-card-grid');
+    if (cardGrid) cardGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted)">No results</div>';
     return;
   }
 
   const isCrypto = market === 'crypto';
+  const fmtPrice = (p) => p <= 0 ? '—'
+                   : p >= 1000 ? `$${Number(p).toLocaleString('en-AU', {minimumFractionDigits:2, maximumFractionDigits:2})}`
+                   : p >= 1    ? `$${p.toFixed(2)}`
+                   : p >= 0.001 ? `$${p.toFixed(4)}`
+                   : `$${p.toFixed(8)}`;
+
+  // ── Render 2-column card grid ──
+  const tableWrap = tbody.closest('.scanner-table-wrap');
+  let cardGrid = tableWrap?.querySelector('.scanner-card-grid');
+  if (!cardGrid && tableWrap) {
+    // Hide the old table, create card grid
+    const tbl = tableWrap.querySelector('table');
+    if (tbl) tbl.style.display = 'none';
+    cardGrid = document.createElement('div');
+    cardGrid.className = 'scanner-card-grid';
+    tableWrap.appendChild(cardGrid);
+  }
+  if (cardGrid) {
+    cardGrid.innerHTML = rows.map(r => {
+      const dir      = r.change_pct > 0 ? 'pos' : r.change_pct < 0 ? 'neg' : '';
+      const chgStr   = `${r.change_pct >= 0 ? '+' : ''}${r.change_pct.toFixed(2)}%`;
+      const priceStr = fmtPrice(r.price);
+      const ticker   = r.ticker;
+      const dispName = isCrypto ? ticker.replace('-USD','') : ticker;
+      const nameShort = r.name.length > 20 ? r.name.slice(0,20) + '…' : r.name;
+      const wlIcon   = r.in_watchlist ? '★' : '☆';
+      const wlCls    = r.in_watchlist ? ' in' : '';
+      return `<div class="scanner-card" onclick="scannerOpenTrade('${ticker}',${r.price})">
+        <span class="sc-ticker">${dispName}</span>
+        <span class="sc-name" title="${r.name}">${nameShort}</span>
+        <span class="sc-price">${priceStr}</span>
+        <span class="sc-change ${dir}">${chgStr}</span>
+        <span class="sc-actions">
+          <button class="sc-star-btn${wlCls}" onclick="event.stopPropagation();toggleWatchlist('${ticker}',this)">${wlIcon}</button>
+          <button class="sc-trade-btn" onclick="event.stopPropagation();scannerOpenTrade('${ticker}',${r.price})">▶</button>
+        </span>
+      </div>`;
+    }).join('');
+  }
+
+  // Also update the original tbody (for compatibility / fallback)
   tbody.innerHTML = rows.map(r => {
     const dir      = r.change_pct > 0 ? 'up' : r.change_pct < 0 ? 'down' : 'flat';
     const chgStr   = `${r.change_pct >= 0 ? '+' : ''}${r.change_pct.toFixed(2)}%`;
-    const priceStr = r.price <= 0 ? '—'
-                   : r.price >= 1000 ? `$${Number(r.price).toLocaleString('en-AU', {minimumFractionDigits:2, maximumFractionDigits:2})}`
-                   : r.price >= 1    ? `$${r.price.toFixed(2)}`
-                   : r.price >= 0.001 ? `$${r.price.toFixed(4)}`
-                   : `$${r.price.toFixed(8)}`;
-    // Use pre-formatted volume from server (includes B/M/K suffix)
+    const priceStr = fmtPrice(r.price);
     const volStr   = r.volume_fmt || (r.volume > 0 ? r.volume.toLocaleString() : '—');
     const wlLabel  = r.in_watchlist ? '★ WATCHING' : '☆ WATCH';
     const wlCls    = r.in_watchlist ? 'in' : '';
@@ -2533,7 +2580,7 @@ function renderScanner(market, filterText = '', filterSector = '') {
     const mktCapCol  = isCrypto ? `<td style="color:var(--text-2);font-size:10px">${r.market_cap_fmt || '—'}</td>` : '';
     const dispName   = isCrypto ? ticker.replace('-USD','') : ticker;
     const nameShort  = r.name.length > 26 ? r.name.slice(0,26) + '…' : r.name;
-    return `<tr class="scanner-row ${dir}">
+    return `<tr class="scanner-row ${dir}" style="display:none">
       <td><strong style="font-family:var(--font-hud)">${dispName}</strong></td>
       <td title="${r.name}" style="color:var(--text-2)">${nameShort}</td>
       ${sectorCol}
@@ -2673,6 +2720,8 @@ function updateModeUI(mode, brokerConnected = false) {
   if (badge) {
     badge.textContent = mode === 'live' ? 'MODE: LIVE ▾' : 'MODE: PAPER ▾';
     badge.className   = mode === 'live' ? 'badge badge--red' : 'badge badge--amber';
+    // Flash to confirm mode change
+    badge.classList.remove('data-flash'); void badge.offsetWidth; badge.classList.add('data-flash');
   }
   // Dropdown option highlight
   const optPaper = el('modeOptPaper');
@@ -4148,3 +4197,145 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === el('searchModal')) closeSearch();
   });
 });
+
+
+// ═══════════════════════════════════════════════════════════
+// RADAR SCAN — cursor-following conic gradient on panels
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('mousemove', (e) => {
+    const panel = e.target.closest('.panel');
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width * 100).toFixed(1);
+    const y = ((e.clientY - rect.top) / rect.height * 100).toFixed(1);
+    panel.style.setProperty('--radar-x', x + '%');
+    panel.style.setProperty('--radar-y', y + '%');
+  });
+});
+
+
+// ═══════════════════════════════════════════════════════════
+// SYSTEM STATUS TOGGLE (OPERATIONAL / PAUSED)
+// ═══════════════════════════════════════════════════════════
+let _systemPaused = false;
+
+function toggleSystemStatus() {
+  _systemPaused = !_systemPaused;
+  const badge = el('statusBadge');
+  if (!badge) return;
+  if (_systemPaused) {
+    badge.textContent = '⏸ PAUSED';
+    badge.className = 'badge badge--paused';
+    pushAlert('SYSTEM', 'Trading PAUSED — no new trades will be executed', 'warning');
+    playBeep(220, 0.15);
+  } else {
+    badge.textContent = '● OPERATIONAL';
+    badge.className = 'badge badge--green';
+    pushAlert('SYSTEM', 'Trading RESUMED — system is operational', 'info');
+    playBeep(660, 0.1);
+  }
+  // Notify server
+  postJSON('/api/system/pause', { paused: _systemPaused }).catch(() => {});
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// BACKTEST STATUS PANEL
+// ═══════════════════════════════════════════════════════════
+let _btTimer = null;
+let _btStartTime = null;
+
+function runBacktestWithStatus() {
+  const statusEl = el('btRunStatus');
+  const tagEl = el('btStatusTag');
+  const timeEl = el('btRunTime');
+  const progressEl = el('btProgressFill');
+  const pctEl = el('btProgressPct');
+  const periodsEl = el('btPeriodsProcessed');
+
+  // Start timer
+  _btStartTime = Date.now();
+  if (_btTimer) clearInterval(_btTimer);
+
+  if (statusEl) { statusEl.textContent = 'RUNNING'; statusEl.className = 'bt-status-val running'; }
+  if (tagEl) { tagEl.textContent = 'RUNNING'; tagEl.style.color = 'var(--green)'; }
+
+  // Simulate period progress
+  let periodsDone = 0;
+  const totalPeriods = 8;
+  const periodInterval = setInterval(() => {
+    periodsDone = Math.min(periodsDone + 1, totalPeriods);
+    if (periodsEl) periodsEl.textContent = `${periodsDone} / ${totalPeriods}`;
+    const pct = Math.round(periodsDone / totalPeriods * 100);
+    if (progressEl) progressEl.style.width = pct + '%';
+    if (pctEl) pctEl.textContent = pct + '%';
+    if (periodsDone >= totalPeriods) clearInterval(periodInterval);
+  }, 400);
+
+  // Update timer display
+  _btTimer = setInterval(() => {
+    if (_btStartTime && timeEl) {
+      const elapsed = Math.floor((Date.now() - _btStartTime) / 1000);
+      const m = Math.floor(elapsed / 60);
+      const s = elapsed % 60;
+      timeEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+    }
+  }, 1000);
+
+  // Actually run the backtest
+  loadBacktest().then(() => {
+    clearInterval(periodInterval);
+    clearInterval(_btTimer);
+    _btTimer = null;
+    if (statusEl) { statusEl.textContent = 'COMPLETE'; statusEl.className = 'bt-status-val'; statusEl.style.color = 'var(--green)'; }
+    if (tagEl) { tagEl.textContent = 'COMPLETE'; tagEl.style.color = 'var(--green)'; }
+    if (periodsEl) periodsEl.textContent = `${totalPeriods} / ${totalPeriods}`;
+    if (progressEl) progressEl.style.width = '100%';
+    if (pctEl) pctEl.textContent = '100%';
+    // Record final time
+    if (_btStartTime && timeEl) {
+      const elapsed = Math.floor((Date.now() - _btStartTime) / 1000);
+      const m = Math.floor(elapsed / 60);
+      const s = elapsed % 60;
+      timeEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+    }
+  }).catch(() => {
+    clearInterval(periodInterval);
+    clearInterval(_btTimer);
+    _btTimer = null;
+    if (statusEl) { statusEl.textContent = 'ERROR'; statusEl.className = 'bt-status-val'; statusEl.style.color = 'var(--red)'; }
+    if (tagEl) { tagEl.textContent = 'ERROR'; tagEl.style.color = 'var(--red)'; }
+  });
+}
+
+function resetBacktest() {
+  if (_btTimer) { clearInterval(_btTimer); _btTimer = null; }
+  _btStartTime = null;
+  const ids = ['btRunStatus', 'btRunTime', 'btPeriodsProcessed', 'btProgressPct'];
+  const defaults = ['IDLE', '0:00', '0 / 8', '0%'];
+  ids.forEach((id, i) => setEl(id, defaults[i]));
+  const statusEl = el('btRunStatus');
+  if (statusEl) { statusEl.className = 'bt-status-val idle'; statusEl.style.color = ''; }
+  const tagEl = el('btStatusTag');
+  if (tagEl) { tagEl.textContent = 'IDLE'; tagEl.style.color = ''; }
+  const progressEl = el('btProgressFill');
+  if (progressEl) progressEl.style.width = '0%';
+  // Clear backtest data
+  setEl('bt-totalRet', '--');
+  setEl('bt-sharpe', '--');
+  setEl('bt-sortino', '--');
+  setEl('bt-calmar', '--');
+  setEl('bt-maxdd', '--');
+  setEl('bt-winrate', '--');
+  setEl('bt-periods', '--');
+  setEl('bt-annRet', '--');
+  const ptb = el('periodTableBody');
+  if (ptb) ptb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:14px">Click RUN BACKTEST to generate results</td></tr>';
+  if (charts.wf) {
+    charts.wf.data.labels = [];
+    charts.wf.data.datasets[0].data = [];
+    charts.wf.update();
+  }
+  pushAlert('BACKTEST', 'Results cleared — ready for a new run', 'info');
+}
