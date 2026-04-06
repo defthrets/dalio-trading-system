@@ -1822,7 +1822,18 @@ function saveUiSettings() {
 // ═══════════════════════════════════════════════════════════
 
 const el = id => document.getElementById(id);
-const setEl = (id, val) => { const e = el(id); if (e) e.textContent = val; };
+const setEl = (id, val) => {
+  const e = el(id);
+  if (!e) return;
+  const old = e.textContent;
+  e.textContent = val;
+  // Flash animation when value changes
+  if (old !== String(val) && old !== '--' && old !== '—') {
+    e.classList.remove('data-flash');
+    void e.offsetWidth;
+    e.classList.add('data-flash');
+  }
+};
 const setWidth = (id, pct) => { const e = el(id); if (e) e.style.width = pct + '%'; };
 
 function fmt$(n) {

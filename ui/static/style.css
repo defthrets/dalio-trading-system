@@ -75,13 +75,24 @@
 
 /* Panel entrance: panels slide+fade in when a tab becomes active */
 @keyframes panelIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
-.tab-panel.active .panel          { animation: panelIn 0.28s ease both; }
-.tab-panel.active .panel:nth-child(2) { animation-delay: 0.06s; }
-.tab-panel.active .panel:nth-child(3) { animation-delay: 0.12s; }
-.tab-panel.active .panel:nth-child(4) { animation-delay: 0.18s; }
+.tab-panel.active .panel           { animation: panelIn 0.35s cubic-bezier(0.22,1,0.36,1) both; }
+.tab-panel.active .panel:nth-child(2) { animation-delay: 0.05s; }
+.tab-panel.active .panel:nth-child(3) { animation-delay: 0.10s; }
+.tab-panel.active .panel:nth-child(4) { animation-delay: 0.15s; }
+.tab-panel.active .panel:nth-child(5) { animation-delay: 0.20s; }
+.tab-panel.active .panel:nth-child(6) { animation-delay: 0.25s; }
+.tab-panel.active .panel:nth-child(7) { animation-delay: 0.30s; }
+.tab-panel.active .panel:nth-child(8) { animation-delay: 0.35s; }
+
+/* Tab description banner entrance */
+@keyframes tabDescIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.tab-panel.active .tab-desc { animation: tabDescIn 0.4s cubic-bezier(0.22,1,0.36,1) both; }
 
 /* Data flash: applied via JS when numeric values update */
 @keyframes dataFlash {
@@ -133,6 +144,386 @@
   from { box-shadow: 0 0 0 0 var(--primary-glow); }
   to   { box-shadow: 0 0 8px 2px var(--primary-glow); }
 }
+
+/* ─── Staggered Table Row Animations ─── */
+@keyframes rowSlideIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.data-table tbody tr {
+  animation: rowSlideIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
+}
+.data-table tbody tr:nth-child(1)  { animation-delay: 0.02s; }
+.data-table tbody tr:nth-child(2)  { animation-delay: 0.04s; }
+.data-table tbody tr:nth-child(3)  { animation-delay: 0.06s; }
+.data-table tbody tr:nth-child(4)  { animation-delay: 0.08s; }
+.data-table tbody tr:nth-child(5)  { animation-delay: 0.10s; }
+.data-table tbody tr:nth-child(6)  { animation-delay: 0.12s; }
+.data-table tbody tr:nth-child(7)  { animation-delay: 0.14s; }
+.data-table tbody tr:nth-child(8)  { animation-delay: 0.16s; }
+.data-table tbody tr:nth-child(9)  { animation-delay: 0.18s; }
+.data-table tbody tr:nth-child(10) { animation-delay: 0.20s; }
+.data-table tbody tr:nth-child(n+11) { animation-delay: 0.22s; }
+
+/* ─── Signal Card Pop-in ─── */
+@keyframes cardPopIn {
+  from { opacity: 0; transform: scale(0.92) translateY(10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.signal-card {
+  animation: cardPopIn 0.35s cubic-bezier(0.22,1,0.36,1) both;
+}
+.signal-card:nth-child(1)  { animation-delay: 0.03s; }
+.signal-card:nth-child(2)  { animation-delay: 0.08s; }
+.signal-card:nth-child(3)  { animation-delay: 0.13s; }
+.signal-card:nth-child(4)  { animation-delay: 0.18s; }
+.signal-card:nth-child(5)  { animation-delay: 0.23s; }
+.signal-card:nth-child(6)  { animation-delay: 0.28s; }
+.signal-card:nth-child(n+7) { animation-delay: 0.33s; }
+
+/* ─── Signal Quick-Trade Row Slide ─── */
+@keyframes sigRowSlide {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.paper-sig-row {
+  animation: sigRowSlide 0.25s cubic-bezier(0.22,1,0.36,1) both;
+}
+.paper-sig-row:nth-child(1)  { animation-delay: 0.02s; }
+.paper-sig-row:nth-child(2)  { animation-delay: 0.05s; }
+.paper-sig-row:nth-child(3)  { animation-delay: 0.08s; }
+.paper-sig-row:nth-child(4)  { animation-delay: 0.11s; }
+.paper-sig-row:nth-child(5)  { animation-delay: 0.14s; }
+.paper-sig-row:nth-child(6)  { animation-delay: 0.17s; }
+.paper-sig-row:nth-child(n+7) { animation-delay: 0.20s; }
+
+/* ─── Table Row Hover Effects ─── */
+.data-table tbody tr {
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+.data-table tbody tr:hover {
+  background: var(--bg-row-hover);
+  transform: translateX(2px);
+}
+.scanner-row {
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+.scanner-row:hover {
+  background: var(--bg-row-hover) !important;
+  transform: translateX(3px);
+  box-shadow: -3px 0 0 var(--primary);
+}
+
+/* ─── Button Hover Glow ─── */
+.btn-primary {
+  transition: background 0.2s ease, box-shadow 0.25s ease, transform 0.15s ease;
+}
+.btn-primary:hover {
+  box-shadow: 0 0 16px var(--primary-glow), 0 0 4px var(--primary-dim);
+  transform: translateY(-1px);
+}
+.btn-primary:active {
+  transform: translateY(0) scale(0.97);
+}
+.btn-ghost {
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+}
+.btn-ghost:hover {
+  transform: translateY(-1px);
+}
+
+/* ─── Badge Pulse Animations ─── */
+@keyframes badgePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.panel-tag { transition: color 0.3s ease, background 0.3s ease; }
+
+@keyframes dotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+.broker-bar-dot { animation: dotPulse 2s ease infinite; }
+
+/* ─── Stats Value Shimmer ─── */
+@keyframes valueShimmer {
+  0%   { background-position: -200px 0; }
+  100% { background-position: 200px 0; }
+}
+.ps-val, .bt-stat-val, .cc-sb-val {
+  transition: color 0.4s ease, text-shadow 0.4s ease;
+}
+
+/* ─── Chart Canvas Fade In ─── */
+canvas {
+  animation: panelIn 0.5s ease both;
+  animation-delay: 0.2s;
+}
+
+/* ─── Heatmap Cell Pop ─── */
+@keyframes hmPop {
+  from { opacity: 0; transform: scale(0.8); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.hm-cell {
+  animation: hmPop 0.3s cubic-bezier(0.22,1,0.36,1) both;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.hm-cell:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 12px rgba(255,140,0,0.2);
+  z-index: 2;
+}
+.hm-cell:nth-child(1) { animation-delay: 0.03s; }
+.hm-cell:nth-child(2) { animation-delay: 0.06s; }
+.hm-cell:nth-child(3) { animation-delay: 0.09s; }
+.hm-cell:nth-child(4) { animation-delay: 0.12s; }
+.hm-cell:nth-child(5) { animation-delay: 0.15s; }
+.hm-cell:nth-child(n+6) { animation-delay: 0.18s; }
+
+/* ─── Order Modal Entrance ─── */
+@keyframes modalOverlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(30px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.order-modal-overlay {
+  animation: modalOverlayIn 0.2s ease both;
+}
+.order-modal {
+  animation: modalSlideUp 0.35s cubic-bezier(0.22,1,0.36,1) both;
+}
+
+/* ─── Broker Card Hover ─── */
+.broker-card {
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+.broker-card:hover {
+  border-color: var(--primary-dim);
+  box-shadow: 0 4px 20px rgba(255,140,0,0.06);
+  transform: translateY(-2px);
+}
+
+/* ─── Confidence Bar Fill Animation ─── */
+@keyframes confFill {
+  from { width: 0; }
+}
+.sc-conf-fill {
+  animation: confFill 0.6s cubic-bezier(0.22,1,0.36,1) both;
+  animation-delay: 0.2s;
+}
+
+/* ─── Stats Bar Slide In ─── */
+@keyframes statSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.cc-sb-stat {
+  animation: statSlideIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
+}
+.cc-sb-stat:nth-child(1) { animation-delay: 0.03s; }
+.cc-sb-stat:nth-child(3) { animation-delay: 0.06s; }
+.cc-sb-stat:nth-child(5) { animation-delay: 0.09s; }
+.cc-sb-stat:nth-child(7) { animation-delay: 0.12s; }
+.cc-sb-stat:nth-child(9) { animation-delay: 0.15s; }
+.cc-sb-stat:nth-child(11) { animation-delay: 0.18s; }
+.cc-sb-stat:nth-child(13) { animation-delay: 0.21s; }
+.cc-sb-stat:nth-child(15) { animation-delay: 0.24s; }
+.cc-sb-stat:nth-child(17) { animation-delay: 0.27s; }
+.cc-sb-stat:nth-child(19) { animation-delay: 0.30s; }
+
+/* ─── Signal Card Hover ─── */
+.signal-card {
+  transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+.signal-card:hover {
+  border-color: var(--primary-dim);
+  box-shadow: 0 4px 20px rgba(255,140,0,0.08), 0 0 1px var(--primary);
+  transform: translateY(-2px);
+}
+.signal-card.selected {
+  box-shadow: 0 0 0 1px var(--primary), 0 4px 24px rgba(255,140,0,0.12);
+}
+
+/* ─── Quick Trade Row Hover ─── */
+.paper-sig-row {
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+.paper-sig-row:hover {
+  background: rgba(255,140,0,0.04);
+  transform: translateX(3px);
+  box-shadow: -3px 0 0 var(--primary);
+}
+
+/* ─── Tab Button Hover ─── */
+.tab-btn {
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+.tab-btn:hover:not(.active) {
+  transform: translateY(-1px);
+}
+.tab-btn.active {
+  animation: tabGlow 2s ease-in-out infinite;
+}
+
+/* ─── Panel Header Border Glow on Panel Hover ─── */
+.panel:hover .panel-header {
+  border-bottom-color: rgba(255,140,0,0.15);
+  transition: border-bottom-color 0.3s ease;
+}
+
+/* ─── Loading Spinner Enhanced ─── */
+.loading-spinner {
+  transition: opacity 0.3s ease;
+}
+
+/* ─── Alert Item Entrance ─── */
+.alert-item {
+  animation: alertSlide 0.3s cubic-bezier(0.22,1,0.36,1) both;
+}
+
+/* ─── News Feed Item Entrance ─── */
+@keyframes newsItemIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.news-card {
+  animation: newsItemIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
+  transition: border-color 0.2s ease, transform 0.15s ease;
+}
+.news-card:hover {
+  border-color: rgba(255,140,0,0.15);
+  transform: translateX(2px);
+}
+.news-card:nth-child(1) { animation-delay: 0.02s; }
+.news-card:nth-child(2) { animation-delay: 0.04s; }
+.news-card:nth-child(3) { animation-delay: 0.06s; }
+.news-card:nth-child(4) { animation-delay: 0.08s; }
+.news-card:nth-child(5) { animation-delay: 0.10s; }
+.news-card:nth-child(n+6) { animation-delay: 0.12s; }
+
+/* ─── Equity Chart Wrapper Entrance ─── */
+.paper-equity-chart-wrap {
+  animation: panelIn 0.4s cubic-bezier(0.22,1,0.36,1) both;
+  animation-delay: 0.15s;
+}
+
+/* ─── Broker Status Bar Entrance ─── */
+@keyframes brokerBarIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.panel--broker-bar {
+  animation: brokerBarIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
+}
+
+/* ─── Search Button Hover ─── */
+.search-nav-btn {
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.25s ease, transform 0.15s ease;
+}
+.search-nav-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 12px rgba(255,140,0,0.1);
+}
+
+/* ─── Scanner Trade Button Pop ─── */
+.scan-trade-btn {
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+.scan-trade-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
+/* ─── Position Close Button ─── */
+.po-close-btn {
+  transition: color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+}
+.po-close-btn:hover {
+  transform: scale(1.1);
+}
+
+/* ─── Input Focus Transition ─── */
+.po-input, .form-input, .ctrl-select, .scanner-search {
+  transition: border-color 0.2s ease, box-shadow 0.25s ease;
+}
+.po-input:focus, .form-input:focus, .scanner-search:focus {
+  box-shadow: 0 0 0 2px var(--primary-glow);
+}
+
+/* ─── Watchlist Star Animation ─── */
+@keyframes starPop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+.scan-wl-btn.in { animation: starPop 0.3s ease; }
+
+/* ─── Smooth Scrollbar ─── */
+.paper-positions-wrap, .paper-signal-grid {
+  scroll-behavior: smooth;
+}
+
+/* ─── Opportunity Card Entrance ─── */
+@keyframes oppCardIn {
+  from { opacity: 0; transform: translateX(10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.cc-opp-card {
+  animation: oppCardIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
+  transition: border-color 0.2s ease, transform 0.15s ease;
+}
+.cc-opp-card:hover { transform: translateX(3px); }
+.cc-opp-card:nth-child(1) { animation-delay: 0.03s; }
+.cc-opp-card:nth-child(2) { animation-delay: 0.07s; }
+.cc-opp-card:nth-child(3) { animation-delay: 0.11s; }
+.cc-opp-card:nth-child(4) { animation-delay: 0.15s; }
+.cc-opp-card:nth-child(5) { animation-delay: 0.19s; }
+.cc-opp-card:nth-child(n+6) { animation-delay: 0.23s; }
+
+/* ─── Correlation Matrix Cell Hover ─── */
+.corr-cell {
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+.corr-cell:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 8px rgba(255,140,0,0.15);
+  z-index: 2;
+}
+
+/* ─── Backtest Stat Entrance ─── */
+.bt-stat {
+  animation: statSlideIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
+  transition: transform 0.15s ease;
+}
+.bt-stat:hover { transform: translateY(-2px); }
+.bt-stat:nth-child(1) { animation-delay: 0.03s; }
+.bt-stat:nth-child(2) { animation-delay: 0.06s; }
+.bt-stat:nth-child(3) { animation-delay: 0.09s; }
+.bt-stat:nth-child(4) { animation-delay: 0.12s; }
+.bt-stat:nth-child(5) { animation-delay: 0.15s; }
+.bt-stat:nth-child(6) { animation-delay: 0.18s; }
+.bt-stat:nth-child(7) { animation-delay: 0.21s; }
+.bt-stat:nth-child(8) { animation-delay: 0.24s; }
+
+/* ─── Portfolio Stat Hover ─── */
+.ps-stat {
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+.ps-stat:hover {
+  transform: translateY(-2px);
+  background: rgba(255,140,0,0.03);
+}
+
+/* ─── Side Button Toggle Animation ─── */
+.po-side-btn {
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+.po-side-btn:hover { transform: translateY(-1px); }
+.po-side-btn.active { animation: btnRipple 0.3s ease; }
 
 /* ─── Reset & Base ─── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -648,9 +1039,12 @@ a:hover { color: var(--primary); text-decoration: underline; }
   border-radius: 3px;
   overflow: hidden;
   position: relative;
-  transition: border-color var(--transition);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
 }
-.panel:hover { border-color: var(--primary-dark); }
+.panel:hover {
+  border-color: var(--primary-dark);
+  box-shadow: 0 2px 16px rgba(255,140,0,0.04);
+}
 .panel::before {
   content: '';
   position: absolute;
