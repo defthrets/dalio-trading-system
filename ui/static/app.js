@@ -172,6 +172,7 @@ function handleWsMessage(msg) {
       break;
     case 'MODE_CHANGE':
       updateModeUI(msg.data.mode, true);
+      refreshCcForMode();
       break;
     case 'PAPER_ORDER':
     case 'PAPER_CLOSE':
@@ -241,8 +242,14 @@ async function loadHealth() {
   try {
     const d = await fetchJSON('/api/portfolio/health');
     applyHealth(d);
-    const hist = await fetchJSON('/api/portfolio/equity_history');
-    updateEquityChart(hist.history);
+    // Feed prediction chart from the mode-appropriate equity source
+    if (_tradingMode === 'live') {
+      const ld = await fetchJSON('/api/real/equity_curve').catch(() => null);
+      if (ld?.equity_curve?.length) updatePredictionFromEquity(ld.equity_curve);
+    } else {
+      const hist = await fetchJSON('/api/portfolio/equity_history');
+      updateEquityChart(hist.history);
+    }
   } catch {}
 }
 
@@ -2812,6 +2819,7 @@ async function setTradingMode(newMode) {
   try {
     const d = await postJSON('/api/mode', { mode: newMode });
     updateModeUI(d.mode, true);
+    refreshCcForMode();
     playBeep(newMode === 'live' ? 880 : 440, 0.1);
     pushAlert('MODE', `Switched to ${d.mode.toUpperCase()} trading mode`, 'info');
     if (newMode === 'live') sendNotification('LIVE MODE ACTIVE', 'Real money trading is now active. Orders will be placed with your broker.');
@@ -3603,7 +3611,7 @@ function _applyCCPortfolio(d) {
           <td>${fmt$(p.market_value)}</td>
           <td class="${pnlCls}">${pnlTxt}</td>
           <td class="${pnlCls}">${pctTxt}</td>
-          <td><button class="btn-ghost btn--sm" style="font-size:9px;padding:2px 6px" onclick="closePaperPosition('${p.ticker}')">✕</button></td>
+          <td><button class="btn-ghost btn--sm" style="font-size:9px;padding:2px 6px" onclick="${_tradingMode === 'live' ? 'closeLivePosition' : 'closePaperPosition'}('${p.ticker}')">✕</button></td>
         </tr>`;
       }).join('');
     }
@@ -3638,7 +3646,7 @@ function renderCcLivePositions(positions) {
       <div class="cc-pos-tile-top">
         <span class="cc-pos-tile-tkr">${ticker}</span>
         <span class="cc-pos-tile-pnl" style="color:${pos ? 'var(--green)' : 'var(--red)'}">${pnlTxt} (${pctTxt})</span>
-        <button class="btn-ghost btn--sm" style="font-size:9px;padding:1px 5px;margin-left:4px" onclick="closePaperPosition('${p.ticker}')">✕</button>
+        <button class="btn-ghost btn--sm" style="font-size:9px;padding:1px 5px;margin-left:4px" onclick="${_tradingMode === 'live' ? 'closeLivePosition' : 'closePaperPosition'}('${p.ticker}')">✕</button>
       </div>
       <div class="cc-pos-tile-meta">
         <span>${p.side}</span>
@@ -3741,26 +3749,43 @@ async function pollLivePnl() {
       !document.querySelector('#ccLivePosList .cc-pos-tile')) return;
 
   try {
+    // Always poll paper P&L for the paper trading tab
     const d = await fetchJSON('/api/paper/live-pnl');
-    if (!d || !d.positions) return;
+    if (d && d.positions) {
+      // Update paper trading tab rows (always, regardless of mode)
+      _updatePaperTableInPlace(d.positions);
 
-    // 1. Update CC live position tiles (always visible on Command Centre)
-    renderCcLivePositions(d.positions);
+      // Update quick-pos badge
+      _updateQuickPosBadge(d.open_count || 0);
+      if (!el('quickPosPanel')?.classList.contains('hidden')) _refreshQuickPos();
 
-    // 2. In-place update paper trading table rows (avoids re-render flicker)
-    _updatePaperTableInPlace(d.positions);
+      const totalEl = el('paperUnrealisedTotal');
+      if (totalEl) {
+        const sign = d.total_unrealised_pnl >= 0 ? '+' : '';
+        totalEl.textContent = sign + fmt$(d.total_unrealised_pnl);
+        totalEl.style.color = d.total_unrealised_pnl >= 0 ? 'var(--green)' : 'var(--red)';
+      }
 
-    // 3. Update quick-pos badge
-    _updateQuickPosBadge(d.open_count || 0);
-    // If panel is open, refresh its content too
-    if (!el('quickPosPanel')?.classList.contains('hidden')) _refreshQuickPos();
+      // CC tiles use paper data when in paper mode
+      if (_tradingMode === 'paper') renderCcLivePositions(d.positions);
+    }
 
-    // 3. Update total unrealised P&L summary row if present
-    const totalEl = el('paperUnrealisedTotal');
-    if (totalEl) {
-      const sign = d.total_unrealised_pnl >= 0 ? '+' : '';
-      totalEl.textContent = sign + fmt$(d.total_unrealised_pnl);
-      totalEl.style.color = d.total_unrealised_pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    // CC tiles use live data when in live mode
+    if (_tradingMode === 'live') {
+      try {
+        const ld = await fetchJSON('/api/real/portfolio');
+        const positions = (ld.positions || []).map(p => ({
+          ticker: p.ticker,
+          side: p.side || (p.qty > 0 ? 'LONG' : 'SHORT'),
+          qty: Math.abs(p.qty),
+          entry_price: p.avg_cost || 0,
+          current_price: p.market_val && p.qty ? p.market_val / Math.abs(p.qty) : 0,
+          market_value: p.market_val || 0,
+          pnl: p.pnl || 0,
+          pnl_pct: p.pnl_pct || 0,
+        }));
+        renderCcLivePositions(positions);
+      } catch {}
     }
   } catch { /* silent — don't spam console every 15s */ }
 }
@@ -3861,12 +3886,72 @@ function _applyCCHistory(d) {
 
 // ─── Command Centre Init ────────────────────────────────────
 function initCommandCentre() {
-  loadPaperPortfolio();
-  loadPaperHistory();
-  loadPaperEquityCurve();
+  refreshCcForMode();
   loadCcOpportunities(8);
   loadQuadrant();
   loadCcRecommendations();
+}
+
+// Load CC portfolio/history/equity from the correct source based on trading mode
+async function refreshCcForMode() {
+  if (_tradingMode === 'live') {
+    _loadCcLivePortfolio();
+    _loadCcLiveHistory();
+    _loadCcLiveEquityCurve();
+  } else {
+    loadPaperPortfolio();
+    loadPaperHistory();
+    loadPaperEquityCurve();
+  }
+}
+
+async function _loadCcLivePortfolio() {
+  try {
+    const d = await fetchJSON('/api/real/portfolio');
+    const positions = d.positions || [];
+    const acctVal = d.account_value || 0;
+    const cash = d.cash || 0;
+    const invested = positions.reduce((s, p) => s + (p.market_val || 0), 0);
+    const totalPnl = positions.reduce((s, p) => s + (p.pnl || 0), 0);
+    const totalPnlPct = acctVal > 0 ? (totalPnl / (acctVal - totalPnl)) * 100 : 0;
+    // Map to CC portfolio format
+    _applyCCPortfolio({
+      total_value: acctVal,
+      cash: cash,
+      invested: invested,
+      open_count: positions.length,
+      total_pnl: totalPnl,
+      total_pnl_pct: totalPnlPct,
+      drawdown: null,
+      sharpe: null,
+      cycles: null,
+      positions: positions.map(p => ({
+        ticker: p.ticker,
+        side: p.side || (p.qty > 0 ? 'LONG' : 'SHORT'),
+        qty: Math.abs(p.qty),
+        entry_price: p.avg_cost || 0,
+        current_price: p.market_val && p.qty ? p.market_val / Math.abs(p.qty) : 0,
+        market_value: p.market_val || 0,
+        pnl: p.pnl || 0,
+        pnl_pct: p.pnl_pct || 0,
+      })),
+    });
+  } catch {}
+}
+
+async function _loadCcLiveHistory() {
+  try {
+    const d = await fetchJSON('/api/real/history');
+    _applyCCHistory({ trades: d.history || [], total: (d.history || []).length });
+  } catch {}
+}
+
+async function _loadCcLiveEquityCurve() {
+  try {
+    const d = await fetchJSON('/api/real/equity_curve');
+    const pts = d.equity_curve || [];
+    if (pts.length) updatePredictionFromEquity(pts);
+  } catch {}
 }
 
 // ─── AI Recommendations ─────────────────────────────────────
@@ -4252,55 +4337,9 @@ document.addEventListener('DOMContentLoaded', () => {
 // ═══════════════════════════════════════════════════════════
 
 function _seedPredictionChart() {
+  // No seed data — prediction will populate once real equity history arrives
   if (!charts.prediction) return;
-  const labels = [];
-  const actual = [];
-  const predicted = [];
-  const upper = [];
-  const lower = [];
-  let equity = 1000;
-  const now = Date.now();
-
-  // 60 days of "actual" history
-  for (let i = 60; i >= 0; i--) {
-    const d = new Date(now - i * 86400000);
-    labels.push(d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' }));
-    equity *= (1 + (Math.random() * 0.016 - 0.004));
-    actual.push(+equity.toFixed(2));
-    predicted.push(null);
-    upper.push(null);
-    lower.push(null);
-  }
-
-  // 30 days of prediction
-  let pred = equity;
-  const drift = 0.003;
-  for (let i = 1; i <= 30; i++) {
-    const d = new Date(now + i * 86400000);
-    labels.push(d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' }));
-    actual.push(null);
-    pred *= (1 + drift + Math.random() * 0.005);
-    predicted.push(+pred.toFixed(2));
-    const spread = pred * 0.02 * Math.sqrt(i / 10);
-    upper.push(+(pred + spread).toFixed(2));
-    lower.push(+(pred - spread).toFixed(2));
-  }
-
-  // Fill last actual into first predicted for continuity
-  predicted[60] = actual[60];
-  upper[60] = actual[60];
-  lower[60] = actual[60];
-
-  charts.prediction.data.labels = labels;
-  charts.prediction.data.datasets[0].data = actual;
-  charts.prediction.data.datasets[1].data = predicted;
-  charts.prediction.data.datasets[2].data = upper;
-  charts.prediction.data.datasets[3].data = lower;
-  charts.prediction.update('none');
-
-  // Set predicted value display
-  const lastPred = predicted.filter(v => v != null).pop();
-  setEl('ccPredictedVal', lastPred ? '$' + lastPred.toLocaleString() : '--');
+  setEl('ccPredictedVal', 'AWAITING DATA');
 }
 
 function updatePredictionFromEquity(equityHistory) {
@@ -4319,21 +4358,38 @@ function updatePredictionFromEquity(equityHistory) {
     lower.push(null);
   });
 
-  // Generate 30 day prediction from last known equity
-  const lastEquity = equityHistory[equityHistory.length - 1]?.v || 1000;
+  // ── Compute real statistics from equity history ──
+  const vals = equityHistory.map(p => p.v).filter(v => v > 0);
+  const returns = [];
+  for (let i = 1; i < vals.length; i++) {
+    returns.push((vals[i] - vals[i - 1]) / vals[i - 1]);
+  }
+
+  // Mean daily return and standard deviation from actual data
+  const n = returns.length;
+  const meanReturn = n > 0 ? returns.reduce((s, r) => s + r, 0) / n : 0;
+  const variance = n > 1
+    ? returns.reduce((s, r) => s + (r - meanReturn) ** 2, 0) / (n - 1)
+    : 0;
+  const stdDev = Math.sqrt(variance);
+
+  const lastEquity = vals[vals.length - 1] || 1000;
   let pred = lastEquity;
-  const drift = 0.003;
+
   // Bridge point
   predicted[predicted.length - 1] = lastEquity;
   upper[upper.length - 1] = lastEquity;
   lower[lower.length - 1] = lastEquity;
 
+  // 30-day forward projection using historical mean return
+  // Confidence bands use actual volatility scaled by sqrt(t)
   for (let i = 1; i <= 30; i++) {
     labels.push(`+${i}d`);
     actual.push(null);
-    pred *= (1 + drift + Math.random() * 0.004);
+    pred *= (1 + meanReturn);
     predicted.push(+pred.toFixed(2));
-    const spread = pred * 0.02 * Math.sqrt(i / 10);
+    // 1.96σ√t gives ~95% confidence interval
+    const spread = lastEquity * stdDev * 1.96 * Math.sqrt(i);
     upper.push(+(pred + spread).toFixed(2));
     lower.push(+(pred - spread).toFixed(2));
   }
@@ -4447,21 +4503,6 @@ function pushOpsLine(cmd, msg, type) {
 
 
 // ═══════════════════════════════════════════════════════════
-// RADAR SCAN — cursor-following conic gradient on panels
-// ═══════════════════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', () => {
-  document.addEventListener('mousemove', (e) => {
-    const panel = e.target.closest('.panel');
-    if (!panel) return;
-    const rect = panel.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width * 100).toFixed(1);
-    const y = ((e.clientY - rect.top) / rect.height * 100).toFixed(1);
-    panel.style.setProperty('--radar-x', x + '%');
-    panel.style.setProperty('--radar-y', y + '%');
-  });
-});
-
-
 // ═══════════════════════════════════════════════════════════
 // SYSTEM STATUS TOGGLE (OPERATIONAL / PAUSED)
 // ═══════════════════════════════════════════════════════════
