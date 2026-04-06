@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260406s" />
+  <link rel="stylesheet" href="/static/style.css?v=20260406t" />
 </head>
 <body>
   <!-- Scanline overlay -->
@@ -142,6 +142,7 @@
 
         <!-- ROW 1: Full-width portfolio stats bar -->
         <div class="panel panel--cc-statsbar">
+          <div class="panel-hint">Your portfolio snapshot — net asset value, cash, invested amount, unrealised P&L, total return, open positions, win rate, and realised P&L. Updates automatically every cycle.</div>
           <div class="cc-statsbar-inner">
             <div class="cc-sb-stat" title="Net Asset Value — total portfolio worth (cash + investments)">
               <div class="cc-sb-label">TOTAL NAV</div>
@@ -201,6 +202,7 @@
             <span class="panel-title">⚡ QUICK TRADE</span>
             <span class="panel-tag" style="color:var(--amber)">PAPER</span>
           </div>
+          <div class="panel-hint">Type any ticker (e.g. BTC, CBA.AX, GLD), pick BUY or SELL, set quantity, then execute. Uses paper money — no real funds.</div>
           <div class="cc-qt-form">
             <div class="po-row">
               <label class="po-label">ASSET</label>
@@ -240,6 +242,7 @@
               <span class="stat-item" id="totalReturnBadge">ROI: <strong>--</strong></span>
             </div>
           </div>
+          <div class="panel-hint">Tracks your portfolio value over time. The line shows growth or decline — upward = making money. NAV is your total account worth, ROI is total return percentage.</div>
           <div class="chart-container">
             <canvas id="equityChart"></canvas>
           </div>
@@ -251,6 +254,7 @@
             <span class="panel-title">ECONOMIC QUADRANT</span>
             <span class="panel-tag">DALIO MACHINE</span>
           </div>
+          <div class="panel-hint">Ray Dalio's All-Weather framework classifies the economy into 4 regimes based on growth and inflation direction. The highlighted quadrant is the current regime — the AI tilts your portfolio toward assets that perform best in that environment.</div>
           <div class="quadrant-display">
             <div class="quadrant-grid">
               <div class="q-cell" id="q-rising_growth">
@@ -293,6 +297,7 @@
             <span class="panel-title">◈ AI TRADE RECOMMENDATIONS</span>
             <button class="btn-ghost btn--sm" onclick="loadCcRecommendations()" style="margin-left:auto">↻ ANALYSE</button>
           </div>
+          <div class="panel-hint">Click ANALYSE to run the AI across all markets. It scores each asset by confidence, shows predicted direction (BUY/SELL), entry price, stop loss, take profit, and a risk/reward ratio. Click any recommendation to see the full justification.</div>
           <div class="cc-recs-list" id="ccRecsList">
             <div style="padding:14px;color:var(--text-muted);font-size:11px">Click ANALYSE to generate AI trade recommendations…</div>
           </div>
@@ -304,6 +309,7 @@
             <span class="panel-title">◈ LIVE POSITIONS</span>
             <span class="panel-tag" id="ccPosCount">0 OPEN</span>
           </div>
+          <div class="panel-hint">Shows all currently open trades with live P&L. Green = in profit, red = in loss. Each tile shows ticker, quantity, entry price, current price, and unrealised gain/loss. Click a position to trade it.</div>
           <!-- Hidden compat elements for legacy JS references -->
           <span id="circuitBreakerBadge" style="display:none">CB: ARMED</span>
           <span id="dailyPnl" style="display:none">--</span>
@@ -328,6 +334,7 @@
             <span class="panel-title">◈ RECENT TRADES</span>
             <span class="panel-tag" id="ccHistCount">0 TRADES</span>
           </div>
+          <div class="panel-hint">History of all closed trades — entry/exit prices, P&L in dollars and percentage, and when the trade happened. Use this to review your past performance and learn from wins and losses.</div>
           <div class="cc-table-wrap">
             <table class="data-table" id="ccHistoryTable">
               <thead>
@@ -349,6 +356,7 @@
             <span class="panel-title">◈ LIVE ACTIVITY</span>
             <span class="pulse-dot"></span>
           </div>
+          <div class="panel-hint">Real-time feed of system events — trade executions, cycle runs, signal alerts, and errors. Most recent events appear at the top. The pulsing dot means the system is actively monitoring.</div>
           <!-- alertFeed kept for compat with existing JS -->
           <div class="alert-feed" id="alertFeed" style="display:none">
             <div class="alert-item alert--info">
@@ -370,6 +378,7 @@
           <div class="panel-header">
             <span class="panel-title">◈ PERFORMANCE METRICS</span>
           </div>
+          <div class="panel-hint">Key performance stats across all your trades. Avg P&L per trade, best/worst trade, daily P&L, max drawdown (biggest dip), Sharpe ratio (risk-adjusted returns — higher is better), and the All-Weather diversification score.</div>
           <div class="cc-perf-grid">
             <div class="cc-perf-item">
               <div class="cc-perf-label">AVG P&amp;L / TRADE</div>
@@ -432,6 +441,7 @@
           <div class="panel-header">
             <span class="panel-title">SIGNAL PARAMETERS</span>
           </div>
+          <div class="panel-hint">Filter which signals appear below. Set minimum confidence (higher = fewer but stronger signals), filter by BUY/SELL type, or by market (ASX/Commodities). Click SCAN NOW to refresh or RUN CYCLE for a full analysis pass.</div>
           <div class="controls-row">
             <div class="control-group">
               <label class="ctrl-label">MIN CONFIDENCE</label>
@@ -467,6 +477,7 @@
             <span class="panel-title">ACTIVE SIGNALS</span>
             <span class="panel-tag" id="signalCount">0 SIGNALS</span>
           </div>
+          <div class="panel-hint">AI-generated trade signals ranked by confidence. Each card shows the ticker, direction (BUY/SELL), confidence %, entry price, stop loss, take profit, and risk/reward ratio. Click a card to see the full justification. Click TRADE to place an order instantly.</div>
           <div class="signal-grid" id="signalGrid">
             <div class="signal-loading">
               <div class="loading-spinner"></div>
@@ -481,6 +492,7 @@
             <span class="panel-title">NEW OPPORTUNITIES</span>
             <span class="panel-tag">AI SUGGESTED</span>
           </div>
+          <div class="panel-hint">Assets the AI has identified as potential trades but hasn't generated a full signal for yet. These are early-stage ideas — click one to open an order form if you want to act on it before a formal signal fires.</div>
           <div class="opportunity-list" id="opportunityList"></div>
         </div>
 
@@ -490,6 +502,7 @@
             <span class="panel-title">DALIO JUSTIFICATION</span>
             <span class="panel-tag">SYSTEMATIC ANALYSIS</span>
           </div>
+          <div class="panel-hint">Click any signal card to see the AI's full reasoning here — RSI gauge, momentum histogram, scenario prediction chart, and a text breakdown of why it chose this trade based on Dalio's principles.</div>
           <div class="just-content" id="justContent">
             <div class="just-placeholder">
               <span>SELECT A SIGNAL TO VIEW JUSTIFICATION</span>
@@ -515,6 +528,7 @@
             <span class="panel-title">GEOPOLITICAL RISK MONITOR</span>
             <span class="pulse-dot" id="conflictPulse"></span>
           </div>
+          <div class="panel-hint">Scans news for conflict-related keywords (war, sanctions, nuclear, etc.). The ring turns red when elevated risk is detected — this signals the AI to shift toward safe-haven assets like gold and bonds. Low count = stable, high count = caution.</div>
           <div class="conflict-meter">
             <div class="conflict-ring" id="conflictRing">
               <div class="conflict-inner">
@@ -541,6 +555,7 @@
             <span class="panel-title">SENTIMENT DISTRIBUTION</span>
             <span class="panel-tag" id="totalArticles">-- ARTICLES</span>
           </div>
+          <div class="panel-hint">Doughnut chart showing overall market mood from analysed news articles. Green = bullish, red = bearish, grey = neutral. A heavily bullish skew suggests optimism; bearish skew suggests caution. Stats below break it down by economic quadrant.</div>
           <div class="chart-container chart-container--sm">
             <canvas id="sentimentChart"></canvas>
           </div>
@@ -554,6 +569,7 @@
             <span class="panel-tag" id="newsArticleCount">-- ARTICLES</span>
             <button class="btn-ghost btn--sm" onclick="loadSentiment()" style="margin-left:auto">↻ REFRESH</button>
           </div>
+          <div class="panel-hint">FinBERT AI-powered news feed. Each article is scored as bullish (green), bearish (red), or neutral (grey). Filter by time range or sentiment. Headlines link to full articles. Use this to understand what's driving market mood.</div>
           <div class="news-filter-bar">
             <label class="news-filter-label">SHOW:</label>
             <select class="ctrl-select" id="newsTimeFilter" onchange="filterNewsArticles()" style="font-size:11px;padding:2px 6px">
@@ -583,6 +599,7 @@
           <div class="panel-header">
             <span class="panel-title">NEWS QUADRANT SIGNAL</span>
           </div>
+          <div class="panel-hint">Shows which economic quadrant the news sentiment is pointing toward. The dominant quadrant determines which asset classes the AI favours. Bullish vs bearish percentages show overall market bias from recent articles.</div>
           <div class="news-quad-display">
             <div class="nq-dominant" id="newsDominantQuadrant">--</div>
             <div class="nq-desc" id="newsDominantDesc">--</div>
@@ -616,6 +633,7 @@
           <div class="panel-header">
             <span class="panel-title">HOLY GRAIL DIVERSIFICATION</span>
           </div>
+          <div class="panel-hint">Dalio's Holy Grail: hold 15+ assets with correlation below 0.3 to dramatically reduce risk. The meter shows how close you are to the threshold. Mean correlation shows average asset independence — lower is better.</div>
           <div class="div-status-content">
             <div class="div-counter">
               <div class="div-num" id="divCount">--</div>
@@ -659,6 +677,7 @@
             <span id="corrDataSource" style="font-size:11px;letter-spacing:1px;font-family:var(--font-mono)">● LOADING</span>
             <button class="btn-ghost btn--sm" onclick="loadCorrelation()">↻ REFRESH</button>
           </div>
+          <div class="panel-hint">Heatmap showing how each pair of assets moves relative to each other. Dark/blue = low correlation (independent — good for diversification). Bright/orange = high correlation (they move together — less diversification benefit). Hover for exact values.</div>
           <div class="heatmap-wrap" id="heatmapWrap">
             <canvas id="correlationCanvas"></canvas>
           </div>
@@ -670,6 +689,7 @@
             <span class="panel-title">RISK PARITY WEIGHTS</span>
             <span class="panel-tag">RISKFOLIO-LIB</span>
           </div>
+          <div class="panel-hint">Suggested allocation so each asset contributes equal risk to the portfolio. Higher-volatility assets get smaller weights, lower-volatility assets get larger weights. Calculated using Riskfolio-Lib's risk-parity optimiser.</div>
           <div class="weights-chart-container">
             <canvas id="weightsChart"></canvas>
           </div>
@@ -680,6 +700,7 @@
           <div class="panel-header">
             <span class="panel-title">SELECTED PORTFOLIO</span>
           </div>
+          <div class="panel-hint">Detailed breakdown of each asset in the optimised portfolio — its suggested weight, risk contribution, and which economic quadrant it fits best. Use this to guide your actual allocation decisions.</div>
           <table class="data-table" id="allocTable">
             <thead>
               <tr>
@@ -710,6 +731,7 @@
           <div class="panel-header">
             <span class="panel-title">CIRCUIT BREAKER</span>
           </div>
+          <div class="panel-hint">Automatic safety switch that halts all trading if losses exceed limits. Daily stop-loss triggers at 2% equity loss in one day. Max drawdown triggers at 10% from peak. Green = armed and trading allowed, red = tripped and trading paused until reset.</div>
           <div class="cb-display">
             <div class="cb-status" id="cbStatus">
               <div class="cb-icon" id="cbIcon">⬡</div>
@@ -742,6 +764,7 @@
           <div class="panel-header">
             <span class="panel-title">DAILY P&L HISTORY</span>
           </div>
+          <div class="panel-hint">Bar chart of daily profit and loss. Green bars = profitable days, red bars = losing days. Look for consistency — many small green bars with few red bars indicates a stable strategy. Large red bars may signal the circuit breaker is close to triggering.</div>
           <div class="chart-container">
             <canvas id="pnlChart"></canvas>
           </div>
@@ -752,6 +775,7 @@
           <div class="panel-header">
             <span class="panel-title">OPEN POSITIONS — RISK VIEW</span>
           </div>
+          <div class="panel-hint">All open positions with risk metrics — position size as % of portfolio, unrealised P&L, and risk status. Large position sizes increase concentration risk. Use this to check if any single position is dominating your portfolio.</div>
           <table class="data-table" id="posTable">
             <thead>
               <tr>
@@ -772,6 +796,7 @@
             <span class="panel-title">◈ RISK METRICS</span>
             <span class="panel-tag" id="riskScoreBadge">SCORE: --</span>
           </div>
+          <div class="panel-hint">Key risk ratios for your portfolio. Sharpe &gt;1 = good risk-adjusted return. Sortino focuses on downside risk only. Max drawdown shows the worst dip from peak. Win rate &gt;50% means you win more trades than you lose. Hover the ? icons for details.</div>
           <div class="metrics-grid">
             <div class="metric-item">
               <div class="metric-label">SHARPE RATIO <span class="metric-tip" title="Return per unit of risk. &gt;1 = good, &gt;2 = excellent. Higher = better risk-adjusted performance.">?</span></div>
@@ -918,6 +943,7 @@
       <div class="scanner-wrap">
         <div class="scanner-toolbar">
           <div class="scanner-title">🇦🇺 ASX MARKET SCANNER</div>
+          <div class="panel-hint" style="flex-basis:100%;margin:-4px 0 4px">Live prices for ASX equities. Filter by ticker, name, or sector. Click column headers to sort. Green rows are up today, red are down. Click TRADE to open an order, or ★ to add to your watchlist.</div>
           <div class="scanner-toolbar-right">
             <input type="text" class="scanner-search" id="asxSearch" placeholder="Filter ticker or name..." oninput="filterScanner('asx',this.value)"/>
             <select class="ctrl-select" id="asxSectorFilter" onchange="filterScanner('asx',el('asxSearch').value)">
@@ -968,6 +994,7 @@
       <div class="scanner-wrap">
         <div class="scanner-toolbar">
           <div class="scanner-title">₿ CRYPTO MARKET SCANNER</div>
+          <div class="panel-hint" style="flex-basis:100%;margin:-4px 0 4px">Live cryptocurrency prices from CoinGecko. Shows price, 24h change, volume, and market cap. Click TRADE to open an order or ★ to watchlist. First load may take a few seconds.</div>
           <div class="scanner-toolbar-right">
             <input type="text" class="scanner-search" id="cryptoSearch" placeholder="Filter ticker..." oninput="filterScanner('crypto',this.value)"/>
             <button class="btn-primary btn--sm" onclick="loadScanner('crypto')">↻ REFRESH</button>
@@ -1006,6 +1033,7 @@
       <div class="scanner-wrap">
         <div class="scanner-toolbar">
           <div class="scanner-title">⛏ COMMODITIES SCANNER</div>
+          <div class="panel-hint" style="flex-basis:100%;margin:-4px 0 4px">Track gold, silver, oil, natural gas, and other commodity prices. Key to the All-Weather strategy as hedges against inflation and geopolitical risk. Click TRADE to place an order on any commodity.</div>
           <div class="scanner-toolbar-right">
             <input type="text" class="scanner-search" id="commSearch" placeholder="Filter ticker or name..." oninput="filterScanner('commodities',this.value)"/>
             <button class="btn-primary btn--sm" onclick="loadScanner('commodities')">↻ REFRESH</button>
@@ -1048,6 +1076,7 @@
             <span class="panel-title">◈ PLACE ORDER</span>
             <span class="panel-tag" style="color:var(--amber)">PAPER MODE</span>
           </div>
+          <div class="panel-hint">Place simulated trades with fake money — no real funds at risk. Type a ticker, pick BUY or SELL, set quantity, and click EXECUTE. The estimated cost updates as you type. Your available cash is shown below.</div>
           <div class="paper-order-form">
             <div class="po-row">
               <label class="po-label">ASSET</label>
@@ -1092,6 +1121,7 @@
               <button class="btn-ghost btn--sm" onclick="resetPaperPortfolio()" title="Reset to starting cash">↺ RESET</button>
             </div>
           </div>
+          <div class="panel-hint">Your paper trading portfolio overview — total value, cash, invested amount, unrealised P&L, return %, and open position count. The equity curve charts your performance over time. Heatmap shows position sizes visually. Click RESET to start fresh with $1,000.</div>
           <div class="paper-summary-grid">
             <div class="ps-stat">
               <div class="ps-label">TOTAL VALUE</div>
@@ -1164,6 +1194,7 @@
             <span class="panel-tag">1-CLICK FROM SIGNALS</span>
             <button class="btn-ghost btn--sm" onclick="loadPaperSignals()">↻ REFRESH</button>
           </div>
+          <div class="panel-hint">One-click trading from AI signals. Each row shows the signal's ticker, direction, confidence, and suggested position size. Click any row to instantly execute that trade in paper mode — no extra forms needed.</div>
           <div class="paper-signal-grid" id="paperSignalList">
             <div style="padding:14px;color:var(--text-muted);font-size:11px">Loading signals...</div>
           </div>
@@ -1175,6 +1206,7 @@
             <span class="panel-title">◈ TRADE HISTORY</span>
             <span class="panel-tag" id="paperTradeCount">0 TRADES</span>
           </div>
+          <div class="panel-hint">Complete log of all closed paper trades — entry/exit prices, P&L in dollars and percentage, and timestamp. Review your trading decisions to identify patterns in your wins and losses.</div>
           <div class="paper-positions-wrap">
             <table class="data-table" id="paperHistoryTable">
               <thead>
@@ -1204,6 +1236,7 @@
 
         <!-- ── BROKER STATUS BAR (full width) ── -->
         <div class="panel panel--broker-bar">
+          <div class="panel-hint">Shows your broker connection status. Green dot = connected and ready to trade. Red = disconnected. Account value, buying power, and cash balance update in real-time from your broker. Click CONFIGURE BROKERS to set up in Settings.</div>
           <div class="broker-bar-inner">
             <div class="broker-bar-status">
               <span class="broker-bar-dot" id="brokerBarDot">●</span>
@@ -1227,6 +1260,7 @@
               <button class="btn-ghost btn--sm" onclick="loadRealPortfolio()">↻ REFRESH</button>
             </div>
           </div>
+          <div class="panel-hint">Your real-money portfolio from your connected broker. Shows account value, cash, invested amount, P&L, buying power, and open positions. Equity curve tracks performance over time. Position heatmap shows allocation visually. Click any position row to trade it.</div>
           <div class="paper-summary-grid" id="livePortfolioStats">
             <div class="ps-stat"><div class="ps-label">TOTAL VALUE</div><div class="ps-val" id="liveAcctVal">—</div></div>
             <div class="ps-stat"><div class="ps-label">CASH</div><div class="ps-val" id="liveCash">—</div></div>
@@ -1274,6 +1308,7 @@
             <span class="panel-tag">1-CLICK EXECUTION</span>
             <button class="btn-ghost btn--sm" onclick="loadLiveSignals()">↻ REFRESH</button>
           </div>
+          <div class="panel-hint">One-click live trading from AI signals. Each row shows the signal's ticker, direction, confidence, and suggested size. Click any row to open the order modal pre-filled with that trade. Orders go through your connected broker with real funds.</div>
           <div class="paper-signal-grid" id="liveSignalList">
             <div style="padding:14px;color:var(--text-muted);font-size:11px">Loading signals...</div>
           </div>
@@ -1286,6 +1321,7 @@
             <span class="panel-tag" id="liveTradeCount">0 ORDERS</span>
             <button class="btn-ghost btn--sm" onclick="loadRealHistory()">↻ REFRESH</button>
           </div>
+          <div class="panel-hint">Log of all orders sent through your broker — ticker, side, quantity, fill price, and time. Use this to audit your live trading activity and verify orders were executed correctly.</div>
           <div class="paper-positions-wrap">
             <table class="data-table">
               <thead>
@@ -1316,6 +1352,7 @@
             <span class="panel-title">BROKER &amp; EXCHANGE CONNECTIONS</span>
             <span class="panel-tag">CONFIGURE TO EXECUTE</span>
           </div>
+          <div class="panel-hint">Connect your broker or exchange to enable live trading. Click CONFIGURE to enter API keys, then TEST to verify the connection works, and SAVE to store credentials securely. Switch between Australian brokers, US brokers, and crypto exchanges using the tabs below.</div>
 
           <!-- Category tabs -->
           <div class="broker-tabs">
@@ -1821,6 +1858,7 @@
           <div class="panel-header">
             <span class="panel-title">⚙ GENERAL</span>
           </div>
+          <div class="panel-hint">Core trading parameters — starting cash, default trade size, risk limits (daily stop-loss, max drawdown), signal thresholds, and Holy Grail diversification targets. Changes apply after clicking SAVE. Reset paper portfolio to apply new starting cash.</div>
           <div class="config-form">
 
             <div class="sett-section-label">TRADING DEFAULTS</div>
@@ -1894,6 +1932,7 @@
           <div class="panel-header">
             <span class="panel-title">🖥 UI &amp; DISPLAY</span>
           </div>
+          <div class="panel-hint">Customise the interface — toggle tutorials, enable sound effects and browser notifications, set data refresh intervals, and choose a colour theme. Changes apply after clicking SAVE UI SETTINGS.</div>
           <div class="config-form">
 
             <div class="sett-section-label">TUTORIALS</div>
@@ -1962,6 +2001,7 @@
             <span class="panel-title">DISCORD WEBHOOK</span>
             <span class="badge badge--amber" id="discordStatus">● UNCONFIGURED</span>
           </div>
+          <div class="panel-hint">Send trade alerts and system notifications to a Discord channel. Create a webhook in Discord (Server Settings → Integrations → Webhooks), paste the URL here, choose which alert types to receive, then click TEST to verify.</div>
           <div class="config-form">
             <div class="form-group">
               <label class="form-label">WEBHOOK URL</label>
@@ -1988,6 +2028,7 @@
             <span class="panel-title">TELEGRAM BOT</span>
             <span class="badge badge--amber" id="telegramStatus">● UNCONFIGURED</span>
           </div>
+          <div class="panel-hint">Receive alerts on Telegram. Create a bot via @BotFather, paste the token here. Get your Chat ID by messaging @userinfobot. Click TEST to send a test message and verify the connection works.</div>
           <div class="config-form">
             <div class="form-group">
               <label class="form-label">BOT TOKEN</label>
@@ -2068,7 +2109,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=20260406s"></script>
+  <script src="/static/app.js?v=20260406t"></script>
 
   <!-- ═══════════════════════════════════════════════
        SPEECH BUBBLE SPOTLIGHT TOOLTIP
