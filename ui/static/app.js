@@ -1539,6 +1539,12 @@ function _showSpot(idx) {
 
   bubble.className = `spot-bubble arrow-${spot.arrow}`;
 
+  // Alternate mascot side — even spots left, odd spots right (mirrors image)
+  const mascot = el('spotMascot');
+  if (mascot) {
+    mascot.className = idx % 2 === 0 ? 'spot-mascot mascot-left' : 'spot-mascot mascot-right';
+  }
+
   const target = document.querySelector(spot.sel);
   if (target) {
     target.classList.add('spot-highlight');
