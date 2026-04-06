@@ -723,7 +723,57 @@ a:hover { color: var(--primary); text-decoration: underline; }
   0%, 100% { box-shadow: 0 0 4px currentColor; }
   50%      { box-shadow: 0 0 10px currentColor, 0 0 2px currentColor inset; }
 }
-#statusBadge, #modeBadge { animation: badgeBorderPulse 3s ease infinite; }
+#modeBadge { animation: badgeBorderPulse 3s ease infinite; }
+
+/* ── OPERATIONAL badge: electric / alive ── */
+@keyframes electricPulse {
+  0%   { box-shadow: 0 0 4px #00cc44, 0 0 8px rgba(0,204,68,0.3); text-shadow: 0 0 4px rgba(0,204,68,0.5); }
+  15%  { box-shadow: 0 0 12px #00cc44, 0 0 25px rgba(0,255,68,0.4), 0 0 4px #00cc44 inset; text-shadow: 0 0 8px rgba(0,255,68,0.8); }
+  20%  { box-shadow: 0 0 3px #00cc44, 0 0 6px rgba(0,204,68,0.2); text-shadow: 0 0 2px rgba(0,204,68,0.3); }
+  25%  { box-shadow: 0 0 18px #00ff44, 0 0 35px rgba(0,255,68,0.5), 0 0 6px #00ff44 inset; text-shadow: 0 0 12px rgba(0,255,68,1); }
+  30%  { box-shadow: 0 0 4px #00cc44, 0 0 8px rgba(0,204,68,0.3); text-shadow: 0 0 4px rgba(0,204,68,0.5); }
+  50%  { box-shadow: 0 0 6px #00cc44, 0 0 14px rgba(0,204,68,0.35); text-shadow: 0 0 6px rgba(0,204,68,0.6); }
+  70%  { box-shadow: 0 0 4px #00cc44, 0 0 8px rgba(0,204,68,0.3); text-shadow: 0 0 4px rgba(0,204,68,0.5); }
+  85%  { box-shadow: 0 0 14px #00ff44, 0 0 30px rgba(0,255,68,0.45), 0 0 5px #00ff44 inset; text-shadow: 0 0 10px rgba(0,255,68,0.9); }
+  90%  { box-shadow: 0 0 3px #00cc44; text-shadow: 0 0 2px rgba(0,204,68,0.3); }
+  100% { box-shadow: 0 0 4px #00cc44, 0 0 8px rgba(0,204,68,0.3); text-shadow: 0 0 4px rgba(0,204,68,0.5); }
+}
+@keyframes electricFlicker {
+  0%, 100% { opacity: 1; }
+  92%      { opacity: 1; }
+  93%      { opacity: 0.7; }
+  94%      { opacity: 1; }
+  96%      { opacity: 0.6; }
+  97%      { opacity: 1; }
+}
+#statusBadge.badge--green {
+  color: #00ff44;
+  border-color: #00ff44;
+  background: rgba(0,255,68,0.12);
+  animation: electricPulse 2.5s ease infinite, electricFlicker 4s step-end infinite;
+}
+#statusBadge.badge--green:hover {
+  background: rgba(0,255,68,0.25);
+  box-shadow: 0 0 20px #00ff44, 0 0 40px rgba(0,255,68,0.4), 0 0 8px #00ff44 inset;
+  text-shadow: 0 0 14px rgba(0,255,68,1);
+}
+
+/* ── PAUSED badge: dead and grey ── */
+#statusBadge.badge--paused {
+  color: #555;
+  border-color: #444;
+  background: rgba(40,40,40,0.5);
+  text-shadow: none;
+  box-shadow: 0 0 2px rgba(60,60,60,0.3);
+  animation: none;
+  opacity: 0.7;
+  filter: grayscale(100%);
+}
+#statusBadge.badge--paused:hover {
+  background: rgba(60,60,60,0.5);
+  box-shadow: 0 0 4px rgba(80,80,80,0.3);
+  opacity: 0.85;
+}
 
 .badge--green  { color: var(--green);  border-color: var(--green);  background: var(--green-glow); }
 .badge--green:hover  { background: rgba(0,204,68,0.18); box-shadow: 0 0 14px var(--green-glow); }
@@ -733,9 +783,6 @@ a:hover { color: var(--primary); text-decoration: underline; }
 .badge--red:hover    { background: rgba(255,23,68,0.2); box-shadow: 0 0 14px var(--red-glow); }
 .badge--cyan   { color: var(--cyan);   border-color: var(--cyan);   background: var(--cyan-glow); }
 .badge--cyan:hover   { background: rgba(0,212,255,0.18); box-shadow: 0 0 14px var(--cyan-glow); }
-
-/* Paused state for operational badge */
-.badge--paused { color: var(--amber); border-color: var(--amber); background: var(--amber-glow); animation: badgeBorderPulse 1.5s ease infinite; }
 
 /* ── Mode dropdown ─────────────────────────────────── */
 .mode-dropdown {
