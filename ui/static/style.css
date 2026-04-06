@@ -3280,7 +3280,7 @@ body.cli-expanded { padding-bottom: 272px; }
 }
 .cc-rec-card:hover { background: rgba(255,140,0,0.04); }
 .cc-rec-card.fit-strong   { border-left-color: var(--green); }
-.cc-rec-card.fit-moderate { border-left-color: var(--primary); }
+.cc-rec-card.fit-moderate { border-left-color: var(--cyan); }
 .cc-rec-card.fit-avoid    { border-left-color: var(--red); }
 .cc-rec-header {
   display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap;

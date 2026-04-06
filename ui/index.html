@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260406k" />
+  <link rel="stylesheet" href="/static/style.css?v=20260406m" />
 </head>
 <body>
   <!-- Scanline overlay -->
@@ -50,7 +50,7 @@
       <div class="system-badges">
         <span class="badge badge--green" id="statusBadge">● OPERATIONAL</span>
         <div class="mode-dropdown" id="modeDropdown">
-          <span class="badge badge--amber" id="modeBadge" onclick="toggleModeDropdown()" title="Switch trading mode">MODE: PAPER ▾</span>
+          <span class="badge badge--red" id="modeBadge" onclick="toggleModeDropdown()" title="Switch trading mode">MODE: LIVE ▾</span>
           <div class="mode-dropdown-menu hidden" id="modeDropdownMenu">
             <button class="mode-drop-opt" id="modeOptPaper" onclick="selectMode('paper')">📄 PAPER</button>
             <button class="mode-drop-opt" id="modeOptLive"  onclick="selectMode('live')">🔴 LIVE</button>
@@ -89,6 +89,9 @@
     <button class="tab-btn active" data-tab="command-center">
       <span class="tab-icon">⬡</span> COMMAND CENTER
     </button>
+    <button class="tab-btn" data-tab="live-trading">
+      <span class="tab-icon">◆</span> LIVE TRADING
+    </button>
     <button class="tab-btn" data-tab="signal-ops">
       <span class="tab-icon">⚡</span> SIGNAL OPS
     </button>
@@ -99,25 +102,22 @@
       <span class="tab-icon">⬢</span> HOLY GRAIL
     </button>
     <button class="tab-btn" data-tab="risk-matrix">
-      <span class="tab-icon">⛊</span> RISK MATRIX
+      <span class="tab-icon">△</span> RISK MATRIX
     </button>
     <button class="tab-btn" data-tab="backtest-lab">
       <span class="tab-icon">◈</span> BACKTEST LAB
     </button>
     <button class="tab-btn" data-tab="asx-scanner">
-      <span class="tab-icon">🇦🇺</span> ASX
+      <span class="tab-icon">▣</span> ASX
     </button>
     <button class="tab-btn" data-tab="crypto-scanner">
       <span class="tab-icon">₿</span> CRYPTO
     </button>
     <button class="tab-btn" data-tab="commodities-scanner">
-      <span class="tab-icon">⛏</span> COMMODITIES
+      <span class="tab-icon">▤</span> COMMODITIES
     </button>
     <button class="tab-btn" data-tab="paper-trading">
-      <span class="tab-icon">📄</span> PAPER TRADING
-    </button>
-    <button class="tab-btn" data-tab="live-trading">
-      <span class="tab-icon">🔴</span> LIVE TRADING
+      <span class="tab-icon">▷</span> PAPER TRADING
     </button>
     <button class="tab-btn" data-tab="comms-config">
       <span class="tab-icon">⚙</span> SETTINGS
@@ -1338,11 +1338,15 @@
             </div>
             <div class="po-row">
               <label class="po-label">QUANTITY</label>
-              <input type="number" id="livePoQty" class="po-input" value="1" min="0.0001" step="any"/>
+              <input type="number" id="livePoQty" class="po-input" value="1" min="0.0001" step="any" oninput="updateLivePoEstimate()"/>
             </div>
             <div class="po-row">
               <label class="po-label">LIMIT PRICE (optional — blank = market)</label>
-              <input type="number" id="livePoPrice" class="po-input" placeholder="Market order if empty" step="any"/>
+              <input type="number" id="livePoPrice" class="po-input" placeholder="Market order if empty" step="any" oninput="updateLivePoEstimate()"/>
+            </div>
+            <div class="po-estimate" id="livePoEstimate">
+              <span class="po-est-label">EST. COST</span>
+              <span class="po-est-val" id="livePoEstVal">—</span>
             </div>
             <button class="btn-primary btn--full live-order-btn" id="livePoSubmitBtn" onclick="submitLiveOrder()">🔴 PLACE LIVE ORDER</button>
             <div class="po-result" id="livePoResult"></div>
@@ -1385,6 +1389,18 @@
                 <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:16px">Connect a broker to see live positions</td></tr>
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <!-- ── LIVE SIGNAL QUICK-TRADE ── -->
+        <div class="panel panel--live-signals">
+          <div class="panel-header">
+            <span class="panel-title">⚡ SIGNAL QUICK-TRADE</span>
+            <span class="panel-tag">1-CLICK LIVE EXECUTION</span>
+            <button class="btn-ghost btn--sm" onclick="loadLiveSignals()">↻ REFRESH</button>
+          </div>
+          <div class="paper-signal-grid" id="liveSignalList">
+            <div style="padding:14px;color:var(--text-muted);font-size:11px">Connect a broker to trade signals live...</div>
           </div>
         </div>
 
@@ -2168,7 +2184,7 @@
        STATUS BAR
   ═══════════════════════════════════════════════ -->
 
-  <script src="/static/app.js?v=20260406k"></script>
+  <script src="/static/app.js?v=20260406m"></script>
 
   <!-- ═══════════════════════════════════════════════
        SPEECH BUBBLE SPOTLIGHT TOOLTIP

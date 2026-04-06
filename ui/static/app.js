@@ -580,7 +580,7 @@ function renderOpportunities(opps, meta = {}) {
     return;
   }
   const regime = (meta.regime_label || '').toUpperCase();
-  const fitColour = { strong:'var(--green)', moderate:'var(--primary)', neutral:'var(--text-2)', avoid:'var(--red)' };
+  const fitColour = { strong:'var(--green)', moderate:'var(--cyan)', neutral:'var(--text-2)', avoid:'var(--red)' };
   const actionColour = { BUY:'var(--green)', LONG:'var(--green)', SELL:'var(--red)', SHORT:'var(--red)', WATCH:'var(--amber)' };
 
   list.innerHTML = opps.map((o, i) => {
@@ -2054,6 +2054,74 @@ async function quickTrade(ticker, price, side, qtyInputId) {
   }
 }
 
+// ─── Live Signal Quick-Trade ──────────────────────────────
+async function loadLiveSignals() {
+  try {
+    const d = await fetchJSON('/api/signals');
+    renderLiveSignalList(d.signals || []);
+  } catch {}
+}
+
+function renderLiveSignalList(signals) {
+  const list = el('liveSignalList');
+  if (!list) return;
+  const active = signals.filter(s => s.action !== 'HOLD').slice(0, 12);
+  if (!active.length) { list.innerHTML = `<div style="padding:14px;color:var(--text-muted);font-size:11px;grid-column:1/-1">No active signals — run a cycle first</div>`; return; }
+  list.innerHTML = active.map(s => {
+    const isBuy  = ['BUY','LONG'].includes(s.action);
+    const actCol = isBuy ? 'var(--green)' : 'var(--red)';
+    const suggestQty = (1000 / (s.price || 100)).toFixed(s.price > 100 ? 2 : 4);
+    const dalioScore = s.dalio_score != null ? `<span class="psr-conf" title="Dalio Fit">⬡ ${s.dalio_score}%</span>` : '';
+    return `<div class="paper-sig-row">
+      <div class="psr-left">
+        <span class="psr-ticker">${s.ticker.replace('-USD','')}</span>
+        <span class="psr-action" style="color:${actCol};font-size:11px">${s.action}</span>
+        <span class="psr-price">${fmtSignalPrice(s)}</span>
+        <span class="psr-conf">Conf: ${s.confidence.toFixed(0)}%</span>
+        ${dalioScore}
+        <span class="psr-conf" style="color:var(--text-2)">${s.reason || ''}</span>
+      </div>
+      <div class="psr-right">
+        <input type="number" class="po-input psr-qty" id="lsrQty-${s.ticker}" value="${suggestQty}" min="0.0001" step="any"/>
+        <button class="psr-btn ${isBuy ? 'buy' : 'sell'}" onclick="quickLiveTrade('${s.ticker}',${s.price},'${isBuy ? 'BUY' : 'SELL'}','lsrQty-${s.ticker}')">
+          ${isBuy ? '▲ BUY' : '▼ SELL'}
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function quickLiveTrade(ticker, price, side, qtyInputId) {
+  const qty = parseFloat(el(qtyInputId)?.value);
+  if (!qty || qty <= 0) { pushAlert('LIVE', 'Enter a valid quantity', 'warning'); return; }
+  try {
+    const d = await postJSON('/api/broker/order', { ticker, side, qty, price });
+    pushAlert('LIVE', `${side} ${qty}× ${ticker} @ ${fmt$(price)}`, 'info');
+    loadRealPortfolio();
+    loadRealHistory();
+  } catch (e) {
+    pushAlert('LIVE', e.message || 'Order failed', 'warning');
+  }
+}
+
+// ─── Live Order Estimate ─────────────────────────────────
+function updateLivePoEstimate() {
+  const ticker = el('livePoTicker')?.value?.trim();
+  const qty = parseFloat(el('livePoQty')?.value) || 0;
+  const limitPrice = parseFloat(el('livePoPrice')?.value);
+  const estEl = el('livePoEstVal');
+  if (!estEl) return;
+  if (!ticker || qty <= 0) { estEl.textContent = '—'; return; }
+  if (limitPrice > 0) {
+    estEl.textContent = fmt$(limitPrice * qty);
+  } else if (_liveQuotePrice > 0) {
+    estEl.textContent = `~${fmt$(_liveQuotePrice * qty)}`;
+  } else {
+    estEl.textContent = '—';
+  }
+}
+let _liveQuotePrice = 0;
+
 // ═══════════════════════════════════════════════════════════
 // MARKET SCANNER (ASX / CRYPTO / COMMODITIES)
 // ═══════════════════════════════════════════════════════════
@@ -2279,7 +2347,7 @@ function sendNotification(title, body, icon = '🔔') {
 // TRADING MODE TOGGLE
 // ═══════════════════════════════════════════════════════════
 
-let _tradingMode = 'paper';
+let _tradingMode = 'live';
 
 async function initTradingMode() {
   try {
@@ -2874,6 +2942,15 @@ function setLivePoSide(side, btn) {
 
 function onLiveTickerInput(val) {
   _livePoTicker = val.toUpperCase().trim();
+  // Fetch price for estimate
+  if (_livePoTicker.length >= 2) {
+    fetchJSON(`/api/quote?ticker=${encodeURIComponent(_livePoTicker)}`).then(d => {
+      _liveQuotePrice = d.price || 0;
+      const qr = el('livePoQuoteResult');
+      if (qr && d.price) qr.innerHTML = `<span style="color:var(--cyan)">${_livePoTicker} — ${fmt$(d.price)}</span>`;
+      updateLivePoEstimate();
+    }).catch(() => { _liveQuotePrice = 0; });
+  }
 }
 
 async function submitLiveOrder() {
@@ -3367,7 +3444,7 @@ function renderCcRecommendations(recs, regimeLabel) {
     list.innerHTML = '<div style="padding:14px;color:var(--text-muted);font-size:10px">No recommendations — load scanner tabs first</div>';
     return;
   }
-  const fitCol = { strong:'var(--green)', moderate:'var(--primary)', neutral:'var(--text-2)', avoid:'var(--red)' };
+  const fitCol = { strong:'var(--green)', moderate:'var(--cyan)', neutral:'var(--text-2)', avoid:'var(--red)' };
   const actCol = { BUY:'var(--green)', LONG:'var(--green)', SELL:'var(--red)', SHORT:'var(--red)', WATCH:'var(--amber)' };
   list.innerHTML = recs.map((r, i) => {
     const a    = r.analysis || {};
@@ -3437,7 +3514,7 @@ async function loadCcOpportunities(n = 8) {
     }
     const meta = d;
     const regime = (meta.regime_label || '').toUpperCase();
-    const fitColour = { strong:'var(--green)', moderate:'var(--primary)', neutral:'var(--text-2)', avoid:'var(--red)' };
+    const fitColour = { strong:'var(--green)', moderate:'var(--cyan)', neutral:'var(--text-2)', avoid:'var(--red)' };
     const actionColour = { BUY:'var(--green)', LONG:'var(--green)', SELL:'var(--red)', SHORT:'var(--red)', WATCH:'var(--amber)' };
     list.innerHTML = opps.map((o, i) => {
       const ac = actionColour[o.action] || 'var(--text-1)';
