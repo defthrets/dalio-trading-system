@@ -4852,6 +4852,52 @@ function initOpsTerminal() {
   // Spawn radar blips and signal symbols
   setInterval(spawnRadarBlip, 3500);
   setInterval(spawnRadarSignal, 2200);
+
+  // Rotate radar status text
+  setInterval(cycleRadarStatus, 3000);
+}
+
+const _RADAR_TICKERS = [
+  'BHP.AX','CBA.AX','CSL.AX','WBC.AX','NAB.AX','RIO.AX','FMG.AX','WES.AX',
+  'BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','PEPE','BONK','FARTCOIN','SHIB',
+  'GLD','SLV','USO','UNG','GOLD','SILVER','CRUDE',
+  'ASX200','S&P500','NASDAQ','VIX','AUD/USD'
+];
+
+const _RADAR_STATUS_MSGS = [
+  () => `TGT ACQUIRED: ${_rndTicker()}`,
+  () => `SCANNING SECTOR ${['ALPHA','BRAVO','CHARLIE','DELTA','ECHO','FOXTROT'][Math.floor(Math.random()*6)]}`,
+  () => `OPS LOCK ON ${_rndTicker()} — AWAITING CONFIRM`,
+  () => `RECON: ${_rndTicker()} IN RANGE`,
+  () => `HOSTILE DETECTED: ${_rndTicker()} BEARISH`,
+  () => `DEPLOYING CAPITAL TO ${_rndTicker()}`,
+  () => `PERIMETER SWEEP — ${Math.floor(Math.random()*60+20)} ASSETS`,
+  () => `INTEL: ${_rndTicker()} MOMENTUM ▲▲`,
+  () => `TRACKING ${_rndTicker()} — RSI ${(Math.random()*50+25).toFixed(1)}`,
+  () => `STANDBY — ALL POSITIONS SECURED`,
+  () => `COMMS CHECK — BROKER LINK ACTIVE`,
+  () => `ENGAGING ${_rndTicker()} — CONFIDENCE ${Math.floor(Math.random()*25+65)}%`,
+  () => `EXTRACT SIGNAL: ${_rndTicker()} LONG`,
+  () => `OVERWATCH: DRAWDOWN ${(Math.random()*3).toFixed(1)}%`,
+  () => `ASSET GRID ONLINE — ${Math.floor(Math.random()*15+10)} ACTIVE`,
+  () => `THREAT LVL: ${['LOW','MODERATE','ELEVATED'][Math.floor(Math.random()*3)]}`,
+  () => `SORTIE: ${_rndTicker()} ENTRY @ $${(Math.random()*500+1).toFixed(2)}`,
+  () => `CHARLIE ACTUAL — ${_rndTicker()} IS GO`,
+  () => `WEAPONS FREE: ${_rndTicker()} SHORT SIGNAL`,
+  () => `EVAC ${_rndTicker()} — STOP LOSS HIT`,
+  () => `OSCAR MIKE — ROTATING INTO ${_rndTicker()}`,
+  () => `FRIENDLIES: ${Math.floor(Math.random()*8+3)} POSITIONS GREEN`,
+];
+
+function _rndTicker() {
+  return _RADAR_TICKERS[Math.floor(Math.random() * _RADAR_TICKERS.length)];
+}
+
+function cycleRadarStatus() {
+  const txt = el('opsRadarText');
+  if (!txt) return;
+  const msg = _RADAR_STATUS_MSGS[Math.floor(Math.random() * _RADAR_STATUS_MSGS.length)]();
+  txt.textContent = msg;
 }
 
 function spawnRadarBlip() {

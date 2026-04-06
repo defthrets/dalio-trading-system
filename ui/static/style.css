@@ -4089,12 +4089,15 @@ body.cli-expanded { padding-bottom: 272px; }
 .ops-radar-label {
   position: absolute;
   bottom: 2px;
-  left: 0; right: 0;
+  left: -40px; right: -40px;
   text-align: center;
   font-family: var(--font-hud);
-  font-size: 9px;
-  letter-spacing: 2px;
+  font-size: 7px;
+  letter-spacing: 1px;
   color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ops-radar-status-dot {
   color: var(--green);
