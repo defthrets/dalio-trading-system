@@ -1499,6 +1499,44 @@ function initSettingsTab() {
     const inp = el('settStartCash'); if (inp) inp.value = d.starting_cash;
     const inp2 = el('startingCashInput'); if (inp2) inp2.value = d.starting_cash;
   }).catch(() => {});
+  // Load saved broker credentials into config panels
+  _loadSavedBrokerCreds();
+}
+
+async function _loadSavedBrokerCreds() {
+  try {
+    const saved = await fetchJSON('/api/broker/saved');
+    if (!saved || typeof saved !== 'object') return;
+    const fieldMap = {
+      alpaca:   { api_key: 'settAlpacaKey', api_secret: 'settAlpacaSecret' },
+      ibkr:     { host: 'settIbkrHost', port: 'settIbkrPort', client_id: 'settIbkrClientId' },
+      binance:  { api_key: 'settBinanceKey', api_secret: 'settBinanceSecret' },
+      coinspot: { api_key: 'settCoinspotKey', api_secret: 'settCoinspotSecret' },
+      coinbase: { api_key: 'settCoinbaseKey', api_secret: 'settCoinbaseSecret' },
+      kraken:   { api_key: 'settKrakenKey', api_secret: 'settKrakenSecret' },
+      bybit:    { api_key: 'settBybitKey', api_secret: 'settBybitSecret' },
+      okx:      { api_key: 'settOkxKey', api_secret: 'settOkxSecret', passphrase: 'settOkxPassphrase' },
+      kucoin:   { api_key: 'settKucoinKey', api_secret: 'settKucoinSecret', passphrase: 'settKucoinPassphrase' },
+      bitget:   { api_key: 'settBitgetKey', api_secret: 'settBitgetSecret', passphrase: 'settBitgetPassphrase' },
+      independentreserve: { api_key: 'settIndependentreserveKey', api_secret: 'settIndependentreserveSecret' },
+    };
+    for (const [broker, creds] of Object.entries(saved)) {
+      const map = fieldMap[broker];
+      if (!map) continue;
+      for (const [key, fieldId] of Object.entries(map)) {
+        const input = el(fieldId);
+        if (input && creds[key]) {
+          input.value = creds[key];
+          input.placeholder = creds[key];
+        }
+      }
+      // Show a saved indicator on the config panel
+      const resultEl = el(`bcfgResult-${broker}`);
+      if (resultEl && !resultEl.innerHTML) {
+        resultEl.innerHTML = '<span style="color:var(--green)">● Saved</span>';
+      }
+    }
+  } catch (e) { /* silent — settings page still works without this */ }
 }
 
 function toggleTutorials(btn) {

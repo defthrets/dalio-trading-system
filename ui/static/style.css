@@ -31,8 +31,8 @@
   --red:         #ff1744;   /* loss / SELL / danger */
   --red-dim:     #d50032;
   --red-glow:    rgba(255,23,68,0.12);
-  --cyan:        #ff8c00;   /* data / info (now orange, same as primary) */
-  --cyan-glow:   rgba(255,140,0,0.10);
+  --cyan:        #00e676;   /* data / info — green accent */
+  --cyan-glow:   rgba(0,230,118,0.10);
 
   /* ── Text: warm white/gray for readability on black ── */
   --text-primary:#f0e8e0;
@@ -1395,26 +1395,28 @@ canvas { display: block; max-width: 100%; }
 
 /* ── Broker Config Panels (Settings page) ─────────────── */
 .broker-cfg-btn {
-  background: none;
-  border: 1px solid var(--primary-dim);
+  background: rgba(255,140,0,.08);
+  border: 1px solid var(--primary);
   color: var(--primary);
   font-family: var(--font-hud);
-  font-size: 13px;
-  letter-spacing: .8px;
-  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 6px 12px;
   border-radius: 2px;
   cursor: pointer;
   transition: all var(--transition);
+  text-transform: uppercase;
 }
-.broker-cfg-btn:hover { background: var(--primary); color: #000; }
+.broker-cfg-btn:hover { background: var(--primary); color: #000; box-shadow: 0 0 12px rgba(255,140,0,.3); }
 .broker-config-panel {
   grid-column: 1 / -1;
-  background: var(--bg-panel);
-  border: 1px solid var(--primary-dim);
+  background: var(--bg-panel-2);
+  border: 2px solid var(--primary);
   border-radius: 4px;
-  padding: 16px 20px;
-  margin: -4px 0 4px;
-  box-shadow: 0 4px 20px rgba(255,140,0,.06);
+  padding: 20px 24px;
+  margin: 4px 0 8px;
+  box-shadow: 0 4px 24px rgba(255,140,0,.15), inset 0 0 30px rgba(255,140,0,.03);
 }
 .broker-config-panel.hidden { display: none; }
 .bcfg-title {
