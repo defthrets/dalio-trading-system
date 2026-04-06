@@ -2421,6 +2421,7 @@ async def _fetch_binance_prices() -> dict:
     """
     global _BINANCE_PRICE_CACHE, _BINANCE_PRICE_TS
     import time as _t
+    import aiohttp
     now = _t.time()
     if now - _BINANCE_PRICE_TS < _BINANCE_PRICE_TTL and _BINANCE_PRICE_CACHE:
         return _BINANCE_PRICE_CACHE
