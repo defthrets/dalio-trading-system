@@ -3962,11 +3962,64 @@ body.cli-expanded { padding-bottom: 272px; }
   padding: 6px 0 2px;
   flex-shrink: 0;
   height: 110px;
+  overflow: hidden;
+  border-radius: 50%;
 }
+
+/* Static noise overlay */
+.radar-static-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    rgba(255,140,0,0.015) 1px,
+    transparent 2px
+  );
+  animation: radarStaticFlicker 0.15s steps(3) infinite;
+  pointer-events: none;
+  z-index: 2;
+  mix-blend-mode: screen;
+}
+@keyframes radarStaticFlicker {
+  0%   { opacity: 0.4; background-position: 0 0; }
+  33%  { opacity: 0.7; background-position: 0 1px; }
+  66%  { opacity: 0.3; background-position: 0 -1px; }
+  100% { opacity: 0.5; background-position: 0 2px; }
+}
+
+/* Horizontal scanline */
+.radar-scanline {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 10%, rgba(255,140,0,0.12) 30%, rgba(255,140,0,0.2) 50%, rgba(255,140,0,0.12) 70%, transparent 90%);
+  animation: scanlineMove 2.5s linear infinite;
+  pointer-events: none;
+  z-index: 3;
+}
+@keyframes scanlineMove {
+  from { top: 0; }
+  to   { top: 100%; }
+}
+
 .ops-radar-svg {
   width: 100px;
   height: 100px;
+  filter: url(#radarGlitch);
+  animation: radarGlitchShake 4s ease-in-out infinite;
 }
+@keyframes radarGlitchShake {
+  0%, 92%, 100% { transform: translate(0, 0); }
+  93%  { transform: translate(-1px, 0); }
+  94%  { transform: translate(2px, -1px); }
+  95%  { transform: translate(-1px, 1px); }
+  96%  { transform: translate(1px, 0); }
+  97%  { transform: translate(0, -1px); }
+  98%  { transform: translate(-2px, 1px); }
+}
+
 .ops-radar-beam {
   transform-origin: 60px 60px;
   animation: radarBeamSpin 3s linear infinite;
@@ -3975,6 +4028,24 @@ body.cli-expanded { padding-bottom: 272px; }
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
+
+.radar-center-dot {
+  animation: centerDotGlitch 3s ease infinite;
+}
+@keyframes centerDotGlitch {
+  0%, 85%, 100% { opacity: 0.9; fill: var(--primary); }
+  87% { opacity: 0.3; fill: var(--red); }
+  89% { opacity: 1; fill: var(--green); }
+  91% { opacity: 0.7; fill: var(--primary); }
+}
+.radar-center-ring {
+  animation: centerRingPulse 2s ease infinite;
+}
+@keyframes centerRingPulse {
+  0%, 100% { r: 7; opacity: 0.08; }
+  50% { r: 9; opacity: 0.15; }
+}
+
 /* Blips */
 .ops-radar-blip {
   fill: var(--green);
@@ -3989,6 +4060,48 @@ body.cli-expanded { padding-bottom: 272px; }
   80%  { opacity: 0.3; r: 1.5; }
   100% { opacity: 0; r: 1; }
 }
+
+/* $ and skull signal symbols */
+.radar-signal {
+  font-size: 7px;
+  font-family: var(--font-hud);
+  font-weight: 700;
+  fill: var(--green);
+  opacity: 0;
+  pointer-events: none;
+  animation: signalGlitchIn 3.5s ease-out forwards;
+}
+.radar-signal.signal-money { fill: var(--green); }
+.radar-signal.signal-skull { fill: var(--red); }
+.radar-signal.signal-warn  { fill: var(--amber); }
+@keyframes signalGlitchIn {
+  0%   { opacity: 0; transform: translate(0, 0); }
+  5%   { opacity: 0.9; }
+  8%   { opacity: 0; transform: translate(2px, -1px); }
+  11%  { opacity: 0.8; transform: translate(-1px, 0); }
+  15%  { opacity: 0; }
+  18%  { opacity: 0.7; transform: translate(0, 1px); }
+  25%  { opacity: 0.9; transform: translate(0, 0); }
+  70%  { opacity: 0.5; }
+  85%  { opacity: 0.2; transform: translate(1px, -1px); }
+  90%  { opacity: 0.6; transform: translate(-2px, 0); }
+  95%  { opacity: 0.1; }
+  100% { opacity: 0; }
+}
+
+/* Glitchy label text */
+.radar-glitch-text {
+  animation: labelGlitch 5s ease infinite;
+}
+@keyframes labelGlitch {
+  0%, 88%, 100% { text-shadow: none; transform: translate(0,0); }
+  89% { text-shadow: -1px 0 var(--red), 1px 0 var(--cyan); transform: translate(1px, 0); }
+  90% { text-shadow: 1px 0 var(--red), -1px 0 var(--green); transform: translate(-1px, 0); }
+  91% { text-shadow: none; transform: translate(0, 0); }
+  95% { text-shadow: -1px 0 var(--cyan); transform: translate(0, -1px); }
+  96% { text-shadow: none; transform: translate(0, 0); }
+}
+
 .ops-radar-label {
   position: absolute;
   bottom: 2px;

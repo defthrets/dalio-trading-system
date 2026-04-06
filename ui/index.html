@@ -199,30 +199,43 @@
           <div class="ops-hud-body">
             <!-- Radar SVG -->
             <div class="ops-radar-wrap">
+              <div class="radar-static-overlay"></div>
+              <div class="radar-scanline"></div>
               <svg class="ops-radar-svg" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-                <!-- Concentric rings -->
-                <circle cx="60" cy="60" r="55" fill="none" stroke="rgba(255,140,0,0.08)" stroke-width="0.5"/>
-                <circle cx="60" cy="60" r="40" fill="none" stroke="rgba(255,140,0,0.06)" stroke-width="0.5"/>
-                <circle cx="60" cy="60" r="25" fill="none" stroke="rgba(255,140,0,0.05)" stroke-width="0.5"/>
-                <circle cx="60" cy="60" r="10" fill="none" stroke="rgba(255,140,0,0.04)" stroke-width="0.5"/>
+                <!-- Concentric rings — glitchy double-stroke -->
+                <circle cx="60" cy="60" r="55" fill="none" stroke="rgba(255,140,0,0.1)" stroke-width="0.5"/>
+                <circle cx="60.4" cy="59.6" r="55" fill="none" stroke="rgba(0,255,100,0.04)" stroke-width="0.5"/>
+                <circle cx="60" cy="60" r="40" fill="none" stroke="rgba(255,140,0,0.08)" stroke-width="0.5"/>
+                <circle cx="59.6" cy="60.3" r="40" fill="none" stroke="rgba(255,0,60,0.03)" stroke-width="0.5"/>
+                <circle cx="60" cy="60" r="25" fill="none" stroke="rgba(255,140,0,0.06)" stroke-width="0.5"/>
+                <circle cx="60" cy="60" r="10" fill="none" stroke="rgba(255,140,0,0.05)" stroke-width="0.5"/>
                 <!-- Crosshairs -->
                 <line x1="60" y1="2" x2="60" y2="118" stroke="rgba(255,140,0,0.06)" stroke-width="0.5"/>
                 <line x1="2" y1="60" x2="118" y2="60" stroke="rgba(255,140,0,0.06)" stroke-width="0.5"/>
+                <!-- Diagonal glitch lines -->
+                <line x1="20" y1="20" x2="100" y2="100" stroke="rgba(255,140,0,0.03)" stroke-width="0.3" stroke-dasharray="3,8"/>
+                <line x1="100" y1="20" x2="20" y2="100" stroke="rgba(255,140,0,0.03)" stroke-width="0.3" stroke-dasharray="3,8"/>
                 <!-- Sweep beam -->
                 <path class="ops-radar-beam" d="M60,60 L60,5 A55,55 0 0,1 107,35 Z" fill="url(#radarGrad)"/>
-                <!-- Blips (positioned by JS) -->
+                <!-- Blips + symbol signals (positioned by JS) -->
                 <g id="radarBlips"></g>
-                <!-- Center dot -->
-                <circle cx="60" cy="60" r="2.5" fill="var(--primary)" opacity="0.9"/>
+                <g id="radarSignals"></g>
+                <!-- Center dot — glitchy pulse -->
+                <circle cx="60" cy="60" r="2.5" fill="var(--primary)" opacity="0.9" class="radar-center-dot"/>
                 <circle cx="60" cy="60" r="4" fill="none" stroke="var(--primary)" stroke-width="0.5" opacity="0.4"/>
+                <circle cx="60" cy="60" r="7" fill="none" stroke="rgba(255,140,0,0.08)" stroke-width="0.3" class="radar-center-ring"/>
                 <defs>
                   <radialGradient id="radarGrad" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="rgba(255,140,0,0.15)"/>
+                    <stop offset="0%" stop-color="rgba(255,140,0,0.18)"/>
                     <stop offset="100%" stop-color="transparent"/>
                   </radialGradient>
+                  <filter id="radarGlitch">
+                    <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" result="noise"/>
+                    <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.5" xChannelSelector="R" yChannelSelector="G"/>
+                  </filter>
                 </defs>
               </svg>
-              <div class="ops-radar-label">
+              <div class="ops-radar-label radar-glitch-text">
                 <span class="ops-radar-status-dot" id="opsRadarDot">●</span>
                 <span id="opsRadarText">SCANNING</span>
               </div>

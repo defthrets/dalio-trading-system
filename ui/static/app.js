@@ -4838,14 +4838,14 @@ function initOpsTerminal() {
     term.scrollTop = term.scrollHeight;
   }, 2500);
 
-  // Also spawn radar blips
+  // Spawn radar blips and signal symbols
   setInterval(spawnRadarBlip, 3500);
+  setInterval(spawnRadarSignal, 2200);
 }
 
 function spawnRadarBlip() {
   const g = document.getElementById('radarBlips');
   if (!g) return;
-  // Random position within radar circle
   const angle = Math.random() * Math.PI * 2;
   const dist = 15 + Math.random() * 35;
   const cx = 60 + Math.cos(angle) * dist;
@@ -4857,11 +4857,49 @@ function spawnRadarBlip() {
   blip.classList.add('ops-radar-blip');
   if (Math.random() < 0.15) blip.classList.add('warn');
   if (Math.random() < 0.05) blip.classList.add('alert');
-  // Randomise animation delay
   blip.style.animationDelay = (Math.random() * 0.5).toFixed(2) + 's';
   g.appendChild(blip);
-  // Remove after animation
   setTimeout(() => blip.remove(), 3500);
+}
+
+const _RADAR_SYMBOLS = ['$', '$', '$', '$$', '\u2620', '\u2620', '\u26A0', '\u25B2', '\u25BC'];
+
+function spawnRadarSignal() {
+  const g = document.getElementById('radarSignals');
+  if (!g) return;
+  // Keep max 6 signals on screen
+  while (g.children.length > 6) g.removeChild(g.firstChild);
+
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 12 + Math.random() * 40;
+  const x = 60 + Math.cos(angle) * dist;
+  const y = 60 + Math.sin(angle) * dist;
+
+  const sym = _RADAR_SYMBOLS[Math.floor(Math.random() * _RADAR_SYMBOLS.length)];
+  const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  txt.setAttribute('x', x.toFixed(1));
+  txt.setAttribute('y', y.toFixed(1));
+  txt.setAttribute('text-anchor', 'middle');
+  txt.setAttribute('dominant-baseline', 'central');
+  txt.textContent = sym;
+  txt.classList.add('radar-signal');
+
+  // Color class based on symbol
+  if (sym.includes('$')) {
+    txt.classList.add('signal-money');
+  } else if (sym === '\u2620') {
+    txt.classList.add('signal-skull');
+    txt.style.fontSize = '9px';
+  } else if (sym === '\u26A0') {
+    txt.classList.add('signal-warn');
+  }
+
+  // Random glitch delay
+  txt.style.animationDelay = (Math.random() * 0.4).toFixed(2) + 's';
+  txt.style.animationDuration = (2.5 + Math.random() * 2).toFixed(1) + 's';
+
+  g.appendChild(txt);
+  setTimeout(() => txt.remove(), 4500);
 }
 
 // Auto-start OPS terminal on page load
