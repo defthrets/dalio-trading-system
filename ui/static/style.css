@@ -3613,10 +3613,10 @@ body.cli-expanded { padding-bottom: 272px; }
 .scanner-table th:hover { color: var(--primary); }
 .scanner-table td { white-space: nowrap; }
 
-/* 2-column scanner card grid (replaces single-column table body) */
+/* 4-column scanner card grid */
 .scanner-card-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
   gap: 1px;
   background: var(--border);
   padding: 0;
@@ -3681,7 +3681,10 @@ body.cli-expanded { padding-bottom: 272px; }
 .scanner-card .sc-star-btn:hover { color: var(--amber); border-color: var(--amber); }
 .scanner-card .sc-trade-btn { color: var(--green); border-color: var(--green-dim); }
 .scanner-card .sc-trade-btn:hover { background: var(--green-glow); }
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
+  .scanner-card-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 900px) {
   .scanner-card-grid { grid-template-columns: 1fr; }
 }
 
