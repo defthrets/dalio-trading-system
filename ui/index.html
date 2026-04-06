@@ -1180,6 +1180,12 @@
                   <option value="binance">BINANCE (Spot / Futures)</option>
                   <option value="coinbase">COINBASE ADVANCED TRADE</option>
                   <option value="coinspot">COINSPOT (AUD Crypto)</option>
+                  <option value="kraken">KRAKEN</option>
+                  <option value="bybit">BYBIT</option>
+                  <option value="okx">OKX</option>
+                  <option value="kucoin">KUCOIN</option>
+                  <option value="bitget">BITGET</option>
+                  <option value="independentreserve">INDEPENDENT RESERVE (AUD)</option>
                 </optgroup>
                 <optgroup label="ASX / Retail">
                   <option value="stake">STAKE (ASX / US)</option>
@@ -1459,7 +1465,8 @@
                 <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settCoinspotSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
-                <button class="btn-primary" onclick="connectBrokerFromSettings('coinspot')">⚡ TEST CONNECTION</button>
+                <button class="btn-primary" onclick="connectBrokerFromSettings('coinspot')">⚡ TEST</button>
+                <button class="btn-ghost" onclick="saveBrokerCreds('coinspot')">💾 SAVE</button>
                 <span class="bcfg-result" id="bcfgResult-coinspot"></span>
               </div>
             </div>
@@ -1573,7 +1580,8 @@
                 <div class="bcfg-field"><label>CLIENT ID</label><input type="number" class="form-input form-input--sm" id="settIbkrClientId" value="1"/></div>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
-                <button class="btn-primary" onclick="connectBrokerFromSettings('ibkr')">⚡ TEST CONNECTION</button>
+                <button class="btn-primary" onclick="connectBrokerFromSettings('ibkr')">⚡ TEST</button>
+                <button class="btn-ghost" onclick="saveBrokerCreds('ibkr')">💾 SAVE</button>
                 <span class="bcfg-result" id="bcfgResult-ibkr"></span>
               </div>
             </div>
@@ -1640,7 +1648,8 @@
                 </div>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
-                <button class="btn-primary" onclick="connectBrokerFromSettings('alpaca')">⚡ TEST CONNECTION</button>
+                <button class="btn-primary" onclick="connectBrokerFromSettings('alpaca')">⚡ TEST</button>
+                <button class="btn-ghost" onclick="saveBrokerCreds('alpaca')">💾 SAVE</button>
                 <span class="bcfg-result" id="bcfgResult-alpaca"></span>
               </div>
             </div>
@@ -1675,7 +1684,8 @@
                 </div>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
-                <button class="btn-primary" onclick="connectBrokerFromSettings('binance')">⚡ TEST CONNECTION</button>
+                <button class="btn-primary" onclick="connectBrokerFromSettings('binance')">⚡ TEST</button>
+                <button class="btn-ghost" onclick="saveBrokerCreds('binance')">💾 SAVE</button>
                 <span class="bcfg-result" id="bcfgResult-binance"></span>
               </div>
             </div>
@@ -1700,80 +1710,162 @@
                 <div class="bcfg-field"><label>PRIVATE KEY (EC)</label><textarea class="form-input form-input--sm" id="settCoinbaseSecret" rows="3" placeholder="-----BEGIN EC PRIVATE KEY-----&#10;..." style="resize:vertical;font-size:9px;" autocomplete="off"></textarea></div>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
-                <button class="btn-primary" onclick="connectBrokerFromSettings('coinbase')">⚡ TEST CONNECTION</button>
+                <button class="btn-primary" onclick="connectBrokerFromSettings('coinbase')">⚡ TEST</button>
+                <button class="btn-ghost" onclick="saveBrokerCreds('coinbase')">💾 SAVE</button>
                 <span class="bcfg-result" id="bcfgResult-coinbase"></span>
               </div>
             </div>
-            <div class="broker-card" data-broker="kraken">
-              <div class="broker-logo">KRK</div>
+            <div class="broker-card featured" data-broker="kraken">
+              <div class="broker-logo api-glow">KRK</div>
               <div class="broker-info">
-                <div class="broker-name">Kraken</div>
+                <div class="broker-name">Kraken <span class="btag api-tag" style="font-size:11px">API</span></div>
                 <div class="broker-desc">200+ coins. Trusted since 2011. Spot + futures. Full API with WebSocket.</div>
                 <div class="broker-tags"><span class="btag">200+ Coins</span><span class="btag">Futures</span><span class="btag api-tag">API</span></div>
               </div>
               <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
+                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('kraken')">⚙ CONFIGURE</button>
                 <a class="broker-link" href="https://www.kraken.com" target="_blank">Open →</a>
               </div>
             </div>
-            <div class="broker-card" data-broker="bybit">
-              <div class="broker-logo">BBT</div>
+            <div class="broker-config-panel hidden" id="brokerCfg-kraken">
+              <div class="bcfg-title">⚡ KRAKEN — API CONFIGURATION</div>
+              <div class="bcfg-desc">Generate keys at kraken.com → Security → API. Enable Query Funds + Create/Modify Orders.</div>
+              <div class="bcfg-fields">
+                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settKrakenKey" placeholder="Kraken API key" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>PRIVATE KEY (Secret)</label><input type="password" class="form-input form-input--sm" id="settKrakenSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn-primary" onclick="connectBrokerFromSettings('kraken')">⚡ TEST</button>
+                <button class="btn-ghost" onclick="saveBrokerCreds('kraken')">💾 SAVE</button>
+                <span class="bcfg-result" id="bcfgResult-kraken"></span>
+              </div>
+            </div>
+            <div class="broker-card featured" data-broker="bybit">
+              <div class="broker-logo api-glow">BBT</div>
               <div class="broker-info">
-                <div class="broker-name">Bybit</div>
+                <div class="broker-name">Bybit <span class="btag api-tag" style="font-size:11px">API</span></div>
                 <div class="broker-desc">Top derivatives exchange. Spot, perpetuals, options. Very popular in AU.</div>
                 <div class="broker-tags"><span class="btag">Perpetuals</span><span class="btag">Options</span><span class="btag api-tag">API</span></div>
               </div>
               <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
+                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('bybit')">⚙ CONFIGURE</button>
                 <a class="broker-link" href="https://www.bybit.com" target="_blank">Open →</a>
               </div>
             </div>
-            <div class="broker-card" data-broker="okx">
-              <div class="broker-logo">OKX</div>
+            <div class="broker-config-panel hidden" id="brokerCfg-bybit">
+              <div class="bcfg-title">⚡ BYBIT — API CONFIGURATION</div>
+              <div class="bcfg-desc">Generate keys at bybit.com → Account → API Management. Enable Trade permission.</div>
+              <div class="bcfg-fields">
+                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settBybitKey" placeholder="Bybit API key" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settBybitSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn-primary" onclick="connectBrokerFromSettings('bybit')">⚡ TEST</button>
+                <button class="btn-ghost" onclick="saveBrokerCreds('bybit')">💾 SAVE</button>
+                <span class="bcfg-result" id="bcfgResult-bybit"></span>
+              </div>
+            </div>
+            <div class="broker-card featured" data-broker="okx">
+              <div class="broker-logo api-glow">OKX</div>
               <div class="broker-info">
-                <div class="broker-name">OKX</div>
+                <div class="broker-name">OKX <span class="btag api-tag" style="font-size:11px">API</span></div>
                 <div class="broker-desc">3rd largest exchange. Spot, futures, options, DEX aggregator. Full API.</div>
                 <div class="broker-tags"><span class="btag">350+ Coins</span><span class="btag">DEX</span><span class="btag api-tag">API</span></div>
               </div>
               <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
+                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('okx')">⚙ CONFIGURE</button>
                 <a class="broker-link" href="https://www.okx.com" target="_blank">Open →</a>
               </div>
             </div>
-            <div class="broker-card" data-broker="kucoin">
-              <div class="broker-logo">KCS</div>
+            <div class="broker-config-panel hidden" id="brokerCfg-okx">
+              <div class="bcfg-title">⚡ OKX — API CONFIGURATION</div>
+              <div class="bcfg-desc">Generate keys at okx.com → Profile → API. Requires API key, secret, AND passphrase.</div>
+              <div class="bcfg-fields">
+                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settOkxKey" placeholder="OKX API key" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settOkxSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>PASSPHRASE</label><input type="password" class="form-input form-input--sm" id="settOkxPassphrase" placeholder="Your API passphrase" autocomplete="off"/></div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn-primary" onclick="connectBrokerFromSettings('okx')">⚡ TEST</button>
+                <button class="btn-ghost" onclick="saveBrokerCreds('okx')">💾 SAVE</button>
+                <span class="bcfg-result" id="bcfgResult-okx"></span>
+              </div>
+            </div>
+            <div class="broker-card featured" data-broker="kucoin">
+              <div class="broker-logo api-glow">KCS</div>
               <div class="broker-info">
-                <div class="broker-name">KuCoin</div>
+                <div class="broker-name">KuCoin <span class="btag api-tag" style="font-size:11px">API</span></div>
                 <div class="broker-desc">700+ coins including small-caps. Spot, margin, futures. Popular for altcoins.</div>
                 <div class="broker-tags"><span class="btag">700+ Coins</span><span class="btag">Altcoins</span><span class="btag api-tag">API</span></div>
               </div>
               <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
+                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('kucoin')">⚙ CONFIGURE</button>
                 <a class="broker-link" href="https://www.kucoin.com" target="_blank">Open →</a>
               </div>
             </div>
-            <div class="broker-card" data-broker="bitget">
-              <div class="broker-logo">BGT</div>
+            <div class="broker-config-panel hidden" id="brokerCfg-kucoin">
+              <div class="bcfg-title">⚡ KUCOIN — API CONFIGURATION</div>
+              <div class="bcfg-desc">Generate keys at kucoin.com → API Management. Requires API key, secret, AND passphrase.</div>
+              <div class="bcfg-fields">
+                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settKucoinKey" placeholder="KuCoin API key" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settKucoinSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>PASSPHRASE</label><input type="password" class="form-input form-input--sm" id="settKucoinPassphrase" placeholder="Your API passphrase" autocomplete="off"/></div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn-primary" onclick="connectBrokerFromSettings('kucoin')">⚡ TEST</button>
+                <button class="btn-ghost" onclick="saveBrokerCreds('kucoin')">💾 SAVE</button>
+                <span class="bcfg-result" id="bcfgResult-kucoin"></span>
+              </div>
+            </div>
+            <div class="broker-card featured" data-broker="bitget">
+              <div class="broker-logo api-glow">BGT</div>
               <div class="broker-info">
-                <div class="broker-name">Bitget</div>
+                <div class="broker-name">Bitget <span class="btag api-tag" style="font-size:11px">API</span></div>
                 <div class="broker-desc">Copy trading + spot + futures. 700+ coins. Growing AU user base.</div>
                 <div class="broker-tags"><span class="btag">Copy Trade</span><span class="btag">Futures</span><span class="btag api-tag">API</span></div>
               </div>
               <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
+                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('bitget')">⚙ CONFIGURE</button>
                 <a class="broker-link" href="https://www.bitget.com" target="_blank">Open →</a>
               </div>
             </div>
-            <div class="broker-card" data-broker="independentreserve">
-              <div class="broker-logo">IR</div>
+            <div class="broker-config-panel hidden" id="brokerCfg-bitget">
+              <div class="bcfg-title">⚡ BITGET — API CONFIGURATION</div>
+              <div class="bcfg-desc">Generate keys at bitget.com → API Management. Requires API key, secret, AND passphrase.</div>
+              <div class="bcfg-fields">
+                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settBitgetKey" placeholder="Bitget API key" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settBitgetSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>PASSPHRASE</label><input type="password" class="form-input form-input--sm" id="settBitgetPassphrase" placeholder="Your API passphrase" autocomplete="off"/></div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn-primary" onclick="connectBrokerFromSettings('bitget')">⚡ TEST</button>
+                <button class="btn-ghost" onclick="saveBrokerCreds('bitget')">💾 SAVE</button>
+                <span class="bcfg-result" id="bcfgResult-bitget"></span>
+              </div>
+            </div>
+            <div class="broker-card featured" data-broker="independentreserve">
+              <div class="broker-logo api-glow">IR</div>
               <div class="broker-info">
-                <div class="broker-name">Independent Reserve</div>
+                <div class="broker-name">Independent Reserve <span class="btag api-tag" style="font-size:11px">API</span></div>
                 <div class="broker-desc">AU-regulated crypto exchange. AUSTRAC registered. AUD deposits. API available.</div>
                 <div class="broker-tags"><span class="btag">AU Regulated</span><span class="btag">AUD</span><span class="btag api-tag">API</span></div>
               </div>
               <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
+                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('independentreserve')">⚙ CONFIGURE</button>
                 <a class="broker-link" href="https://www.independentreserve.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-config-panel hidden" id="brokerCfg-independentreserve">
+              <div class="bcfg-title">⚡ INDEPENDENT RESERVE — API CONFIGURATION</div>
+              <div class="bcfg-desc">Generate keys at independentreserve.com → Settings → API Keys. Enable trading permissions.</div>
+              <div class="bcfg-fields">
+                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settIndependentreserveKey" placeholder="IR API key" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settIndependentreserveSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn-primary" onclick="connectBrokerFromSettings('independentreserve')">⚡ TEST</button>
+                <button class="btn-ghost" onclick="saveBrokerCreds('independentreserve')">💾 SAVE</button>
+                <span class="bcfg-result" id="bcfgResult-independentreserve"></span>
               </div>
             </div>
           </div>

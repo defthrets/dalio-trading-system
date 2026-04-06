@@ -845,6 +845,102 @@ class CoinSpotBroker(BrokerBase):
         return await self.place_order(ticker, "SELL", pos["qty"])
 
 
+class GenericCryptoBroker(BrokerBase):
+    """Generic HMAC-signed crypto exchange broker for exchanges that follow
+    the standard API key + secret pattern. Subclass and set name, _BASE, and
+    override methods as needed for exchange-specific behaviour."""
+    name: str = "generic"
+    _BASE: str = ""
+
+    def __init__(self):
+        self._api_key:    Optional[str] = None
+        self._api_secret: Optional[str] = None
+        self._passphrase: Optional[str] = None
+        self._connected   = False
+
+    def is_connected(self) -> bool:
+        return self._connected
+
+    def _headers(self, body: str = "") -> dict:
+        import time as _t, hmac as _hmac, hashlib as _hs
+        ts = str(int(_t.time() * 1000))
+        msg = ts + body
+        sig = _hmac.new(self._api_secret.encode(), msg.encode(), _hs.sha256).hexdigest()
+        h = {"Content-Type": "application/json", "API-KEY": self._api_key,
+             "API-SIGN": sig, "API-TIMESTAMP": ts}
+        if self._passphrase:
+            h["API-PASSPHRASE"] = self._passphrase
+        return h
+
+    async def connect(self, api_key: str, api_secret: str, passphrase: str = "", **kwargs) -> None:
+        self._api_key    = api_key
+        self._api_secret = api_secret
+        self._passphrase = passphrase or None
+        self._connected  = True
+        logger.info(f"{self.name.upper()} credentials saved (connection validated on first trade)")
+
+    async def get_account(self) -> dict:
+        return {"broker": self.name, "account_value": 0, "buying_power": 0,
+                "cash": 0, "currency": "USD", "note": "Connect and trade to populate"}
+
+    async def place_order(self, ticker: str, side: str, qty: float, price: Optional[float] = None) -> dict:
+        raise NotImplementedError(f"{self.name.upper()} order routing not yet implemented — coming soon")
+
+    async def get_positions(self) -> list:
+        return []
+
+    async def get_history(self) -> list:
+        return []
+
+    async def close_position(self, ticker: str) -> dict:
+        raise NotImplementedError(f"{self.name.upper()} close not yet implemented")
+
+
+class KrakenBroker(GenericCryptoBroker):
+    name = "kraken"
+    _BASE = "https://api.kraken.com"
+
+
+class BybitBroker(GenericCryptoBroker):
+    name = "bybit"
+    _BASE = "https://api.bybit.com"
+
+
+class OKXBroker(GenericCryptoBroker):
+    name = "okx"
+    _BASE = "https://www.okx.com"
+
+    async def connect(self, api_key: str, api_secret: str, passphrase: str = "", **kwargs) -> None:
+        if not passphrase:
+            raise ValueError("OKX requires a passphrase in addition to API key and secret")
+        await super().connect(api_key, api_secret, passphrase, **kwargs)
+
+
+class KuCoinBroker(GenericCryptoBroker):
+    name = "kucoin"
+    _BASE = "https://api.kucoin.com"
+
+    async def connect(self, api_key: str, api_secret: str, passphrase: str = "", **kwargs) -> None:
+        if not passphrase:
+            raise ValueError("KuCoin requires a passphrase in addition to API key and secret")
+        await super().connect(api_key, api_secret, passphrase, **kwargs)
+
+
+class BitgetBroker(GenericCryptoBroker):
+    name = "bitget"
+    _BASE = "https://api.bitget.com"
+
+    async def connect(self, api_key: str, api_secret: str, passphrase: str = "", **kwargs) -> None:
+        if not passphrase:
+            raise ValueError("Bitget requires a passphrase in addition to API key and secret")
+        await super().connect(api_key, api_secret, passphrase, **kwargs)
+
+
+class IndependentReserveBroker(GenericCryptoBroker):
+    name = "independentreserve"
+    _BASE = "https://api.independentreserve.com"
+
+
 class StakeBroker(BrokerBase):
     name = "stake"
     def is_connected(self) -> bool: return False
@@ -3439,7 +3535,10 @@ async def broker_connect(payload: dict):
     global ACTIVE_BROKER
     broker_name = payload.get("broker", "").lower()
     _BROKER_MAP = {"ibkr": IBKRBroker, "alpaca": AlpacaBroker, "binance": BinanceBroker,
-                   "coinbase": CoinbaseBroker, "coinspot": CoinSpotBroker, "stake": StakeBroker}
+                   "coinbase": CoinbaseBroker, "coinspot": CoinSpotBroker,
+                   "kraken": KrakenBroker, "bybit": BybitBroker, "okx": OKXBroker,
+                   "kucoin": KuCoinBroker, "bitget": BitgetBroker,
+                   "independentreserve": IndependentReserveBroker, "stake": StakeBroker}
     if broker_name not in _BROKER_MAP:
         raise HTTPException(400, f"broker must be one of: {', '.join(_BROKER_MAP)}")
     broker: BrokerBase = _BROKER_MAP[broker_name]()
@@ -3466,6 +3565,50 @@ async def broker_status():
         return {"broker": ACTIVE_BROKER.name, "connected": True, **acct}
     except Exception as e:
         return {"broker": ACTIVE_BROKER.name, "connected": True, "error": str(e)}
+
+
+_BROKER_CREDS_FILE = DATA_DIR / "broker_credentials.json"
+
+
+def _load_broker_creds() -> dict:
+    if _BROKER_CREDS_FILE.exists():
+        try:
+            return json.loads(_BROKER_CREDS_FILE.read_text())
+        except Exception:
+            return {}
+    return {}
+
+
+def _save_broker_creds(creds: dict):
+    _BROKER_CREDS_FILE.write_text(json.dumps(creds, indent=2))
+
+
+@app.post("/api/broker/save")
+async def broker_save(payload: dict):
+    broker_name = payload.get("broker", "").lower()
+    if not broker_name:
+        raise HTTPException(400, "broker name required")
+    creds = _load_broker_creds()
+    creds[broker_name] = {k: v for k, v in payload.items() if k != "broker"}
+    _save_broker_creds(creds)
+    STATE.add_alert("BROKER", f"{broker_name.upper()} credentials saved", "INFO")
+    return {"status": "saved", "broker": broker_name}
+
+
+@app.get("/api/broker/saved")
+async def broker_saved():
+    creds = _load_broker_creds()
+    # Return broker names with masked keys (don't expose full secrets)
+    result = {}
+    for name, data in creds.items():
+        masked = {}
+        for k, v in data.items():
+            if isinstance(v, str) and len(v) > 6 and any(s in k.lower() for s in ("secret", "key", "pass", "private")):
+                masked[k] = v[:4] + "•" * (len(v) - 8) + v[-4:]
+            else:
+                masked[k] = v
+        result[name] = masked
+    return result
 
 
 # ─────────────────────────────────────────────

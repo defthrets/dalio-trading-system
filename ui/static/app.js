@@ -2580,6 +2580,33 @@ async function connectBrokerFromSettings(broker) {
     payload.api_key    = el('settCoinbaseKey')?.value?.trim();
     payload.api_secret = el('settCoinbaseSecret')?.value?.trim();
     if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">Key name and private key required</span>'; return; }
+  } else if (broker === 'kraken') {
+    payload.api_key    = el('settKrakenKey')?.value?.trim();
+    payload.api_secret = el('settKrakenSecret')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
+  } else if (broker === 'bybit') {
+    payload.api_key    = el('settBybitKey')?.value?.trim();
+    payload.api_secret = el('settBybitSecret')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
+  } else if (broker === 'okx') {
+    payload.api_key    = el('settOkxKey')?.value?.trim();
+    payload.api_secret = el('settOkxSecret')?.value?.trim();
+    payload.passphrase = el('settOkxPassphrase')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret || !payload.passphrase) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key, secret, and passphrase required</span>'; return; }
+  } else if (broker === 'kucoin') {
+    payload.api_key    = el('settKucoinKey')?.value?.trim();
+    payload.api_secret = el('settKucoinSecret')?.value?.trim();
+    payload.passphrase = el('settKucoinPassphrase')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret || !payload.passphrase) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key, secret, and passphrase required</span>'; return; }
+  } else if (broker === 'bitget') {
+    payload.api_key    = el('settBitgetKey')?.value?.trim();
+    payload.api_secret = el('settBitgetSecret')?.value?.trim();
+    payload.passphrase = el('settBitgetPassphrase')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret || !payload.passphrase) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key, secret, and passphrase required</span>'; return; }
+  } else if (broker === 'independentreserve') {
+    payload.api_key    = el('settIndependentreserveKey')?.value?.trim();
+    payload.api_secret = el('settIndependentreserveSecret')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
   }
 
   try {
@@ -2593,6 +2620,40 @@ async function connectBrokerFromSettings(broker) {
     await loadRealPortfolio();
   } catch (e) {
     if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ ${e.message || 'Connection failed'}</span>`;
+  }
+}
+
+// Build payload from settings fields for a given broker
+function _getBrokerPayload(broker) {
+  const _f = (id) => el(id)?.value?.trim() || '';
+  const map = {
+    alpaca:   () => ({ api_key: _f('settAlpacaKey'), api_secret: _f('settAlpacaSecret'), base_url: el('settAlpacaEnv')?.value === 'live' ? 'https://api.alpaca.markets' : 'https://paper-api.alpaca.markets' }),
+    ibkr:     () => ({ host: _f('settIbkrHost') || '127.0.0.1', port: _f('settIbkrPort') || '7497', client_id: _f('settIbkrClientId') || '1' }),
+    binance:  () => ({ api_key: _f('settBinanceKey'), api_secret: _f('settBinanceSecret'), testnet: el('settBinanceTestnet')?.value }),
+    coinspot: () => ({ api_key: _f('settCoinspotKey'), api_secret: _f('settCoinspotSecret') }),
+    coinbase: () => ({ api_key: _f('settCoinbaseKey'), api_secret: _f('settCoinbaseSecret') }),
+    kraken:   () => ({ api_key: _f('settKrakenKey'), api_secret: _f('settKrakenSecret') }),
+    bybit:    () => ({ api_key: _f('settBybitKey'), api_secret: _f('settBybitSecret') }),
+    okx:      () => ({ api_key: _f('settOkxKey'), api_secret: _f('settOkxSecret'), passphrase: _f('settOkxPassphrase') }),
+    kucoin:   () => ({ api_key: _f('settKucoinKey'), api_secret: _f('settKucoinSecret'), passphrase: _f('settKucoinPassphrase') }),
+    bitget:   () => ({ api_key: _f('settBitgetKey'), api_secret: _f('settBitgetSecret'), passphrase: _f('settBitgetPassphrase') }),
+    independentreserve: () => ({ api_key: _f('settIndependentreserveKey'), api_secret: _f('settIndependentreserveSecret') }),
+  };
+  return map[broker] ? map[broker]() : {};
+}
+
+async function saveBrokerCreds(broker) {
+  const resultEl = el(`bcfgResult-${broker}`);
+  const payload = { broker, ..._getBrokerPayload(broker) };
+  // Check at least one field has a value
+  const vals = Object.values(payload).filter(v => typeof v === 'string' && v.length > 0);
+  if (vals.length < 2) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">Fill in credentials first</span>'; return; }
+  try {
+    await postJSON('/api/broker/save', payload);
+    if (resultEl) resultEl.innerHTML = '<span style="color:var(--green)">💾 Credentials saved</span>';
+    pushAlert('BROKER', `${broker.toUpperCase()} credentials saved`, 'info');
+  } catch (e) {
+    if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">Save failed: ${e.message}</span>`;
   }
 }
 
@@ -2645,6 +2706,23 @@ async function connectBroker() {
     if (res) res.innerHTML = '<span style="color:var(--amber)">⚠ Stake does not support bot-trading API</span>';
     if (btn) { btn.textContent = '▶ CONNECT BROKER'; btn.classList.remove('loading'); }
     return;
+  } else {
+    // For new brokers (kraken, bybit, okx, kucoin, bitget, independentreserve),
+    // load saved credentials — configure them in Settings tab first
+    try {
+      const saved = await fetchJSON('/api/broker/saved');
+      if (saved[broker]) {
+        Object.assign(payload, saved[broker]);
+      } else {
+        if (res) res.innerHTML = '<span style="color:var(--amber)">⚠ No saved credentials — configure in Settings tab first</span>';
+        if (btn) { btn.textContent = '▶ CONNECT BROKER'; btn.classList.remove('loading'); }
+        return;
+      }
+    } catch (e) {
+      if (res) res.innerHTML = '<span style="color:var(--amber)">⚠ Configure credentials in Settings tab first</span>';
+      if (btn) { btn.textContent = '▶ CONNECT BROKER'; btn.classList.remove('loading'); }
+      return;
+    }
   }
   try {
     const d = await postJSON('/api/broker/connect', payload);
