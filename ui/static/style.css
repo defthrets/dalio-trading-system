@@ -3967,22 +3967,27 @@ body.cli-expanded { padding-bottom: 272px; }
   z-index: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  justify-content: flex-start;
+  align-items: flex-start;
   pointer-events: none;
+  padding: 4px 6px;
+  gap: 1px;
 }
 .radar-telemetry-line {
   font-family: var(--font-mono);
-  font-size: 5.5px;
-  letter-spacing: 0.5px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
   white-space: nowrap;
   opacity: 0;
-  color: rgba(255,140,0,0.18);
-  line-height: 1.6;
+  color: rgba(255,140,0,0.25);
+  line-height: 1.4;
   animation: telemetryFade 4s ease forwards;
+  width: 100%;
+  text-transform: uppercase;
 }
-.radar-telemetry-line.fast { color: rgba(0,204,68,0.22); }
-.radar-telemetry-line.slow { color: rgba(255,60,60,0.22); }
+.radar-telemetry-line.fast { color: rgba(0,204,68,0.3); }
+.radar-telemetry-line.slow { color: rgba(255,60,60,0.3); }
 @keyframes telemetryFade {
   0%   { opacity: 0; }
   10%  { opacity: 1; }
@@ -4378,3 +4383,232 @@ body.cli-expanded { padding-bottom: 272px; }
 .cc-rec-analysis-line { margin-bottom: 2px; }
 .cc-rec-risk-flags { color: var(--amber); }
 .cc-rec-actions { display: flex; gap: 6px; margin-top: 6px; }
+
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — Tablet breakpoint
+   ═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .app-header { flex-wrap: wrap; padding: 8px 12px; gap: 6px; }
+  .header-left, .header-right { width: 100%; justify-content: center; }
+  .logo-block { justify-content: center; }
+  .system-badges { justify-content: center; flex-wrap: wrap; }
+
+  .tab-nav { flex-wrap: wrap; gap: 2px; padding: 4px 8px; }
+  .tab-btn { font-size: 9px; padding: 6px 8px; flex: 0 0 auto; }
+  .tab-btn .tab-icon { display: none; }
+  .search-nav-btn { font-size: 9px; padding: 6px 8px; }
+
+  .tab-content { padding: 8px; }
+
+  /* Stack all grid panels to single column */
+  .panel-grid,
+  .panel-grid--cc-hub,
+  .panel-grid--paper,
+  .panel-grid--settings,
+  .panel-grid--scanner,
+  .panel-grid--live,
+  .panel-grid--risk,
+  .panel-grid--intel,
+  .panel-grid--grail,
+  .panel-grid--backtest {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px;
+  }
+
+  .panel { grid-column: 1 / -1 !important; }
+
+  /* Ticker strip narrower */
+  .ticker-strip { font-size: 9px; }
+  .ticker-item { padding: 0 8px; }
+
+  /* Signal grid 1 column on tablet */
+  .signal-grid { grid-template-columns: 1fr !important; }
+
+  /* Scanner cards 1 column */
+  .scanner-card-grid { grid-template-columns: 1fr !important; }
+
+  /* Broker grid single column */
+  .broker-grid { grid-template-columns: 1fr !important; }
+
+  /* OPS radar smaller */
+  .ops-radar-wrap { max-width: 200px; margin: 0 auto; }
+
+  /* CLI terminal full width */
+  .cli-wrap { max-width: 100%; }
+
+  /* Order modal full width */
+  .order-modal { width: 95vw !important; max-width: 95vw !important; }
+
+  /* Search modal full width */
+  .search-modal-content { width: 95vw !important; max-width: 95vw !important; }
+}
+
+@media (max-width: 640px) {
+  .app-header { padding: 6px 8px; }
+  .logo-main { font-size: 16px; }
+  .logo-sub { font-size: 7px; }
+  .system-badges { gap: 4px; }
+  .badge { font-size: 8px; padding: 2px 6px; }
+
+  .tab-nav { padding: 2px 4px; }
+  .tab-btn { font-size: 8px; padding: 4px 6px; }
+
+  .panel { padding: 10px; }
+  .panel-header { padding: 8px 10px; }
+  .panel-title { font-size: 10px; }
+
+  .form-row { flex-direction: column; }
+  .form-group { width: 100%; }
+
+  .paper-summary-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .ps-stat { padding: 8px; }
+
+  .signal-card { padding: 10px; }
+  .sc-header { flex-wrap: wrap; gap: 4px; }
+
+  .just-grid { grid-template-columns: 1fr !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LIGHT THEME OVERRIDES
+   ═══════════════════════════════════════════════════════════ */
+
+.light-theme .scanlines,
+.light-theme .noise { display: none !important; }
+
+.light-theme .panel {
+  background: var(--bg-panel);
+  border-color: var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.light-theme .panel-header {
+  border-color: var(--border);
+}
+
+.light-theme .app-header {
+  background: var(--bg-panel);
+  border-color: var(--border);
+}
+
+.light-theme .tab-nav {
+  background: var(--bg-panel);
+  border-color: var(--border);
+}
+
+.light-theme .tab-btn {
+  color: var(--text-2);
+}
+.light-theme .tab-btn.active {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+.light-theme .tab-btn:hover {
+  color: var(--text-1);
+}
+
+.light-theme .ticker-strip {
+  background: var(--bg-panel);
+  border-color: var(--border);
+}
+
+.light-theme .form-input,
+.light-theme .ctrl-select {
+  background: var(--bg-1);
+  border-color: var(--border);
+  color: var(--text-1);
+}
+
+.light-theme table tr:nth-child(even) {
+  background: rgba(0,0,0,0.02);
+}
+
+.light-theme .alert-item {
+  border-color: var(--border);
+}
+
+.light-theme .signal-card {
+  background: var(--bg-panel);
+  border-color: var(--border);
+}
+
+.light-theme .order-modal {
+  background: var(--bg-panel);
+  border-color: var(--border);
+}
+
+.light-theme .search-modal-content {
+  background: var(--bg-panel);
+  border-color: var(--border);
+}
+
+.light-theme .spot-bubble {
+  background: var(--bg-panel);
+  border-color: var(--primary);
+  color: var(--text-1);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MULTI-TIMEFRAME BADGES
+   ═══════════════════════════════════════════════════════════ */
+
+.sc-timeframes {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.sc-tf-badge {
+  font-size: 8px;
+  padding: 1px 5px;
+  border: 1px solid;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.5px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PRICE ALERTS
+   ═══════════════════════════════════════════════════════════ */
+
+.pa-alert-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+.pa-alert-row.triggered {
+  opacity: 0.5;
+}
+.pa-ticker { font-weight: 700; min-width: 80px; }
+.pa-dir { min-width: 60px; font-size: 9px; }
+.pa-target { flex: 1; color: var(--text-1); }
+.pa-remove-btn {
+  background: none;
+  border: 1px solid var(--red);
+  color: var(--red);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  transition: all var(--transition);
+}
+.pa-remove-btn:hover {
+  background: var(--red);
+  color: #000;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CSV EXPORT BUTTON STYLE
+   ═══════════════════════════════════════════════════════════ */
+.btn-ghost.btn--sm[title="Export to CSV"] {
+  font-size: 9px;
+  letter-spacing: 0.5px;
+}

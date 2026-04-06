@@ -287,6 +287,8 @@ function applyHealth(d) {
   const halted = d.circuit_breaker_active;
   const cbIcon  = el('cbIcon'),  cbLabel = el('cbLabel'), cbSub = el('cbSublabel');
   if (cbIcon)  { cbIcon.textContent  = halted ? '⛔' : '⬡'; cbIcon.className  = halted ? 'cb-icon halted' : 'cb-icon'; }
+  if (halted && !STATE._cbAlarmFired) { STATE._cbAlarmFired = true; playCircuitBreakerAlarm(); sendNotification('CIRCUIT BREAKER', 'Trading HALTED — limit hit'); }
+  if (!halted) STATE._cbAlarmFired = false;
   if (cbLabel) { cbLabel.textContent = halted ? 'HALTED'   : 'ARMED';           cbLabel.className = halted ? 'cb-label halted' : 'cb-label'; }
   if (cbSub)   cbSub.textContent    = halted ? 'Trading SUSPENDED — limit hit' : 'Trading permitted';
   const cbBadge = el('circuitBreakerBadge');
@@ -672,6 +674,7 @@ function signalCardHTML(s) {
           ${rsiGaugeSVG(rsiVal)}
         </div>
       </div>
+      ${multiTimeframeBadgesHTML(s)}
       ${s.options_strategy ? `<div style="font-size:9px;color:var(--cyan);margin-top:4px">⚙ Options: ${s.options_strategy}</div>` : ''}
       <div class="sc-prediction">
         <div class="sc-pred-header">
@@ -1787,11 +1790,13 @@ function checkStrongSignals(signals) {
   if (!strong) {
     el('strongSignalBanner')?.classList.add('hidden');
     el('strongSignalInPage')?.classList.add('hidden');
+    STATE._lastStrongTicker = null;
     return;
   }
 
   const isBuy  = ['BUY','LONG'].includes(strong.action);
   const verb   = isBuy ? 'BUY' : 'SHORT/SELL';
+  if (STATE._lastStrongTicker !== strong.ticker) { STATE._lastStrongTicker = strong.ticker; playStrongSignalChime(); }
   const detail = `${strong.ticker.replace('-USD','')}  ·  Entry ${fmtSignalPrice(strong)}  ·  Stop ${strong.stop_loss ? '$'+strong.stop_loss.toFixed(2) : '--'}  ·  Target ${strong.take_profit ? '$'+strong.take_profit.toFixed(2) : '--'}  ·  Confidence ${strong.confidence.toFixed(1)}%  ·  R:R ${strong.rr_ratio?.toFixed(2)}`;
 
   // Fixed top banner
@@ -2883,7 +2888,8 @@ async function loadWatchlist() {
   try {
     const d = await fetchJSON('/api/watchlist');
     _watchlist = d.watchlist || [];
-  } catch {}
+    _saveWatchlistLocal();
+  } catch { _loadWatchlistLocal(); }
 }
 
 async function toggleWatchlist(ticker, btn) {
@@ -2892,6 +2898,7 @@ async function toggleWatchlist(ticker, btn) {
     const endpoint = inList ? '/api/watchlist/remove' : '/api/watchlist/add';
     const d = await postJSON(endpoint, { ticker });
     _watchlist = d.watchlist || [];
+    _saveWatchlistLocal();
     // Update all buttons for this ticker across all scanner tables
     document.querySelectorAll('.scan-wl-btn').forEach(b => {
       if (b.closest('tr')?.querySelector('strong')?.textContent?.replace('-','') === ticker.replace('-USD','')) {
@@ -4977,8 +4984,8 @@ const _TELEMETRY_FEEDS = [
 function spawnTelemetryLine() {
   const wrap = el('radarTelemetry');
   if (!wrap) return;
-  // Keep max 8 lines visible
-  while (wrap.children.length > 8) wrap.removeChild(wrap.firstChild);
+  // Keep max 14 lines visible to fill the radar background
+  while (wrap.children.length > 14) wrap.removeChild(wrap.firstChild);
 
   const feed = _TELEMETRY_FEEDS[Math.floor(Math.random() * _TELEMETRY_FEEDS.length)];
   const latency = Math.random() < 0.85
@@ -5201,4 +5208,318 @@ function resetBacktest() {
     charts.wf.update();
   }
   pushAlert('BACKTEST', 'Results cleared — ready for a new run', 'info');
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// TEST CONNECTION DRY-RUN — validates broker API keys
+// ═══════════════════════════════════════════════════════════
+
+async function testBrokerConnection(broker) {
+  const resultEl = el(`bcfgResult-${broker}`);
+  if (resultEl) resultEl.innerHTML = '<span style="color:var(--amber)">⌛ Testing connection (dry-run)...</span>';
+  const payload = { broker, ..._getBrokerPayload(broker), dry_run: true };
+  // Check at least one field
+  const vals = Object.values(payload).filter(v => typeof v === 'string' && v.length > 0);
+  if (vals.length < 2) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">Fill in credentials first</span>'; return; }
+  try {
+    const d = await postJSON('/api/broker/test', payload);
+    if (d.success) {
+      if (resultEl) resultEl.innerHTML = `<span style="color:var(--green)">✓ Connection OK — ${d.message || 'API keys valid'}</span>`;
+      playBeep(880, 0.1);
+      pushAlert('BROKER', `${broker.toUpperCase()} test connection successful`, 'info');
+    } else {
+      if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ ${d.message || 'Connection failed'}</span>`;
+    }
+  } catch (e) {
+    // Fallback: try direct connection test for Alpaca
+    if (broker === 'alpaca') {
+      try {
+        const creds = _getBrokerPayload('alpaca');
+        const env = el('settAlpacaEnv')?.value || 'paper';
+        const base = env === 'live' ? 'https://api.alpaca.markets' : 'https://paper-api.alpaca.markets';
+        const r = await fetch(`${base}/v2/account`, {
+          headers: { 'APCA-API-KEY-ID': creds.api_key, 'APCA-API-SECRET-KEY': creds.api_secret }
+        });
+        if (r.ok) {
+          const data = await r.json();
+          if (resultEl) resultEl.innerHTML = `<span style="color:var(--green)">✓ Alpaca ${env.toUpperCase()} — Account: ${data.account_number} | Equity: $${parseFloat(data.equity).toLocaleString()}</span>`;
+          playBeep(880, 0.1);
+        } else {
+          if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ Auth failed (${r.status}) — check keys</span>`;
+        }
+      } catch (e2) {
+        if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ Network error — ${e2.message}</span>`;
+      }
+    } else {
+      if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ ${e.message || 'Test failed'}</span>`;
+    }
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// CSV EXPORT — paper and live trade history
+// ═══════════════════════════════════════════════════════════
+
+function exportPaperTradesCSV() {
+  _exportTradesCSV('/api/paper/history', 'dalios_paper_trades.csv', 'paper');
+}
+
+function exportLiveTradesCSV() {
+  _exportTradesCSV('/api/real/history', 'dalios_live_trades.csv', 'live');
+}
+
+async function _exportTradesCSV(endpoint, filename, mode) {
+  try {
+    const d = await fetchJSON(endpoint);
+    const trades = mode === 'live' ? (d.history || []) : (d.trades || []);
+    if (!trades.length) { pushAlert('EXPORT', 'No trades to export', 'warning'); return; }
+
+    const headers = mode === 'live'
+      ? ['Ticker','Side','Qty','Price','Status','Timestamp']
+      : ['ID','Ticker','Side','Qty','Entry Price','Exit Price','P&L ($)','P&L (%)','Timestamp'];
+
+    const rows = trades.map(t => {
+      if (mode === 'live') {
+        return [t.ticker, t.side, t.qty, t.price ?? '', t.status ?? '', t.timestamp ?? ''];
+      }
+      return [t.id, t.ticker, t.side, t.qty, t.entry_price, t.exit_price, t.pnl?.toFixed(2) ?? '', t.pnl_pct?.toFixed(2) ?? '', t.timestamp ?? ''];
+    });
+
+    let csv = headers.join(',') + '\n';
+    rows.forEach(r => { csv += r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',') + '\n'; });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+    pushAlert('EXPORT', `${trades.length} trades exported to ${filename}`, 'info');
+    playBeep(660, 0.08);
+  } catch (e) {
+    pushAlert('EXPORT', `Export failed: ${e.message}`, 'warning');
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// ENHANCED SOUND ALERTS — circuit breaker + strong signals
+// ═══════════════════════════════════════════════════════════
+
+function playCircuitBreakerAlarm() {
+  if (!_soundOn || !_audioCtx) return;
+  // Three-tone alarm
+  playBeep(220, 0.3, 'sawtooth', 0.2);
+  setTimeout(() => playBeep(180, 0.3, 'sawtooth', 0.2), 350);
+  setTimeout(() => playBeep(220, 0.4, 'sawtooth', 0.25), 700);
+}
+
+function playStrongSignalChime() {
+  if (!_soundOn || !_audioCtx) return;
+  playBeep(523, 0.12, 'sine', 0.15);
+  setTimeout(() => playBeep(659, 0.12, 'sine', 0.13), 130);
+  setTimeout(() => playBeep(784, 0.15, 'sine', 0.12), 260);
+  setTimeout(() => playBeep(1047, 0.2, 'sine', 0.1), 400);
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// WATCHLIST PERSISTENCE — localStorage backup
+// ═══════════════════════════════════════════════════════════
+
+function _saveWatchlistLocal() {
+  try { localStorage.setItem('dalios_watchlist', JSON.stringify(_watchlist)); } catch {}
+}
+
+function _loadWatchlistLocal() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('dalios_watchlist') || '[]');
+    if (saved.length && !_watchlist.length) _watchlist = saved;
+  } catch {}
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// MULTI-TIMEFRAME SIGNAL CONFIDENCE
+// ═══════════════════════════════════════════════════════════
+
+function multiTimeframeBadgesHTML(s) {
+  if (!s.timeframes) return '';
+  const tfs = s.timeframes;
+  return `<div class="sc-timeframes">
+    ${Object.entries(tfs).map(([tf, conf]) => {
+      const c = conf ?? 0;
+      const col = c >= 70 ? 'var(--green)' : c >= 50 ? 'var(--amber)' : 'var(--red)';
+      return `<span class="sc-tf-badge" style="border-color:${col};color:${col}" title="${tf} confidence">${tf}: ${c.toFixed(0)}%</span>`;
+    }).join('')}
+  </div>`;
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// CUSTOM PRICE ALERTS
+// ═══════════════════════════════════════════════════════════
+
+let _priceAlerts = [];
+const _PRICE_ALERTS_KEY = 'dalios_price_alerts';
+
+function _loadPriceAlerts() {
+  try { _priceAlerts = JSON.parse(localStorage.getItem(_PRICE_ALERTS_KEY) || '[]'); } catch { _priceAlerts = []; }
+}
+function _savePriceAlerts() {
+  try { localStorage.setItem(_PRICE_ALERTS_KEY, JSON.stringify(_priceAlerts)); } catch {}
+}
+
+function addPriceAlert() {
+  const ticker = el('paAlertTicker')?.value?.trim().toUpperCase();
+  const price = parseFloat(el('paAlertPrice')?.value);
+  const direction = el('paAlertDir')?.value || 'above';
+  if (!ticker || !price || price <= 0) { pushAlert('ALERTS', 'Enter ticker and target price', 'warning'); return; }
+
+  _priceAlerts.push({ id: Date.now(), ticker, target: price, direction, triggered: false, created: new Date().toISOString() });
+  _savePriceAlerts();
+  renderPriceAlerts();
+  pushAlert('ALERTS', `Alert set: ${ticker} ${direction} $${price.toFixed(2)}`, 'info');
+  playBeep(660, 0.08);
+
+  // Clear inputs
+  if (el('paAlertTicker')) el('paAlertTicker').value = '';
+  if (el('paAlertPrice')) el('paAlertPrice').value = '';
+}
+
+function removePriceAlert(id) {
+  _priceAlerts = _priceAlerts.filter(a => a.id !== id);
+  _savePriceAlerts();
+  renderPriceAlerts();
+}
+
+function renderPriceAlerts() {
+  const list = el('priceAlertList');
+  if (!list) return;
+  if (!_priceAlerts.length) {
+    list.innerHTML = '<div style="padding:14px;color:var(--text-muted);font-size:10px;text-align:center">No alerts set — add one above</div>';
+    return;
+  }
+  list.innerHTML = _priceAlerts.map(a => {
+    const col = a.triggered ? 'var(--green)' : 'var(--amber)';
+    const icon = a.triggered ? '✓' : a.direction === 'above' ? '▲' : '▼';
+    return `<div class="pa-alert-row${a.triggered ? ' triggered' : ''}">
+      <span class="pa-ticker" style="color:var(--cyan)">${a.ticker}</span>
+      <span class="pa-dir" style="color:${col}">${icon} ${a.direction.toUpperCase()}</span>
+      <span class="pa-target">$${a.target.toFixed(2)}</span>
+      <button class="pa-remove-btn" onclick="removePriceAlert(${a.id})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function checkPriceAlerts() {
+  if (!_priceAlerts.length) return;
+  const untriggered = _priceAlerts.filter(a => !a.triggered);
+  if (!untriggered.length) return;
+
+  // Check against scanner data
+  const allData = [...(_scannerData.asx || []), ...(_scannerData.crypto || []), ...(_scannerData.commodities || [])];
+  untriggered.forEach(a => {
+    const row = allData.find(r => r.ticker === a.ticker || r.ticker.replace('-USD','') === a.ticker);
+    if (!row) return;
+    const hit = a.direction === 'above' ? row.price >= a.target : row.price <= a.target;
+    if (hit) {
+      a.triggered = true;
+      _savePriceAlerts();
+      renderPriceAlerts();
+      pushAlert('PRICE ALERT', `${a.ticker} hit $${a.target.toFixed(2)} (now $${row.price.toFixed(2)})`, 'warning');
+      playStrongSignalChime();
+      sendNotification('Price Alert', `${a.ticker} is now $${row.price.toFixed(2)} — target $${a.target.toFixed(2)} ${a.direction}`);
+    }
+  });
+}
+
+// Check price alerts every 30s
+document.addEventListener('DOMContentLoaded', () => {
+  _loadPriceAlerts();
+  setInterval(checkPriceAlerts, 30000);
+});
+
+
+// ═══════════════════════════════════════════════════════════
+// LIGHT THEME
+// ═══════════════════════════════════════════════════════════
+
+// Add light theme to _THEMES
+_THEMES.light = {
+  primary: '#d97706', green: '#16a34a', red: '#dc2626', amber: '#d97706', bg0: '#f5f5f4',
+  text1: '#1c1917', text2: '#78716c', textMuted: '#a8a29e',
+  bgPanel: '#ffffff', border: '#e7e5e4', borderHi: '#d6d3d1',
+};
+
+const _origSetTheme = setTheme;
+window.setTheme = function(name, btn) {
+  const t = _THEMES[name]; if (!t) return;
+  const root = document.documentElement;
+  root.style.setProperty('--primary', t.primary);
+  root.style.setProperty('--green', t.green);
+  root.style.setProperty('--red', t.red);
+  root.style.setProperty('--amber', t.amber);
+  root.style.setProperty('--bg-0', t.bg0);
+  root.style.setProperty('--primary-glow', t.primary + '40');
+  root.style.setProperty('--green-glow', t.green + '40');
+
+  // Light theme overrides
+  if (name === 'light') {
+    root.style.setProperty('--bg-1', '#eeeeee');
+    root.style.setProperty('--bg-2', '#e5e5e5');
+    root.style.setProperty('--bg-panel', '#ffffff');
+    root.style.setProperty('--bg-panel-2', '#fafaf9');
+    root.style.setProperty('--bg-card', '#ffffff');
+    root.style.setProperty('--bg-row-hover', '#f5f5f4');
+    root.style.setProperty('--text-primary', '#1c1917');
+    root.style.setProperty('--text-1', '#292524');
+    root.style.setProperty('--text-2', '#78716c');
+    root.style.setProperty('--text-muted', '#a8a29e');
+    root.style.setProperty('--border', '#e7e5e4');
+    root.style.setProperty('--border-hi', '#d6d3d1');
+    root.classList.add('light-theme');
+  } else {
+    // Reset to dark defaults
+    root.style.setProperty('--bg-1', '#0a0a0a');
+    root.style.setProperty('--bg-2', '#141414');
+    root.style.setProperty('--bg-panel', '#0d0d0d');
+    root.style.setProperty('--bg-panel-2', '#111111');
+    root.style.setProperty('--bg-card', '#0f0f0f');
+    root.style.setProperty('--bg-row-hover', '#1a1a1a');
+    root.style.setProperty('--text-primary', '#f0e8e0');
+    root.style.setProperty('--text-1', '#e0d6cc');
+    root.style.setProperty('--text-2', '#8a7e72');
+    root.style.setProperty('--text-muted', '#5a524a');
+    root.style.setProperty('--border', '#222222');
+    root.style.setProperty('--border-hi', '#333333');
+    root.classList.remove('light-theme');
+  }
+
+  document.querySelectorAll('.sett-theme-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _saveSetting('theme', name);
+  pushAlert('SETTINGS', `Theme set to ${name.toUpperCase()}`, 'info');
+};
+
+
+// ═══════════════════════════════════════════════════════════
+// TUTORIAL RESTART FROM SETTINGS
+// ═══════════════════════════════════════════════════════════
+
+function restartGuidedTour() {
+  // Clear all spot states
+  GUIDED_TAB_ORDER.forEach(tabId => {
+    (SPOTS[tabId] || []).forEach(s => localStorage.removeItem(`dalios_spot_${s.id}`));
+  });
+  localStorage.removeItem('dalios_welcome_done');
+  localStorage.removeItem('dalios_welcome_never');
+
+  // Switch to command center and start
+  _guidedMode = true;
+  const ccBtn = document.querySelector('[data-tab="command-center"]');
+  if (ccBtn) ccBtn.click();
+  setTimeout(() => showTutorial('command-center', true), 400);
+  pushAlert('TUTORIAL', 'Guided tour restarted', 'info');
 }

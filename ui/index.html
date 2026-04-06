@@ -1258,6 +1258,7 @@
           <div class="panel-header">
             <span class="panel-title">◈ TRADE HISTORY</span>
             <span class="panel-tag" id="paperTradeCount">0 TRADES</span>
+              <button class="btn-ghost btn--sm" onclick="exportPaperTradesCSV()" title="Export to CSV">📥 CSV</button>
           </div>
           <div class="panel-hint">Complete log of all closed paper trades — entry/exit prices, P&L in dollars and percentage, and timestamp. Review your trading decisions to identify patterns in your wins and losses.</div>
           <div class="paper-positions-wrap">
@@ -1383,6 +1384,7 @@
           <div class="panel-header">
             <span class="panel-title">◈ ORDER HISTORY</span>
             <span class="panel-tag" id="liveTradeCount">0 ORDERS</span>
+              <button class="btn-ghost btn--sm" onclick="exportLiveTradesCSV()" title="Export to CSV">📥 CSV</button>
             <button class="btn-ghost btn--sm" onclick="loadRealHistory()">↻ REFRESH</button>
           </div>
           <div class="panel-hint">Log of all orders sent through your broker — ticker, side, quantity, fill price, and time. Use this to audit your live trading activity and verify orders were executed correctly.</div>
@@ -1690,7 +1692,8 @@
                 </div>
               </div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('alpaca')">⚡ TEST</button>
+                <button class="btn-primary btn--sm" onclick="testBrokerConnection('alpaca')">🔍 TEST CONNECTION</button>
+                <button class="btn-primary btn--sm" style="background:var(--green)" onclick="connectBrokerFromSettings('alpaca')">⚡ CONNECT</button>
                 <button class="btn-ghost" onclick="saveBrokerCreds('alpaca')">💾 SAVE</button>
                 <span class="bcfg-result" id="bcfgResult-alpaca"></span>
               </div>
@@ -2004,6 +2007,7 @@
               <button class="sett-toggle-btn on" id="settTutorialBtn" onclick="toggleTutorials(this)">ON</button>
             </div>
             <button class="btn-ghost btn--full" style="margin-top:8px" onclick="resetAllTutorials()">↺ RESET — SHOW ALL TUTORIALS AGAIN</button>
+            <button class="btn-primary btn--full" style="margin-top:8px" onclick="restartGuidedTour()">▶ START GUIDED TOUR</button>
 
             <div class="sett-section-label" style="margin-top:16px">SOUND &amp; ALERTS</div>
             <div class="sett-toggle-row">
@@ -2049,9 +2053,43 @@
               <button class="sett-theme-btn" data-theme="matrix" onclick="setTheme('matrix',this)">◈ MATRIX</button>
               <button class="sett-theme-btn" data-theme="void" onclick="setTheme('void',this)">◉ VOID</button>
               <button class="sett-theme-btn" data-theme="amber" onclick="setTheme('amber',this)">⬡ AMBER</button>
+              <button class="sett-theme-btn" data-theme="light" onclick="setTheme('light',this)">☀ LIGHT</button>
             </div>
 
             <button class="btn-primary btn--full" style="margin-top:14px" onclick="saveUiSettings()">💾 SAVE UI SETTINGS</button>
+          </div>
+        </div>
+
+
+        <!-- ── PRICE ALERTS ── -->
+        <div class="panel panel--price-alerts">
+          <div class="panel-header">
+            <span class="panel-title">🔔 PRICE ALERTS</span>
+            <span class="panel-tag">CUSTOM TRIGGERS</span>
+          </div>
+          <div class="panel-hint">Set custom alerts — get notified when a ticker hits your target price. Alerts persist across sessions and check every 30 seconds against live scanner data.</div>
+          <div class="config-form">
+            <div class="form-row" style="gap:8px;align-items:flex-end">
+              <div class="form-group" style="flex:2">
+                <label class="form-label">TICKER</label>
+                <input type="text" class="form-input form-input--sm" id="paAlertTicker" placeholder="BTC-USD, BHP.AX, GLD" autocomplete="off"/>
+              </div>
+              <div class="form-group" style="flex:1">
+                <label class="form-label">DIRECTION</label>
+                <select class="ctrl-select" id="paAlertDir">
+                  <option value="above">ABOVE ▲</option>
+                  <option value="below">BELOW ▼</option>
+                </select>
+              </div>
+              <div class="form-group" style="flex:1">
+                <label class="form-label">TARGET ($)</label>
+                <input type="number" class="form-input form-input--sm" id="paAlertPrice" placeholder="0.00" step="any" min="0"/>
+              </div>
+              <button class="btn-primary btn--sm" onclick="addPriceAlert()" style="white-space:nowrap">+ ADD ALERT</button>
+            </div>
+            <div id="priceAlertList" style="margin-top:12px;max-height:200px;overflow-y:auto">
+              <div style="padding:14px;color:var(--text-muted);font-size:10px;text-align:center">No alerts set — add one above</div>
+            </div>
           </div>
         </div>
 
