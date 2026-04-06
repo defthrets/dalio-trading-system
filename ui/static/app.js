@@ -1516,6 +1516,11 @@ async function _loadSavedBrokerCreds() {
       ig:         { api_key: 'settIgKey', api_secret: 'settIgSecret', passphrase: 'settIgPassphrase' },
       cmc:        { api_key: 'settCmcKey', api_secret: 'settCmcSecret', passphrase: 'settCmcPassphrase' },
       schwab:     { api_key: 'settSchwabKey', api_secret: 'settSchwabSecret' },
+      commsec:    { api_key: 'settCommsecKey', api_secret: 'settCommsecSecret', passphrase: 'settCommsecPassphrase' },
+      stake:      { api_key: 'settStakeKey', api_secret: 'settStakeSecret' },
+      moomoo:     { api_key: 'settMoomooKey', api_secret: 'settMoomooSecret' },
+      superhero:  { api_key: 'settSuperheroKey', api_secret: 'settSuperheroSecret' },
+      nabtrade:   { api_key: 'settNabtradeKey', api_secret: 'settNabtradeSecret', passphrase: 'settNabtradePassphrase' },
     };
     for (const [broker, creds] of Object.entries(saved)) {
       const map = fieldMap[broker];
@@ -2660,6 +2665,28 @@ async function connectBrokerFromSettings(broker) {
     payload.api_key    = el('settSchwabKey')?.value?.trim();
     payload.api_secret = el('settSchwabSecret')?.value?.trim();
     if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">App key and secret required</span>'; return; }
+  } else if (broker === 'commsec') {
+    payload.api_key    = el('settCommsecKey')?.value?.trim();
+    payload.api_secret = el('settCommsecSecret')?.value?.trim();
+    payload.passphrase = el('settCommsecPassphrase')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">Client ID and secret required</span>'; return; }
+  } else if (broker === 'stake') {
+    payload.api_key    = el('settStakeKey')?.value?.trim();
+    payload.api_secret = el('settStakeSecret')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
+  } else if (broker === 'moomoo') {
+    payload.api_key    = el('settMoomooKey')?.value?.trim();
+    payload.api_secret = el('settMoomooSecret')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">App ID and secret required</span>'; return; }
+  } else if (broker === 'superhero') {
+    payload.api_key    = el('settSuperheroKey')?.value?.trim();
+    payload.api_secret = el('settSuperheroSecret')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
+  } else if (broker === 'nabtrade') {
+    payload.api_key    = el('settNabtradeKey')?.value?.trim();
+    payload.api_secret = el('settNabtradeSecret')?.value?.trim();
+    payload.passphrase = el('settNabtradePassphrase')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
   }
 
   try {
@@ -2695,6 +2722,11 @@ function _getBrokerPayload(broker) {
     ig:         () => ({ api_key: _f('settIgKey'), api_secret: _f('settIgSecret'), passphrase: _f('settIgPassphrase') }),
     cmc:        () => ({ api_key: _f('settCmcKey'), api_secret: _f('settCmcSecret'), passphrase: _f('settCmcPassphrase') }),
     schwab:     () => ({ api_key: _f('settSchwabKey'), api_secret: _f('settSchwabSecret') }),
+    commsec:    () => ({ api_key: _f('settCommsecKey'), api_secret: _f('settCommsecSecret'), passphrase: _f('settCommsecPassphrase') }),
+    stake:      () => ({ api_key: _f('settStakeKey'), api_secret: _f('settStakeSecret') }),
+    moomoo:     () => ({ api_key: _f('settMoomooKey'), api_secret: _f('settMoomooSecret') }),
+    superhero:  () => ({ api_key: _f('settSuperheroKey'), api_secret: _f('settSuperheroSecret') }),
+    nabtrade:   () => ({ api_key: _f('settNabtradeKey'), api_secret: _f('settNabtradeSecret'), passphrase: _f('settNabtradePassphrase') }),
   };
   return map[broker] ? map[broker]() : {};
 }

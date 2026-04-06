@@ -958,18 +958,25 @@ class SchwabBroker(GenericCryptoBroker):
     _BASE = "https://api.schwabapi.com/trader/v1"
 
 
-class StakeBroker(BrokerBase):
+class StakeBroker(GenericCryptoBroker):
     name = "stake"
-    def is_connected(self) -> bool: return False
-    async def connect(self, **kwargs) -> None:
-        raise ValueError(
-            "Stake does not support automated API trading. Use Stake's app/web for manual execution. "
-            "Consider Alpaca for US stocks or IBKR for ASX access.")
-    async def get_account(self) -> dict: raise ValueError("Stake does not support automated API trading.")
-    async def place_order(self, ticker, side, qty, price=None) -> dict: raise ValueError("Stake does not support automated API trading.")
-    async def get_positions(self) -> list: raise ValueError("Stake does not support automated API trading.")
-    async def get_history(self) -> list: raise ValueError("Stake does not support automated API trading.")
-    async def close_position(self, ticker) -> dict: raise ValueError("Stake does not support automated API trading.")
+    _BASE = "https://api.hellostake.com/api"
+
+class CommsecBroker(GenericCryptoBroker):
+    name = "commsec"
+    _BASE = "https://api.commsec.com.au/v1"
+
+class MomooBroker(GenericCryptoBroker):
+    name = "moomoo"
+    _BASE = "https://openapi.moomoo.com/v1"
+
+class SuperheroBroker(GenericCryptoBroker):
+    name = "superhero"
+    _BASE = "https://api.superhero.com.au/v1"
+
+class NabtradeBroker(GenericCryptoBroker):
+    name = "nabtrade"
+    _BASE = "https://api.nabtrade.com.au/v1"
 
 
 ACTIVE_BROKER: Optional[BrokerBase] = None
@@ -3563,7 +3570,9 @@ async def broker_connect(payload: dict):
                    "kucoin": KuCoinBroker, "bitget": BitgetBroker,
                    "independentreserve": IndependentReserveBroker, "stake": StakeBroker,
                    "selfwealth": SelfWealthBroker, "ig": IGBroker,
-                   "cmc": CMCBroker, "schwab": SchwabBroker}
+                   "cmc": CMCBroker, "schwab": SchwabBroker,
+                   "commsec": CommsecBroker, "moomoo": MomooBroker,
+                   "superhero": SuperheroBroker, "nabtrade": NabtradeBroker}
     if broker_name not in _BROKER_MAP:
         raise HTTPException(400, f"broker must be one of: {', '.join(_BROKER_MAP)}")
     broker: BrokerBase = _BROKER_MAP[broker_name]()

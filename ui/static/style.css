@@ -1899,16 +1899,17 @@ canvas { display: block; max-width: 100%; }
 .broker-info { flex: 1; min-width: 0; }
 .broker-name {
   font-family: var(--font-hud);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-1);
   letter-spacing: 0.5px;
   margin-bottom: 3px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  flex-wrap: wrap;
 }
-.broker-desc { font-size: 9.5px; color: var(--text-2); line-height: 1.5; margin-bottom: 5px; }
+.broker-desc { font-size: 11px; color: var(--text-2); line-height: 1.5; margin-bottom: 5px; }
 .broker-tags { display: flex; flex-wrap: wrap; gap: 3px; }
 .btag {
   font-size: 11px;
