@@ -4855,6 +4855,9 @@ function initOpsTerminal() {
 
   // Rotate radar status text
   setInterval(cycleRadarStatus, 3000);
+
+  // Speed test telemetry in radar background
+  setInterval(spawnTelemetryLine, 800);
 }
 
 const _RADAR_TICKERS = [
@@ -4898,6 +4901,34 @@ function cycleRadarStatus() {
   if (!txt) return;
   const msg = _RADAR_STATUS_MSGS[Math.floor(Math.random() * _RADAR_STATUS_MSGS.length)]();
   txt.textContent = msg;
+}
+
+const _TELEMETRY_FEEDS = [
+  'ASX.FEED', 'CRYPTO.WS', 'COINGECKO', 'YAHOO.FIN', 'BROKER.API',
+  'SIGNAL.GEN', 'NEWS.FEED', 'SENTIMENT', 'PRICE.STR', 'ORDER.RTR',
+  'MKT.DATA', 'TICK.FEED', 'RSI.CALC', 'CORR.ENG', 'RISK.MON'
+];
+
+function spawnTelemetryLine() {
+  const wrap = el('radarTelemetry');
+  if (!wrap) return;
+  // Keep max 8 lines visible
+  while (wrap.children.length > 8) wrap.removeChild(wrap.firstChild);
+
+  const feed = _TELEMETRY_FEEDS[Math.floor(Math.random() * _TELEMETRY_FEEDS.length)];
+  const latency = Math.random() < 0.85
+    ? (Math.random() * 45 + 2).toFixed(0)   // fast: 2-47ms
+    : (Math.random() * 200 + 80).toFixed(0); // slow: 80-280ms
+  const ms = +latency;
+  const status = ms < 50 ? 'OK' : ms < 120 ? 'WARN' : 'SLOW';
+  const ticker = _RADAR_TICKERS[Math.floor(Math.random() * _RADAR_TICKERS.length)];
+
+  const line = document.createElement('div');
+  line.className = 'radar-telemetry-line' + (ms < 30 ? ' fast' : ms > 100 ? ' slow' : '');
+  line.textContent = `${feed} ${ticker} ${latency}ms ${status}`;
+  line.style.animationDelay = (Math.random() * 0.3).toFixed(2) + 's';
+  wrap.appendChild(line);
+  setTimeout(() => line.remove(), 4000);
 }
 
 function spawnRadarBlip() {
