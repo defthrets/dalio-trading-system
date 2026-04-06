@@ -1476,12 +1476,12 @@ const SPOTS = {
   'command-center': [
     { id:'cmd-quadrant', sel:'#quadrantPanel',      arrow:'right',  title:'\ud83d\udcca ECONOMIC QUADRANT',    text:"Shows which economic regime we\'re in right now. The glowing cell tells you what to buy or avoid \u2014 think of it as your GPS for markets." },
     { id:'cmd-chart',    sel:'.panel--cc-chart',    arrow:'bottom', title:'\ud83d\udcc8 LIVE PRICE CHART',      text:"Click any position and it charts right here \u2014 candles, line view, moving averages, RSI, even a 30-day prediction. Basically a crystal ball, but with math." },
-    { id:'cmd-vitals',   sel:'.panel--gauges',      arrow:'left',   title:'\u2764 PORTFOLIO VITALS',       text:"Daily P&L and drawdown at a glance. If drawdown hits 10%, the system automatically stops trading. It\'s like a seatbelt for your portfolio." },
+    { id:'cmd-vitals',   sel:'.panel--gauges',      arrow:'left',   title:'\u2764 PORTFOLIO VITALS',       text:"Daily P&L and drawdown at a glance. If drawdown hits 10%, the system stops trading. Like a seatbelt for your portfolio \u2014 she\'s got your back." },
     { id:'cmd-cycle',    sel:'#runCycleBtn',        arrow:'bottom', title:'\u25b6 RUN A SCAN NOW',         text:"Hit this and the system scans every ASX, crypto, and commodity asset for trade opportunities. Fresh signals in seconds." },
   ],
   'live-trading': [
     { id:'lt-broker',   sel:'.panel--broker-bar',    arrow:'bottom', title:'\ud83d\udd17 BROKER STATUS',         text:"Shows if your broker is connected. Green = good to go, red = something needs attention. Account balance updates live." },
-    { id:'lt-equity',   sel:'.panel--live-equity',   arrow:'right',  title:'\ud83d\udcc8 EQUITY CURVE',          text:"Tracks your real portfolio value over time. Line going up = things are working. NAV is total worth, ROI is your return. Simple." },
+    { id:'lt-equity',   sel:'.panel--live-equity',   arrow:'right',  title:'\ud83d\udcc8 EQUITY CURVE',          text:"Tracks your real portfolio value over time. Line going up = you\'re smashing it. NAV is total worth, ROI is your return." },
     { id:'lt-summary',  sel:'.panel--live-summary',  arrow:'left',   title:'\ud83d\udcbc LIVE PORTFOLIO',        text:"Your real-money portfolio straight from the broker. Cash, P&L, positions \u2014 everything in one place. Click any position for more details." },
     { id:'lt-signals',  sel:'.panel--live-signals',  arrow:'top',    title:'\u26a1 QUICK-TRADE',            text:"One-click trading from AI signals with real money. Click a signal, order fires off to your broker. Dangerously convenient." },
   ],
@@ -1502,7 +1502,7 @@ const SPOTS = {
     { id:'hg-weights',   sel:'.panel--weights',     arrow:'bottom', title:'\u2696 RISK-PARITY WEIGHTS',     text:"Each asset gets weighted so they all contribute equal risk \u2014 not equal dollars, equal risk. Sounds simple, but it\'s surprisingly powerful." },
   ],
   'risk-matrix': [
-    { id:'rm-cb',        sel:'.panel--circuit-breaker', arrow:'right',  title:'\ud83d\uded1 CIRCUIT BREAKER',    text:"Your safety net. If daily loss passes 2% or total drawdown hits 10%, trading stops automatically. Because the best trade is sometimes no trade." },
+    { id:'rm-cb',        sel:'.panel--circuit-breaker', arrow:'right',  title:'\ud83d\uded1 CIRCUIT BREAKER',    text:"Your safety net, legend. If daily loss passes 2% or total drawdown hits 10%, trading stops automatically. No panic selling on your watch." },
     { id:'rm-metrics',   sel:'.panel--risk-metrics',arrow:'left',   title:'\ud83d\udcca RISK METRICS',           text:"Sharpe above 1.0 = solid. Sortino above 1.5 = very solid. Max drawdown shows the worst dip so far. Win rate over 55% means you\'ve got an edge." },
     { id:'rm-pos',       sel:'.panel--pos-table',   arrow:'top',    title:'\ud83d\udccb OPEN POSITIONS',         text:"All your current trades and how they\'re performing. Green = winning, Red = not winning. Keep an eye on anything near its stop-loss." },
   ],
@@ -1522,7 +1522,7 @@ const SPOTS = {
     { id:'com-table',    sel:'#commStats',          arrow:'bottom', title:'\u26cf COMMODITIES',              text:"Gold, silver, oil, gas \u2014 the classic hedges. These tend to shine when inflation picks up or the world gets chaotic. Click TRADE to open a position." },
   ],
   'paper-trading': [
-    { id:'pt-order',    sel:'.panel--paper-order',   arrow:'right',  title:'\ud83d\udcc4 PLACE AN ORDER',         text:"Enter any ticker \u2014 ASX, crypto, commodity \u2014 pick BUY or SELL, set your quantity, hit Execute. Real prices, fake money. The best kind of practice." },
+    { id:'pt-order',    sel:'.panel--paper-order',   arrow:'right',  title:'\ud83d\udcc4 PLACE AN ORDER',         text:"Enter any ticker \u2014 ASX, crypto, commodity \u2014 pick BUY or SELL, set your quantity, hit Execute. Real prices, fake money. Easy as." },
     { id:'pt-summary',  sel:'.panel--paper-summary', arrow:'left',   title:'\ud83d\udcbc PORTFOLIO TRACKER',      text:"Your paper trading portfolio. Starts at your configured amount and tracks every move. Total value, P&L, positions \u2014 all updating live." },
     { id:'pt-signals',  sel:'.panel--paper-signals', arrow:'right',  title:'\u26a1 1-CLICK SIGNAL TRADES',   text:"AI\'s top picks, pre-loaded and ready. See something you like? One click and it\'s in your paper portfolio. Fastest way to test ideas." },
     { id:'pt-history',  sel:'.panel--paper-history', arrow:'top',    title:'\ud83d\udccb TRADE HISTORY',           text:"Every closed trade logged with entry, exit, and P&L. Check which signals actually make money over time \u2014 that\'s where the real insights are." },
@@ -1530,7 +1530,7 @@ const SPOTS = {
   'comms-config': [
     { id:'cfg-brokers',  sel:'.panel--brokers',     arrow:'top',    title:'\ud83d\udd17 BROKER CONNECTIONS',     text:"Connect your broker or exchange here. Alpaca is great for getting started \u2014 free paper trading with a full API. Click \'Open\' to visit their site." },
     { id:'cfg-discord',  sel:'.panel--discord',     arrow:'right',  title:'\ud83d\udce3 DISCORD ALERTS',         text:"Get trade alerts sent straight to your Discord. Paste in your webhook URL, hit Test, done. Never miss a signal again." },
-    { id:'cfg-mode',     sel:'#cfgMode',            arrow:'left',   title:'\u26a0 PAPER vs LIVE MODE',      text:"Start in PAPER mode, always. It\'s play money so you can learn the system risk-free. Only switch to LIVE when you\'re confident. No rush." },
+    { id:'cfg-mode',     sel:'#cfgMode',            arrow:'left',   title:'\u26a0 PAPER vs LIVE MODE',      text:"Start in PAPER mode, always. It\'s play money so you can learn the system risk-free. Only switch to LIVE when you\'re confident. No rush, legend." },
   ],
 };
 
