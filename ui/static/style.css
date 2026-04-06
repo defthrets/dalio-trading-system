@@ -4014,16 +4014,6 @@ body.cli-expanded { padding-bottom: 272px; }
   width: 100px;
   height: 100px;
   filter: url(#radarGlitch);
-  animation: radarGlitchShake 4s ease-in-out infinite;
-}
-@keyframes radarGlitchShake {
-  0%, 92%, 100% { transform: translate(0, 0); }
-  93%  { transform: translate(-1px, 0); }
-  94%  { transform: translate(2px, -1px); }
-  95%  { transform: translate(-1px, 1px); }
-  96%  { transform: translate(1px, 0); }
-  97%  { transform: translate(0, -1px); }
-  98%  { transform: translate(-2px, 1px); }
 }
 
 .ops-radar-beam {
