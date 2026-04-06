@@ -1216,6 +1216,7 @@ function renderPositionTable(positions) {
       <td class="td-cyan">${p.ticker}</td>
       <td class="${sideColor}">${p.side}</td>
       <td>${p.size_pct?.toFixed(1)}%</td>
+      <td>${miniSparkSVG(p.ticker, p.unrealised_pnl_pct)}</td>
       <td class="${pnlClass}">${p.unrealised_pnl_pct >= 0 ? '+' : ''}${p.unrealised_pnl_pct?.toFixed(2)}%</td>
       <td><span class="sc-fit ${p.unrealised_pnl_pct >= 0 ? 'strong' : 'weak'}">${p.unrealised_pnl_pct >= -5 ? 'ACTIVE' : 'NEAR SL'}</span></td>
     </tr>`;
@@ -2721,6 +2722,26 @@ async function submitOrderModal() {
 // MARKET SCANNER (ASX / CRYPTO / COMMODITIES)
 // ═══════════════════════════════════════════════════════════
 
+// ── Mini Sparkline SVG (deterministic from ticker + change%) ──
+function miniSparkSVG(ticker, changePct, w = 40, h = 14) {
+  // Deterministic hash from ticker string
+  let hash = 0;
+  for (let i = 0; i < ticker.length; i++) hash = ((hash << 5) - hash + ticker.charCodeAt(i)) | 0;
+  const seed = (n) => { hash = (hash * 16807 + n) & 0x7fffffff; return (hash & 0xffff) / 0xffff; };
+  // Generate 10 points trending toward changePct direction
+  const pts = [];
+  const drift = changePct > 0 ? 0.06 : changePct < 0 ? -0.06 : 0;
+  let y = 0.5;
+  for (let i = 0; i < 10; i++) {
+    y += (seed(i) - 0.45) * 0.25 + drift;
+    y = Math.max(0.05, Math.min(0.95, y));
+    pts.push(y);
+  }
+  const col = changePct > 0 ? 'var(--green)' : changePct < 0 ? 'var(--red)' : 'var(--text-2)';
+  const path = pts.map((v, i) => `${i === 0 ? 'M' : 'L'}${(i / 9 * w).toFixed(1)},${((1 - v) * h).toFixed(1)}`).join(' ');
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="vertical-align:middle;flex-shrink:0"><path d="${path}" fill="none" stroke="${col}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
 const _scannerData = { asx: [], crypto: [], commodities: [] };
 const _scannerSort = { asx: null, crypto: null, commodities: null };
 
@@ -2831,6 +2852,7 @@ function renderScanner(market, filterText = '', filterSector = '') {
         <span class="sc-ticker">${dispName}</span>
         <span class="sc-name" title="${r.name}">${nameShort}</span>
         <span class="sc-price">${priceStr}</span>
+        ${miniSparkSVG(ticker, r.change_pct)}
         <span class="sc-change ${dir}">${chgStr}</span>
         <span class="sc-actions">
           <button class="sc-star-btn${wlCls}" onclick="event.stopPropagation();toggleWatchlist('${ticker}',this)">${wlIcon}</button>
@@ -3828,6 +3850,7 @@ function _applyCCPortfolio(d) {
           <td>${p.qty % 1 === 0 ? p.qty : p.qty.toFixed(4)}</td>
           <td>${fmt$(p.entry_price)}</td>
           <td style="color:var(--text-1)">${fmt$(p.current_price)}</td>
+          <td>${miniSparkSVG(p.ticker, p.pnl_pct)}</td>
           <td>${fmt$(p.market_value)}</td>
           <td class="${pnlCls}">${pnlTxt}</td>
           <td class="${pnlCls}">${pctTxt}</td>
@@ -3865,6 +3888,7 @@ function renderCcLivePositions(positions) {
     return `<div class="cc-pos-tile ${cls}" style="cursor:pointer" onclick="selectPositionForChart('${p.ticker}')">
       <div class="cc-pos-tile-top">
         <span class="cc-pos-tile-tkr">${ticker}</span>
+        ${miniSparkSVG(p.ticker, p.pnl_pct, 36, 12)}
         <span class="cc-pos-tile-pnl" style="color:${pos ? 'var(--green)' : 'var(--red)'}">${pnlTxt} (${pctTxt})</span>
         <button class="btn-ghost btn--sm" style="font-size:9px;padding:1px 5px;margin-left:4px" onclick="${_tradingMode === 'live' ? 'closeLivePosition' : 'closePaperPosition'}('${p.ticker}')">✕</button>
       </div>
