@@ -159,11 +159,7 @@
     <!-- ─────────────────────────────────────
          TAB 1: COMMAND CENTER
     ───────────────────────────────────── -->
-    <section id="tab-command-center" class="tab-panel active">
-      <div class="tab-desc">
-        <strong>Command Center</strong> — Your dashboard overview. See portfolio value, daily P&L, equity curve, and market status at a glance. Click <strong>Run Cycle</strong> to trigger a full market scan across all assets.
-      </div>
-      <div class="panel-grid panel-grid--cc-hub">
+    <section id="tab-command-center" class="tab-panel active">      <div class="panel-grid panel-grid--cc-hub">
 
         <!-- ROW 1: Prediction Growth Chart (slim, full width) -->
         <div class="panel panel--cc-statsbar">
@@ -472,10 +468,6 @@
          TAB 2: SIGNAL OPS
     ───────────────────────────────────── -->
     <section id="tab-signal-ops" class="tab-panel">
-      <div class="tab-desc">
-        <strong>Signal Ops</strong> — AI-generated trade signals ranked by confidence. Each card shows entry price, stop loss, take profit, and risk/reward ratio. Click any card to see the full AI justification. Use <strong>Scan Now</strong> to refresh signals or <strong>Run Cycle</strong> for a full analysis pass. Click <strong>TRADE</strong> on any signal to open an order.
-      </div>
-
       <!-- Strong signal in-page alert (per-tab version) -->
       <div id="strongSignalInPage" class="strong-signal-inpage hidden">
         <span class="ssi-pulse"></span>
@@ -566,11 +558,7 @@
     <!-- ─────────────────────────────────────
          TAB 3: INTEL CENTER
     ───────────────────────────────────── -->
-    <section id="tab-intel-center" class="tab-panel">
-      <div class="tab-desc">
-        <strong>Intel Center</strong> — Live sentiment analysis from 30+ news sources (Reuters, Bloomberg, CNBC, CoinDesk, BBC, WSJ, and more). Auto-refreshes every 5 minutes. Monitors news for each economic quadrant, tracks geopolitical risk, and shows market mood. <strong>Red ring</strong> = elevated risk. Green = bullish, red = bearish.
-      </div>
-      <div class="panel-grid panel-grid--intel">
+    <section id="tab-intel-center" class="tab-panel">      <div class="panel-grid panel-grid--intel">
 
         <!-- Conflict Risk Meter -->
         <div class="panel panel--conflict">
@@ -673,11 +661,7 @@
     <!-- ─────────────────────────────────────
          TAB 4: HOLY GRAIL
     ───────────────────────────────────── -->
-    <section id="tab-holy-grail" class="tab-panel">
-      <div class="tab-desc">
-        <strong>Holy Grail</strong> — Ray Dalio's diversification principle: hold 15+ uncorrelated assets to reduce risk without sacrificing returns. The <strong>correlation matrix</strong> shows how assets move together (dark = independent = good). The <strong>meter</strong> tracks your diversification score, and <strong>risk-parity weights</strong> suggest how to allocate so each asset contributes equal risk.
-      </div>
-      <div class="panel-grid panel-grid--grail">
+    <section id="tab-holy-grail" class="tab-panel">      <div class="panel-grid panel-grid--grail">
 
         <!-- Diversification Status -->
         <div class="panel panel--div-status">
@@ -771,11 +755,7 @@
     <!-- ─────────────────────────────────────
          TAB 5: RISK MATRIX
     ───────────────────────────────────── -->
-    <section id="tab-risk-matrix" class="tab-panel">
-      <div class="tab-desc">
-        <strong>Risk Matrix</strong> — Safety controls for your portfolio. The <strong>circuit breaker</strong> auto-halts trading if daily loss exceeds 2% or total drawdown exceeds 10%. Monitor Sharpe ratio (risk-adjusted return), Sortino (downside risk), win rate, and max drawdown. Open positions show live P&L — green is profit, red is loss.
-      </div>
-      <div class="panel-grid panel-grid--risk">
+    <section id="tab-risk-matrix" class="tab-panel">      <div class="panel-grid panel-grid--risk">
 
         <!-- Circuit Breaker -->
         <div class="panel panel--circuit-breaker" id="cbPanel">
@@ -1024,11 +1004,7 @@
     <!-- ─────────────────────────────────────
          TAB 7: ASX SCANNER
     ───────────────────────────────────── -->
-    <section id="tab-asx-scanner" class="tab-panel">
-      <div class="tab-desc">
-        <strong>ASX Scanner</strong> — Live prices for Australian Stock Exchange equities. Filter by ticker, name, or sector. Click column headers to sort. Green rows are up today, red are down. Click <strong>TRADE</strong> to open an order for any stock. Add assets to your watchlist with the star button.
-      </div>
-      <div class="scanner-wrap">
+    <section id="tab-asx-scanner" class="tab-panel">      <div class="scanner-wrap">
         <div class="scanner-toolbar">
           <div class="scanner-title">🇦🇺 ASX MARKET SCANNER</div>
           <div class="panel-hint" style="flex-basis:100%;margin:-4px 0 4px">Live prices for ASX equities. Filter by ticker, name, or sector. Click column headers to sort. Green rows are up today, red are down. Click TRADE to open an order, or ★ to add to your watchlist.</div>
@@ -1075,11 +1051,7 @@
     <!-- ─────────────────────────────────────
          TAB 8: CRYPTO SCANNER
     ───────────────────────────────────── -->
-    <section id="tab-crypto-scanner" class="tab-panel">
-      <div class="tab-desc">
-        <strong>Crypto Scanner</strong> — Live cryptocurrency prices from CoinGecko. Shows price, 24h change, volume, and market cap. Click <strong>TRADE</strong> to open an order. Prices update automatically — first load may take 5-15 seconds.
-      </div>
-      <div class="scanner-wrap">
+    <section id="tab-crypto-scanner" class="tab-panel">      <div class="scanner-wrap">
         <div class="scanner-toolbar">
           <div class="scanner-title">₿ CRYPTO MARKET SCANNER</div>
           <div class="panel-hint" style="flex-basis:100%;margin:-4px 0 4px">Live cryptocurrency prices from CoinGecko. Shows price, 24h change, volume, and market cap. Click TRADE to open an order or ★ to watchlist. First load may take a few seconds.</div>
@@ -1114,11 +1086,7 @@
     <!-- ─────────────────────────────────────
          TAB 9: COMMODITIES SCANNER
     ───────────────────────────────────── -->
-    <section id="tab-commodities-scanner" class="tab-panel">
-      <div class="tab-desc">
-        <strong>Commodities Scanner</strong> — Track gold, silver, oil, natural gas, and other commodity prices in real-time. These assets are key to the All-Weather strategy as hedges against inflation and geopolitical risk. Click <strong>TRADE</strong> to place an order.
-      </div>
-      <div class="scanner-wrap">
+    <section id="tab-commodities-scanner" class="tab-panel">      <div class="scanner-wrap">
         <div class="scanner-toolbar">
           <div class="scanner-title">⛏ COMMODITIES SCANNER</div>
           <div class="panel-hint" style="flex-basis:100%;margin:-4px 0 4px">Track gold, silver, oil, natural gas, and other commodity prices. Key to the All-Weather strategy as hedges against inflation and geopolitical risk. Click TRADE to place an order on any commodity.</div>
@@ -1152,11 +1120,7 @@
     <!-- ─────────────────────────────────────
          TAB 10: PAPER TRADING
     ───────────────────────────────────── -->
-    <section id="tab-paper-trading" class="tab-panel">
-      <div class="tab-desc">
-        <strong>Paper Trading</strong> — Practice trading with simulated money. Place orders, track your portfolio, and see P&L without risking real funds. Use <strong>Signal Quick-Trade</strong> for 1-click orders from AI signals. Your equity curve tracks performance over time. Reset anytime to start fresh.
-      </div>
-      <div class="panel-grid panel-grid--paper">
+    <section id="tab-paper-trading" class="tab-panel">      <div class="panel-grid panel-grid--paper">
 
         <!-- ── ORDER ENTRY ── -->
         <div class="panel panel--paper-order">
@@ -1316,11 +1280,7 @@
     <!-- ─────────────────────────────────────
          TAB 8: LIVE TRADING
     ───────────────────────────────────── -->
-    <section id="tab-live-trading" class="tab-panel">
-      <div class="tab-desc">
-        <strong>Live Trading</strong> — Real money trading through your connected broker. The <strong>broker bar</strong> shows connection status and account balance. View your live portfolio, P&L, and position heatmap. Click any signal in <strong>Quick-Trade</strong> to open an order. Configure your broker in the <strong>Settings</strong> tab first.
-      </div>
-      <div class="panel-grid panel-grid--live">
+    <section id="tab-live-trading" class="tab-panel">      <div class="panel-grid panel-grid--live">
 
         <!-- ── BROKER STATUS BAR (full width) ── -->
         <div class="panel panel--broker-bar">
@@ -1443,11 +1403,7 @@
     <!-- ─────────────────────────────────────
          SETTINGS TAB
     ───────────────────────────────────── -->
-    <section id="tab-comms-config" class="tab-panel">
-      <div class="tab-desc">
-        <strong>Settings</strong> — Connect your broker or exchange accounts for live trading. Click <strong>CONFIGURE</strong> on any broker to enter your API keys. Use <strong>TEST</strong> to verify the connection, then <strong>SAVE</strong> to store credentials. Saved keys are masked for security. You can also configure notifications and system preferences below.
-      </div>
-      <div class="panel-grid panel-grid--settings">
+    <section id="tab-comms-config" class="tab-panel">      <div class="panel-grid panel-grid--settings">
 
         <!-- ── BROKER & EXCHANGE CONNECTIONS (moved to top) ── -->
         <div class="panel panel--brokers" style="grid-column: 1 / -1; grid-row: 1;">
