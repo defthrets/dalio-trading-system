@@ -4142,7 +4142,6 @@ body.cli-expanded { padding-bottom: 272px; }
 .ops-hud-status {
   font-size: 10px;
   color: var(--green);
-  animation: dotPulse 2s ease infinite;
 }
 
 /* ── Terminal ── */
