@@ -73,8 +73,8 @@ def _yf_fetch_sync(tickers: list, period: str = "3mo") -> Optional[dict]:
             period=period,
             auto_adjust=True,
             progress=False,
-            threads=False,
-            timeout=8,
+            threads=True,
+            timeout=10,
         )
         if raw is None or raw.empty:
             return None
@@ -103,7 +103,7 @@ def _yf_fetch_sync(tickers: list, period: str = "3mo") -> Optional[dict]:
 
 async def _get_prices(tickers: list, period: str = "3mo") -> Optional[dict]:
     """Async wrapper around yfinance; caches 5 min. Times out in 12s."""
-    key = f"px_{'_'.join(sorted(tickers)[:8])}_{period}"
+    key = f"px_{hash(tuple(sorted(tickers)))}_{period}"
     cached = _cache_get(key)
     if cached is not None:
         return cached
@@ -1183,7 +1183,12 @@ async def _gen_signals(n: int = 12) -> list[dict]:
     """
     Generate trade signals from real yfinance price data.
     Pulls from scanner cache first (free), then fetches fresh for uncached tickers.
+    Results cached 2 min so repeat loads are instant.
     """
+    cache_key = f"signals_{n}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
     # ── Seed candidate pool — equal split across ASX / Crypto / Commodities ──
     # Pull best movers from scanner cache first (already have prices)
     cached_by_market: dict = {"asx": [], "crypto": [], "commodities": []}
@@ -1207,10 +1212,10 @@ async def _gen_signals(n: int = 12) -> list[dict]:
         cached_by_market["crypto"]       + fresh["crypto"] +
         cached_by_market["commodities"]  + fresh["commodities"]
     ))
-    candidates = candidates[:n * 4]
+    candidates = candidates[:n * 3]
 
-    # ── Fetch 3-month price history ───────────────────────────────────────
-    prices_map = await _get_prices(candidates[:40], "3mo") or {}
+    # ── Fetch 3-month price history (cap at 24 for speed) ──────────────
+    prices_map = await _get_prices(candidates[:24], "3mo") or {}
 
     # Also pull single-day prices from scanner cache for RSI seed
     cache_prices: dict = {}
@@ -1300,7 +1305,9 @@ async def _gen_signals(n: int = 12) -> list[dict]:
     # If truly nothing actionable, fall back to showing highest-confidence HOLDs
     if not active:
         active = sorted(signals, key=lambda s: s["confidence"], reverse=True)
-    return active[:n]
+    result = active[:n]
+    _cache_set(cache_key, result)
+    return result
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -2033,11 +2040,10 @@ async def equity_history():
 
 @app.get("/api/signals")
 async def get_signals():
-    signals = await _gen_signals(12)
-    opportunities = await _gen_signals(5)
+    all_sigs = await _gen_signals(17)
     return {
-        "signals": signals,
-        "new_opportunities": opportunities,
+        "signals": all_sigs[:12],
+        "new_opportunities": all_sigs[12:17] or all_sigs[:5],
         "timestamp": datetime.utcnow().isoformat(),
     }
 
