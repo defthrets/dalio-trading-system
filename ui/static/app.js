@@ -167,7 +167,7 @@ function handleWsMessage(msg) {
         const strong = (msg.data.top_signals || []).find(s => s.confidence > 0.8);
         if (strong) {
           playSignalBeep();
-          sendNotification('Strong Signal', `${strong.action} ${strong.ticker} — ${(strong.confidence * 100).toFixed(0)}% confidence`);
+          sendNotification('Strong Signal', `${strong.action} ${strong.ticker} — ${((Number(strong.confidence)||0) * 100).toFixed(0)}% confidence`);
         }
       }
       break;
@@ -627,18 +627,18 @@ function sellDateStr(days) {
 }
 
 function signalCardHTML(s) {
-  const conf      = s.confidence ?? 0;
+  const conf      = Number(s.confidence) || 0;
   const confPct   = Math.min(conf, 100);
   const confColor = conf >= 80 ? 'var(--green)' : conf >= 65 ? 'var(--amber)' : 'var(--red)';
   const overview  = s.dalio_justification?.ai_overview ?? '';
   const srcBadge  = s.data_source === 'LIVE'
     ? `<span style="font-size:8px;color:var(--green);letter-spacing:1px">● LIVE</span>`
     : `<span style="font-size:8px;color:var(--amber);letter-spacing:1px">● DEMO</span>`;
-  const rrNum     = s.rr_ratio ?? 0;
+  const rrNum     = Number(s.rr_ratio) || 0;
   const rrLabel   = rrNum >= 2.5 ? '★ EXCELLENT' : rrNum >= 1.5 ? '✓ GOOD' : '⚠ LOW';
   const rrColor   = rrNum >= 2.5 ? 'var(--green)' : rrNum >= 1.5 ? 'var(--amber)' : 'var(--red)';
-  const rsiVal    = s.rsi ?? 50;
-  const psPct     = s.position_size_pct ?? 0;
+  const rsiVal    = Number(s.rsi) || 50;
+  const psPct     = Number(s.position_size_pct) || 0;
 
   return `
     <div class="signal-card ${s.action}" data-ticker="${s.ticker}">
@@ -912,8 +912,9 @@ function filterNewsArticles() {
     return true;
   });
 
-  setEl('newsArticleCount', `${filtered.length} / ${articles.length} ARTICLES`);
-  renderNewsFeed(filtered);
+  const capped = filtered.slice(0, 200);
+  setEl('newsArticleCount', `${capped.length}${filtered.length > 200 ? ' (max 200)' : ''} / ${articles.length} ARTICLES`);
+  renderNewsFeed(capped);
 }
 
 function renderNewsFeed(headlines) {
@@ -1797,7 +1798,7 @@ function checkStrongSignals(signals) {
   const isBuy  = ['BUY','LONG'].includes(strong.action);
   const verb   = isBuy ? 'BUY' : 'SHORT/SELL';
   if (STATE._lastStrongTicker !== strong.ticker) { STATE._lastStrongTicker = strong.ticker; playStrongSignalChime(); }
-  const detail = `${strong.ticker.replace('-USD','')}  ·  Entry ${fmtSignalPrice(strong)}  ·  Stop ${strong.stop_loss ? '$'+strong.stop_loss.toFixed(2) : '--'}  ·  Target ${strong.take_profit ? '$'+strong.take_profit.toFixed(2) : '--'}  ·  Confidence ${strong.confidence.toFixed(1)}%  ·  R:R ${strong.rr_ratio?.toFixed(2)}`;
+  const detail = `${strong.ticker.replace('-USD','')}  ·  Entry ${fmtSignalPrice(strong)}  ·  Stop ${strong.stop_loss ? '$'+(+strong.stop_loss).toFixed(2) : '--'}  ·  Target ${strong.take_profit ? '$'+(+strong.take_profit).toFixed(2) : '--'}  ·  Confidence ${(Number(strong.confidence)||0).toFixed(1)}%  ·  R:R ${(Number(strong.rr_ratio)||0).toFixed(2)}`;
 
   // Fixed top banner
   const banner = el('strongSignalBanner');
@@ -1813,7 +1814,7 @@ function checkStrongSignals(signals) {
   if (inPage) {
     inPage.className = `strong-signal-inpage ${isBuy ? '' : 'sell'}`;
     setEl('ssiAction', `⚡ STRONG ${verb}: ${strong.ticker.replace('-USD','')}`);
-    setEl('ssiDetail', `Confidence ${strong.confidence.toFixed(1)}%  ·  Entry ${fmtSignalPrice(strong)}  ·  Stop $${strong.stop_loss?.toFixed(2)}  ·  Target $${strong.take_profit?.toFixed(2)}  ·  R:R ${strong.rr_ratio?.toFixed(2)}`);
+    setEl('ssiDetail', `Confidence ${(Number(strong.confidence)||0).toFixed(1)}%  ·  Entry ${fmtSignalPrice(strong)}  ·  Stop $${strong.stop_loss != null ? (+strong.stop_loss).toFixed(2) : '--'}  ·  Target $${strong.take_profit != null ? (+strong.take_profit).toFixed(2) : '--'}  ·  R:R ${(Number(strong.rr_ratio)||0).toFixed(2)}`);
   }
 }
 
@@ -2485,7 +2486,7 @@ function renderPaperSignalList(signals) {
         <span class="psr-ticker">${s.ticker.replace('-USD','')}</span>
         <span class="psr-action" style="color:${actCol};font-size:10px">${s.action}</span>
         <span class="psr-price">${fmtSignalPrice(s)}</span>
-        <span class="psr-conf">Conf: ${s.confidence.toFixed(0)}%</span>
+        <span class="psr-conf">Conf: ${(Number(s.confidence)||0).toFixed(0)}%</span>
         ${dalioScore}
         <span class="psr-conf" style="color:var(--text-2)">${s.reason || ''}</span>
       </div>
@@ -2528,7 +2529,7 @@ function renderLiveSignalList(signals) {
   list.innerHTML = active.map(s => {
     const isBuy  = ['BUY','LONG'].includes(s.action);
     const actCol = isBuy ? 'var(--green)' : 'var(--red)';
-    const conf = s.confidence ?? 0;
+    const conf = Number(s.confidence) || 0;
     const dalioScore = s.dalio_score != null ? `<span class="psr-conf" title="Dalio Fit">⬡ ${s.dalio_score}%</span>` : '';
     return `<div class="paper-sig-row" style="cursor:pointer" onclick="openOrderModal('${s.ticker}',${isBuy ? "'BUY'" : "'SELL'"},${s.price})">
       <div class="psr-left">
@@ -5349,7 +5350,7 @@ function multiTimeframeBadgesHTML(s) {
   const tfs = s.timeframes;
   return `<div class="sc-timeframes">
     ${Object.entries(tfs).map(([tf, conf]) => {
-      const c = conf ?? 0;
+      const c = Number(conf) || 0;
       const col = c >= 70 ? 'var(--green)' : c >= 50 ? 'var(--amber)' : 'var(--red)';
       return `<span class="sc-tf-badge" style="border-color:${col};color:${col}" title="${tf} confidence">${tf}: ${c.toFixed(0)}%</span>`;
     }).join('')}

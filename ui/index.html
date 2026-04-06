@@ -713,7 +713,7 @@
             <span id="corrDataSource" style="font-size:11px;letter-spacing:1px;font-family:var(--font-mono)">● LOADING</span>
             <button class="btn-ghost btn--sm" onclick="loadCorrelation()">↻ REFRESH</button>
           </div>
-          <div class="panel-hint">Heatmap showing how each pair of assets moves relative to each other. Dark/blue = low correlation (independent — good for diversification). Bright/orange = high correlation (they move together — less diversification benefit). Hover for exact values.</div>
+          <div class="panel-hint">Heatmap showing how each pair of assets moves relative to each other. Dark = low correlation (independent — good for diversification). Bright green = high positive correlation (move together — less diversification). Red = negative correlation (move opposite — natural hedge). Grey = moderate.</div>
           <div class="heatmap-wrap" id="heatmapWrap">
             <canvas id="correlationCanvas"></canvas>
           </div>
