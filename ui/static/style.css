@@ -1231,24 +1231,6 @@ canvas { display: block; max-width: 100%; }
 .api-key-link a:hover { color: var(--primary); }
 
 /* ─── Status Bar ─── */
-.status-bar {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 8px 20px;
-  background: var(--bg-1);
-  border-top: 1px solid var(--border-hi);
-  font-family: var(--font-hud);
-  font-size: 13px;
-  letter-spacing: 2px;
-  color: var(--text-muted);
-  position: sticky;
-  bottom: 0;
-  z-index: 100;
-  flex-wrap: wrap;
-}
-.status-bar span { white-space: nowrap; }
-.sb-version { margin-left: auto; color: var(--text-muted); opacity: 0.5; }
 
 /* ─── Glitch animation for alerts ─── */
 .glitch {

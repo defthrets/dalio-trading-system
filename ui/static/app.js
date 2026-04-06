@@ -150,7 +150,6 @@ function handleWsMessage(msg) {
       pushAlert('SYSTEM', msg.message, 'info');
       break;
     case 'HEARTBEAT':
-      document.getElementById('sb-ws').textContent = `WS: ${msg.status} #${msg.seq}`;
       document.getElementById('uptimeBadge').textContent = `UPTIME: ${formatUptime(msg.uptime)}`;
       break;
     case 'HEALTH_UPDATE':
@@ -159,7 +158,6 @@ function handleWsMessage(msg) {
     case 'CYCLE_UPDATE':
       STATE.cycleCount++;
       document.getElementById('cycleCount').textContent = STATE.cycleCount;
-      document.getElementById('sb-cycle').textContent = `CYCLE: ${STATE.cycleCount}`;
       pushAlert('CYCLE', `Cycle #${msg.data.cycle} complete — ${msg.data.signals_found} signals`, 'info');
       if (msg.data.top_signals) {
         renderSignalGrid(msg.data.top_signals);
@@ -194,7 +192,6 @@ function handleWsMessage(msg) {
 function setWsState(state) {
   const dot = document.querySelector('.ws-dot');
   dot.className = 'ws-dot ' + (state === 'connected' ? 'connected' : state === 'error' ? 'error' : '');
-  document.getElementById('sb-ws').textContent = `WS: ${state.toUpperCase()}`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -223,10 +220,8 @@ async function loadStatus() {
     const d = await fetchJSON('/api/status');
     STATE.status = d;
     document.getElementById('modeBadge').textContent   = `MODE: ${d.mode}`;
-    document.getElementById('sb-mode').textContent     = `MODE: ${d.mode}`;
     document.getElementById('statusBadge').textContent = `● ${d.status}`;
     document.getElementById('cycleCount').textContent  = d.cycle_count;
-    document.getElementById('sb-cycle').textContent    = `CYCLE: ${d.cycle_count}`;
     document.getElementById('uptimeBadge').textContent = `UPTIME: ${formatUptime(d.uptime_seconds)}`;
     document.getElementById('cfgMode').value = d.mode.toLowerCase();
   } catch {}
@@ -247,7 +242,6 @@ function applyHealth(d) {
 
   // Command center — plain English labels
   setEl('navValue',     fmt$( d.equity ));
-  setEl('sb-equity',    `NAV: ${fmt$(d.equity)}`);
   setEl('openPositions', d.open_positions);
   // Sharpe: plain English
   const sh = d.sharpe_ratio ?? 0;
@@ -341,7 +335,6 @@ function applyQuadrant(d) {
   setEl('gdpVal',    d.gdp_value !== undefined ? d.gdp_value.toFixed(2) : '--');
   setEl('cpiVal',    d.cpi_value !== undefined ? d.cpi_value.toFixed(2) : '--');
   setEl('quadConf',  d.confidence ? d.confidence.toFixed(1) : '--');
-  setEl('sb-quadrant', `QUADRANT: ${meta.label}`);
 
   // Apply quadrant colour to name
   const nameEl = el('activeQuadrantName');
