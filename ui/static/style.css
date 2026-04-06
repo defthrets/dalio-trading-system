@@ -2423,7 +2423,7 @@ canvas { display: block; max-width: 100%; }
 
 .broker-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
   gap: 8px;
   margin-bottom: 14px;
 }
@@ -2431,20 +2431,21 @@ canvas { display: block; max-width: 100%; }
 
 .broker-card {
   display: flex;
-  gap: 12px;
-  padding: 12px;
+  gap: 10px;
+  padding: 10px 12px;
   background: var(--bg-2);
   border: 1px solid var(--border);
   border-radius: 3px;
   transition: all var(--transition);
+  align-items: center;
 }
 .broker-card:hover { border-color: var(--border-hi); background: var(--bg-panel-2); }
 .broker-card.featured { border-color: rgba(255,140,0,0.25); }
 .broker-card.featured:hover { border-color: var(--cyan); box-shadow: 0 0 14px rgba(255,140,0,0.08); }
 
 .broker-logo {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   background: var(--bg-panel);
   border: 1px solid var(--border-hi);
   border-radius: 4px;
@@ -2452,7 +2453,7 @@ canvas { display: block; max-width: 100%; }
   align-items: center;
   justify-content: center;
   font-family: var(--font-hud);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--text-2);
   flex-shrink: 0;
@@ -2465,21 +2466,21 @@ canvas { display: block; max-width: 100%; }
 .broker-info { flex: 1; min-width: 0; }
 .broker-name {
   font-family: var(--font-hud);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--text-1);
   letter-spacing: 0.5px;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   flex-wrap: wrap;
 }
-.broker-desc { font-size: 11px; color: var(--text-2); line-height: 1.5; margin-bottom: 5px; }
+.broker-desc { font-size: 10px; color: var(--text-2); line-height: 1.4; margin-bottom: 3px; white-space: normal; }
 .broker-tags { display: flex; flex-wrap: wrap; gap: 3px; }
 .btag {
-  font-size: 11px;
-  padding: 1px 5px;
+  font-size: 9px;
+  padding: 1px 4px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
   color: var(--text-2);
@@ -2491,9 +2492,8 @@ canvas { display: block; max-width: 100%; }
 
 .broker-actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: space-between;
+  flex-direction: row;
+  align-items: center;
   gap: 6px;
   flex-shrink: 0;
 }
