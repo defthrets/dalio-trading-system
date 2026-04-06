@@ -1291,9 +1291,8 @@
               </div>
             </div>
 
-            <div style="display:flex;gap:8px;margin-top:4px">
-              <button class="btn-primary" style="flex:1" id="brokerConnectBtn" onclick="connectBroker()">▶ CONNECT</button>
-              <button class="btn-ghost" style="flex:1" id="brokerWizardBtn" onclick="openBrokerWizard()" disabled>📋 SETUP GUIDE</button>
+            <div style="margin-top:4px">
+              <button class="btn-primary btn--full" id="brokerConnectBtn" onclick="connectBroker()">▶ CONNECT</button>
             </div>
             <div class="po-result" id="brokerConnectResult"></div>
 
@@ -1410,6 +1409,375 @@
     ───────────────────────────────────── -->
     <section id="tab-comms-config" class="tab-panel">
       <div class="panel-grid panel-grid--settings">
+
+        <!-- ── BROKER & EXCHANGE CONNECTIONS (moved to top) ── -->
+        <div class="panel panel--brokers" style="grid-column: 1 / -1; grid-row: 1;">
+          <div class="panel-header">
+            <span class="panel-title">BROKER &amp; EXCHANGE CONNECTIONS</span>
+            <span class="panel-tag">CONFIGURE TO EXECUTE</span>
+          </div>
+
+          <!-- Category tabs -->
+          <div class="broker-tabs">
+            <button class="broker-tab active" data-bcat="au" onclick="switchBrokerTab('au',this)">🇦🇺 AUSTRALIAN</button>
+            <button class="broker-tab" data-bcat="us" onclick="switchBrokerTab('us',this)">🇺🇸 US BROKERS</button>
+            <button class="broker-tab" data-bcat="crypto" onclick="switchBrokerTab('crypto',this)">₿ CRYPTO EXCHANGES</button>
+          </div>
+
+          <!-- AU Brokers -->
+          <div class="broker-grid" id="bcat-au">
+            <div class="broker-card" data-broker="commsec">
+              <div class="broker-logo">CBA</div>
+              <div class="broker-info">
+                <div class="broker-name">CommSec</div>
+                <div class="broker-desc">Australia's #1 broker. ASX, ETFs, options. CBA-backed.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">ETF</span><span class="btag">Options</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Manual</span>
+                <a class="broker-link" href="https://www.commsec.com.au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card featured" data-broker="coinspot">
+              <div class="broker-logo api-glow">CS</div>
+              <div class="broker-info">
+                <div class="broker-name">CoinSpot <span class="btag api-tag" style="font-size:9px">FULL API</span></div>
+                <div class="broker-desc">Australia's most popular crypto exchange. 300+ coins. AUD deposits. AUSTRAC registered.</div>
+                <div class="broker-tags"><span class="btag">300+ Coins</span><span class="btag">AUD</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('coinspot')">⚙ CONFIGURE</button>
+                <a class="broker-link" href="https://www.coinspot.com.au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <!-- CoinSpot inline config -->
+            <div class="broker-config-panel hidden" id="brokerCfg-coinspot">
+              <div class="bcfg-title">⚡ COINSPOT — API CONFIGURATION</div>
+              <div class="bcfg-desc">Generate keys at coinspot.com.au → My Account → API Keys. Enable Read + Trade permissions.</div>
+              <div class="bcfg-fields">
+                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settCoinspotKey" placeholder="CoinSpot API key" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settCoinspotSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn-primary" onclick="connectBrokerFromSettings('coinspot')">⚡ TEST CONNECTION</button>
+                <span class="bcfg-result" id="bcfgResult-coinspot"></span>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="selfwealth">
+              <div class="broker-logo">SW</div>
+              <div class="broker-info">
+                <div class="broker-name">SelfWealth</div>
+                <div class="broker-desc">Flat $9.50/trade. ASX & US markets. Has REST API.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.selfwealth.com.au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="stake">
+              <div class="broker-logo">STK</div>
+              <div class="broker-info">
+                <div class="broker-name">Stake</div>
+                <div class="broker-desc">US & ASX stocks. $0 brokerage on US. Popular with younger investors.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Manual</span>
+                <a class="broker-link" href="https://hellostake.com/au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="moomoo">
+              <div class="broker-logo">MM</div>
+              <div class="broker-info">
+                <div class="broker-name">moomoo</div>
+                <div class="broker-desc">Advanced charting, fractional shares. ASX, US, HK markets.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span><span class="btag">HK</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Manual</span>
+                <a class="broker-link" href="https://www.moomoo.com/au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="superhero">
+              <div class="broker-logo">SH</div>
+              <div class="broker-info">
+                <div class="broker-name">Superhero</div>
+                <div class="broker-desc">$0 ETF brokerage. $2 ASX trades. CHESS-sponsored.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">ETF</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Manual</span>
+                <a class="broker-link" href="https://www.superhero.com.au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="ig-au">
+              <div class="broker-logo">IG</div>
+              <div class="broker-info">
+                <div class="broker-name">IG Markets AU</div>
+                <div class="broker-desc">CFDs, FX, indices, options. Shorting supported. Has API.</div>
+                <div class="broker-tags"><span class="btag">CFD</span><span class="btag">FX</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.ig.com/au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="cmc">
+              <div class="broker-logo">CMC</div>
+              <div class="broker-info">
+                <div class="broker-name">CMC Markets</div>
+                <div class="broker-desc">Stockbroking & CFDs. $0 on ETFs. Has trading API.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">CFD</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.cmcmarkets.com/en-au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="nabtrade">
+              <div class="broker-logo">NAB</div>
+              <div class="broker-info">
+                <div class="broker-name">nabtrade</div>
+                <div class="broker-desc">NAB's investing platform. ASX, US, bonds, managed funds.</div>
+                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span><span class="btag">Bonds</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Manual</span>
+                <a class="broker-link" href="https://www.nabtrade.com.au" target="_blank">Open →</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- US Brokers -->
+          <div class="broker-grid hidden" id="bcat-us">
+            <div class="broker-card" data-broker="ibkr">
+              <div class="broker-logo api-glow">IB</div>
+              <div class="broker-info">
+                <div class="broker-name">Interactive Brokers <span class="btag api-tag" style="font-size:9px">API</span></div>
+                <div class="broker-desc">Professional-grade. Stocks, options, futures, FX, bonds. TWS & REST API. ASX access available.</div>
+                <div class="broker-tags"><span class="btag">Global</span><span class="btag">Options</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('ibkr')">⚙ CONFIGURE</button>
+                <a class="broker-link" href="https://www.interactivebrokers.com.au" target="_blank">Open →</a>
+              </div>
+            </div>
+            <!-- IBKR inline config -->
+            <div class="broker-config-panel hidden" id="brokerCfg-ibkr">
+              <div class="bcfg-title">⚡ INTERACTIVE BROKERS — TWS CONNECTION</div>
+              <div class="bcfg-desc">Ensure TWS or IB Gateway is running with API connections enabled. Paper port: 7497 · Live port: 7496.</div>
+              <div class="bcfg-fields">
+                <div class="bcfg-field"><label>TWS HOST</label><input type="text" class="form-input form-input--sm" id="settIbkrHost" value="127.0.0.1"/></div>
+                <div class="bcfg-field"><label>TWS PORT</label><input type="number" class="form-input form-input--sm" id="settIbkrPort" value="7497"/></div>
+                <div class="bcfg-field"><label>CLIENT ID</label><input type="number" class="form-input form-input--sm" id="settIbkrClientId" value="1"/></div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn-primary" onclick="connectBrokerFromSettings('ibkr')">⚡ TEST CONNECTION</button>
+                <span class="bcfg-result" id="bcfgResult-ibkr"></span>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="schwab">
+              <div class="broker-logo">SCH</div>
+              <div class="broker-info">
+                <div class="broker-name">Charles Schwab</div>
+                <div class="broker-desc">$0 commissions. Stocks, ETFs, options, futures. Has Schwab API (thinkorswim).</div>
+                <div class="broker-tags"><span class="btag">US</span><span class="btag">Options</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.schwab.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="robinhood">
+              <div class="broker-logo">RH</div>
+              <div class="broker-info">
+                <div class="broker-name">Robinhood</div>
+                <div class="broker-desc">$0 commissions. Stocks, options, crypto. Simple interface, limited API access.</div>
+                <div class="broker-tags"><span class="btag">US</span><span class="btag">Options</span><span class="btag">Crypto</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Manual</span>
+                <a class="broker-link" href="https://robinhood.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="webull">
+              <div class="broker-logo">WB</div>
+              <div class="broker-info">
+                <div class="broker-name">Webull</div>
+                <div class="broker-desc">Advanced charts, extended hours, fractional shares. Paper trading available.</div>
+                <div class="broker-tags"><span class="btag">US</span><span class="btag">Options</span><span class="btag">Paper</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Manual</span>
+                <a class="broker-link" href="https://www.webull.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card featured" data-broker="alpaca">
+              <div class="broker-logo api-glow">ALP</div>
+              <div class="broker-info">
+                <div class="broker-name">Alpaca <span class="btag api-tag" style="font-size:9px">FULL API</span></div>
+                <div class="broker-desc">Commission-free US stocks & crypto. Free paper trading. Full REST + WebSocket API. Best for automation.</div>
+                <div class="broker-tags"><span class="btag">US Stocks</span><span class="btag">Crypto</span><span class="btag api-tag">Paper Trading</span></div>
+              </div>
+              <div class="broker-actions">
+                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('alpaca')">⚙ CONFIGURE</button>
+                <a class="broker-link" href="https://alpaca.markets" target="_blank">Open →</a>
+              </div>
+            </div>
+            <!-- Alpaca inline config -->
+            <div class="broker-config-panel hidden" id="brokerCfg-alpaca">
+              <div class="bcfg-title">⚡ ALPACA — AUTOMATED ORDER ROUTING</div>
+              <div class="bcfg-desc">Connect Alpaca to send trade signals directly as orders. Start with paper trading — free with zero risk.</div>
+              <div class="bcfg-fields">
+                <div class="bcfg-field"><label>API KEY ID</label><input type="text" class="form-input form-input--sm" id="settAlpacaKey" placeholder="PKxxx..." autocomplete="off"/></div>
+                <div class="bcfg-field"><label>SECRET KEY</label><input type="password" class="form-input form-input--sm" id="settAlpacaSecret" placeholder="••••••••••••••••" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>ENDPOINT</label>
+                  <select class="ctrl-select" id="settAlpacaEnv">
+                    <option value="paper">Paper Trading (safe — recommended)</option>
+                    <option value="live">Live Trading (Real Money)</option>
+                  </select>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn-primary" onclick="connectBrokerFromSettings('alpaca')">⚡ TEST CONNECTION</button>
+                <span class="bcfg-result" id="bcfgResult-alpaca"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Crypto Exchanges -->
+          <div class="broker-grid hidden" id="bcat-crypto">
+            <div class="broker-card featured" data-broker="binance">
+              <div class="broker-logo api-glow">BNB</div>
+              <div class="broker-info">
+                <div class="broker-name">Binance <span class="btag api-tag" style="font-size:9px">FULL API</span></div>
+                <div class="broker-desc">World's largest crypto exchange by volume. 350+ coins. Spot, futures, margin. Full REST + WebSocket API.</div>
+                <div class="broker-tags"><span class="btag">350+ Coins</span><span class="btag">Futures</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('binance')">⚙ CONFIGURE</button>
+                <a class="broker-link" href="https://www.binance.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <!-- Binance inline config -->
+            <div class="broker-config-panel hidden" id="brokerCfg-binance">
+              <div class="bcfg-title">⚡ BINANCE — SPOT TRADING API</div>
+              <div class="bcfg-desc">Generate keys at binance.com → API Management. Enable Spot Trading. Never enable Withdrawals.</div>
+              <div class="bcfg-fields">
+                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settBinanceKey" placeholder="Binance API key" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settBinanceSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>MODE</label>
+                  <select class="ctrl-select" id="settBinanceTestnet">
+                    <option value="false">Live (Real Funds)</option>
+                    <option value="true">Testnet (Free Test Funds)</option>
+                  </select>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn-primary" onclick="connectBrokerFromSettings('binance')">⚡ TEST CONNECTION</button>
+                <span class="bcfg-result" id="bcfgResult-binance"></span>
+              </div>
+            </div>
+            <div class="broker-card featured" data-broker="coinbase">
+              <div class="broker-logo api-glow">CB</div>
+              <div class="broker-info">
+                <div class="broker-name">Coinbase Advanced <span class="btag api-tag" style="font-size:9px">API</span></div>
+                <div class="broker-desc">US-regulated. 250+ coins. Most trusted in US. Advanced Trade API available.</div>
+                <div class="broker-tags"><span class="btag">250+ Coins</span><span class="btag">US Regulated</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('coinbase')">⚙ CONFIGURE</button>
+                <a class="broker-link" href="https://advanced.coinbase.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <!-- Coinbase inline config -->
+            <div class="broker-config-panel hidden" id="brokerCfg-coinbase">
+              <div class="bcfg-title">⚡ COINBASE — ADVANCED TRADE API</div>
+              <div class="bcfg-desc">Use CDP keys from Settings → API. Key name format: organizations/.../apiKeys/... Requires Trade permission.</div>
+              <div class="bcfg-fields">
+                <div class="bcfg-field"><label>KEY NAME</label><input type="text" class="form-input form-input--sm" id="settCoinbaseKey" placeholder="organizations/xxx/apiKeys/xxx" autocomplete="off"/></div>
+                <div class="bcfg-field"><label>PRIVATE KEY (EC)</label><textarea class="form-input form-input--sm" id="settCoinbaseSecret" rows="3" placeholder="-----BEGIN EC PRIVATE KEY-----&#10;..." style="resize:vertical;font-size:9px;" autocomplete="off"></textarea></div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn-primary" onclick="connectBrokerFromSettings('coinbase')">⚡ TEST CONNECTION</button>
+                <span class="bcfg-result" id="bcfgResult-coinbase"></span>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="kraken">
+              <div class="broker-logo">KRK</div>
+              <div class="broker-info">
+                <div class="broker-name">Kraken</div>
+                <div class="broker-desc">200+ coins. Trusted since 2011. Spot + futures. Full API with WebSocket.</div>
+                <div class="broker-tags"><span class="btag">200+ Coins</span><span class="btag">Futures</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.kraken.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="bybit">
+              <div class="broker-logo">BBT</div>
+              <div class="broker-info">
+                <div class="broker-name">Bybit</div>
+                <div class="broker-desc">Top derivatives exchange. Spot, perpetuals, options. Very popular in AU.</div>
+                <div class="broker-tags"><span class="btag">Perpetuals</span><span class="btag">Options</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.bybit.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="okx">
+              <div class="broker-logo">OKX</div>
+              <div class="broker-info">
+                <div class="broker-name">OKX</div>
+                <div class="broker-desc">3rd largest exchange. Spot, futures, options, DEX aggregator. Full API.</div>
+                <div class="broker-tags"><span class="btag">350+ Coins</span><span class="btag">DEX</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.okx.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="kucoin">
+              <div class="broker-logo">KCS</div>
+              <div class="broker-info">
+                <div class="broker-name">KuCoin</div>
+                <div class="broker-desc">700+ coins including small-caps. Spot, margin, futures. Popular for altcoins.</div>
+                <div class="broker-tags"><span class="btag">700+ Coins</span><span class="btag">Altcoins</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.kucoin.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="bitget">
+              <div class="broker-logo">BGT</div>
+              <div class="broker-info">
+                <div class="broker-name">Bitget</div>
+                <div class="broker-desc">Copy trading + spot + futures. 700+ coins. Growing AU user base.</div>
+                <div class="broker-tags"><span class="btag">Copy Trade</span><span class="btag">Futures</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.bitget.com" target="_blank">Open →</a>
+              </div>
+            </div>
+            <div class="broker-card" data-broker="independentreserve">
+              <div class="broker-logo">IR</div>
+              <div class="broker-info">
+                <div class="broker-name">Independent Reserve</div>
+                <div class="broker-desc">AU-regulated crypto exchange. AUSTRAC registered. AUD deposits. API available.</div>
+                <div class="broker-tags"><span class="btag">AU Regulated</span><span class="btag">AUD</span><span class="btag api-tag">API</span></div>
+              </div>
+              <div class="broker-actions">
+                <span class="broker-status offline">● Configure</span>
+                <a class="broker-link" href="https://www.independentreserve.com" target="_blank">Open →</a>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- ── GENERAL SETTINGS ── -->
         <div class="panel panel--sett-general">
@@ -1598,348 +1966,6 @@
           </div>
         </div>
 
-        <!-- Broker & Exchange Integrations -->
-        <div class="panel panel--brokers" style="grid-column: 1 / -1;">
-          <div class="panel-header">
-            <span class="panel-title">BROKER &amp; EXCHANGE CONNECTIONS</span>
-            <span class="panel-tag">CONNECT TO EXECUTE</span>
-          </div>
-
-          <!-- Category tabs -->
-          <div class="broker-tabs">
-            <button class="broker-tab active" data-bcat="au" onclick="switchBrokerTab('au',this)">🇦🇺 AUSTRALIAN BROKERS</button>
-            <button class="broker-tab" data-bcat="us" onclick="switchBrokerTab('us',this)">🇺🇸 US BROKERS</button>
-            <button class="broker-tab" data-bcat="crypto" onclick="switchBrokerTab('crypto',this)">₿ CRYPTO EXCHANGES</button>
-          </div>
-
-          <!-- AU Brokers -->
-          <div class="broker-grid" id="bcat-au">
-            <div class="broker-card" data-broker="commsec">
-              <div class="broker-logo">CBA</div>
-              <div class="broker-info">
-                <div class="broker-name">CommSec</div>
-                <div class="broker-desc">Australia's #1 broker. ASX, ETFs, options. CBA-backed.</div>
-                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">ETF</span><span class="btag">Options</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Manual</span>
-                <a class="broker-link" href="https://www.commsec.com.au" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="selfwealth">
-              <div class="broker-logo">SW</div>
-              <div class="broker-info">
-                <div class="broker-name">SelfWealth</div>
-                <div class="broker-desc">Flat $9.50/trade. ASX & US markets. Has REST API.</div>
-                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
-                <a class="broker-link" href="https://www.selfwealth.com.au" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="stake">
-              <div class="broker-logo">STK</div>
-              <div class="broker-info">
-                <div class="broker-name">Stake</div>
-                <div class="broker-desc">US & ASX stocks. $0 brokerage on US. Popular with younger investors.</div>
-                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Manual</span>
-                <a class="broker-link" href="https://hellostake.com/au" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="moomoo">
-              <div class="broker-logo">MM</div>
-              <div class="broker-info">
-                <div class="broker-name">moomoo</div>
-                <div class="broker-desc">Advanced charting, fractional shares. ASX, US, HK markets.</div>
-                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span><span class="btag">HK</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Manual</span>
-                <a class="broker-link" href="https://www.moomoo.com/au" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="superhero">
-              <div class="broker-logo">SH</div>
-              <div class="broker-info">
-                <div class="broker-name">Superhero</div>
-                <div class="broker-desc">$0 ETF brokerage. $2 ASX trades. CHESS-sponsored.</div>
-                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">ETF</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Manual</span>
-                <a class="broker-link" href="https://www.superhero.com.au" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="ig-au">
-              <div class="broker-logo">IG</div>
-              <div class="broker-info">
-                <div class="broker-name">IG Markets AU</div>
-                <div class="broker-desc">CFDs, FX, indices, options. Shorting supported. Has API.</div>
-                <div class="broker-tags"><span class="btag">CFD</span><span class="btag">FX</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
-                <a class="broker-link" href="https://www.ig.com/au" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="cmc">
-              <div class="broker-logo">CMC</div>
-              <div class="broker-info">
-                <div class="broker-name">CMC Markets</div>
-                <div class="broker-desc">Stockbroking & CFDs. $0 on ETFs. Has trading API.</div>
-                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">CFD</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
-                <a class="broker-link" href="https://www.cmcmarkets.com/en-au" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="nabtrade">
-              <div class="broker-logo">NAB</div>
-              <div class="broker-info">
-                <div class="broker-name">nabtrade</div>
-                <div class="broker-desc">NAB's investing platform. ASX, US, bonds, managed funds.</div>
-                <div class="broker-tags"><span class="btag">ASX</span><span class="btag">US</span><span class="btag">Bonds</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Manual</span>
-                <a class="broker-link" href="https://www.nabtrade.com.au" target="_blank">Open →</a>
-              </div>
-            </div>
-          </div>
-
-          <!-- US Brokers -->
-          <div class="broker-grid hidden" id="bcat-us">
-            <div class="broker-card featured" data-broker="alpaca">
-              <div class="broker-logo api-glow">ALP</div>
-              <div class="broker-info">
-                <div class="broker-name">Alpaca <span class="btag api-tag" style="font-size:9px">FULL API</span></div>
-                <div class="broker-desc">Commission-free US stocks & crypto. Free paper trading. Full REST + WebSocket API. Best for automation.</div>
-                <div class="broker-tags"><span class="btag">US Stocks</span><span class="btag">Crypto</span><span class="btag api-tag">Paper Trading</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline" id="alpacaStatus">● Not Connected</span>
-                <a class="broker-link" href="https://alpaca.markets" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="ibkr">
-              <div class="broker-logo">IB</div>
-              <div class="broker-info">
-                <div class="broker-name">Interactive Brokers</div>
-                <div class="broker-desc">Professional-grade. Stocks, options, futures, FX, bonds. TWS & REST API. ASX access available.</div>
-                <div class="broker-tags"><span class="btag">Global</span><span class="btag">Options</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
-                <a class="broker-link" href="https://www.interactivebrokers.com.au" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="schwab">
-              <div class="broker-logo">SCH</div>
-              <div class="broker-info">
-                <div class="broker-name">Charles Schwab</div>
-                <div class="broker-desc">$0 commissions. Stocks, ETFs, options, futures. Has Schwab API (thinkorswim).</div>
-                <div class="broker-tags"><span class="btag">US</span><span class="btag">Options</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
-                <a class="broker-link" href="https://www.schwab.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="robinhood">
-              <div class="broker-logo">RH</div>
-              <div class="broker-info">
-                <div class="broker-name">Robinhood</div>
-                <div class="broker-desc">$0 commissions. Stocks, options, crypto. Simple interface, limited API access.</div>
-                <div class="broker-tags"><span class="btag">US</span><span class="btag">Options</span><span class="btag">Crypto</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Manual</span>
-                <a class="broker-link" href="https://robinhood.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="webull">
-              <div class="broker-logo">WB</div>
-              <div class="broker-info">
-                <div class="broker-name">Webull</div>
-                <div class="broker-desc">Advanced charts, extended hours, fractional shares. Paper trading available.</div>
-                <div class="broker-tags"><span class="btag">US</span><span class="btag">Options</span><span class="btag">Paper</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Manual</span>
-                <a class="broker-link" href="https://www.webull.com" target="_blank">Open →</a>
-              </div>
-            </div>
-          </div>
-
-          <!-- Crypto Exchanges -->
-          <div class="broker-grid hidden" id="bcat-crypto">
-            <div class="broker-card featured" data-broker="binance">
-              <div class="broker-logo api-glow">BNB</div>
-              <div class="broker-info">
-                <div class="broker-name">Binance <span class="btag api-tag" style="font-size:9px">FULL API</span></div>
-                <div class="broker-desc">World's largest crypto exchange by volume. 350+ coins. Spot, futures, margin. Full REST + WebSocket API.</div>
-                <div class="broker-tags"><span class="btag">350+ Coins</span><span class="btag">Futures</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
-                <a class="broker-link" href="https://www.binance.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card featured" data-broker="coinbase">
-              <div class="broker-logo api-glow">CB</div>
-              <div class="broker-info">
-                <div class="broker-name">Coinbase Advanced <span class="btag api-tag" style="font-size:9px">API</span></div>
-                <div class="broker-desc">US-regulated. 250+ coins. Most trusted in US. Advanced Trade API available.</div>
-                <div class="broker-tags"><span class="btag">250+ Coins</span><span class="btag">US Regulated</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
-                <a class="broker-link" href="https://advanced.coinbase.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="kraken">
-              <div class="broker-logo">KRK</div>
-              <div class="broker-info">
-                <div class="broker-name">Kraken</div>
-                <div class="broker-desc">200+ coins. Trusted since 2011. Spot + futures. Full API with WebSocket.</div>
-                <div class="broker-tags"><span class="btag">200+ Coins</span><span class="btag">Futures</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
-                <a class="broker-link" href="https://www.kraken.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="bybit">
-              <div class="broker-logo">BBT</div>
-              <div class="broker-info">
-                <div class="broker-name">Bybit</div>
-                <div class="broker-desc">Top derivatives exchange. Spot, perpetuals, options. Very popular in AU.</div>
-                <div class="broker-tags"><span class="btag">Perpetuals</span><span class="btag">Options</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
-                <a class="broker-link" href="https://www.bybit.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="okx">
-              <div class="broker-logo">OKX</div>
-              <div class="broker-info">
-                <div class="broker-name">OKX</div>
-                <div class="broker-desc">3rd largest exchange. Spot, futures, options, DEX aggregator. Full API.</div>
-                <div class="broker-tags"><span class="btag">350+ Coins</span><span class="btag">DEX</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
-                <a class="broker-link" href="https://www.okx.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="kucoin">
-              <div class="broker-logo">KCS</div>
-              <div class="broker-info">
-                <div class="broker-name">KuCoin</div>
-                <div class="broker-desc">700+ coins including small-caps. Spot, margin, futures. Popular for altcoins.</div>
-                <div class="broker-tags"><span class="btag">700+ Coins</span><span class="btag">Altcoins</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
-                <a class="broker-link" href="https://www.kucoin.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="bitget">
-              <div class="broker-logo">BGT</div>
-              <div class="broker-info">
-                <div class="broker-name">Bitget</div>
-                <div class="broker-desc">Copy trading + spot + futures. 700+ coins. Growing AU user base.</div>
-                <div class="broker-tags"><span class="btag">Copy Trade</span><span class="btag">Futures</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
-                <a class="broker-link" href="https://www.bitget.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-card" data-broker="independentreserve">
-              <div class="broker-logo">IR</div>
-              <div class="broker-info">
-                <div class="broker-name">Independent Reserve</div>
-                <div class="broker-desc">🇦🇺 AU-regulated crypto exchange. AUSTRAC registered. AUD deposits. API available.</div>
-                <div class="broker-tags"><span class="btag">AU Regulated</span><span class="btag">AUD</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <span class="broker-status offline">● Configure</span>
-                <a class="broker-link" href="https://www.independentreserve.com" target="_blank">Open →</a>
-              </div>
-            </div>
-          </div>
-
-          <!-- Alpaca API connect panel -->
-          <div class="broker-connect-panel" id="alpacaPanel">
-            <div class="bcp-title">⚡ ALPACA — AUTOMATED ORDER ROUTING</div>
-            <div class="bcp-desc">Connect Alpaca to have DALIOS send trade signals directly as orders. Start with paper trading — it's free and has zero risk.</div>
-            <div class="bcp-fields">
-              <div class="bcp-field">
-                <label>API KEY ID</label>
-                <input type="password" class="form-input form-input--sm" id="alpacaKey" placeholder="PKxxx..." />
-              </div>
-              <div class="bcp-field">
-                <label>SECRET KEY</label>
-                <input type="password" class="form-input form-input--sm" id="alpacaSecret" placeholder="••••••••••••••••" />
-              </div>
-              <div class="bcp-field">
-                <label>ENDPOINT</label>
-                <select class="ctrl-select" id="alpacaEnv">
-                  <option value="paper">Paper Trading (safe — recommended)</option>
-                  <option value="live">Live Trading</option>
-                </select>
-              </div>
-            </div>
-            <div style="display:flex;gap:8px">
-              <button class="btn-primary" onclick="connectAlpaca()">⚡ TEST CONNECTION</button>
-              <span id="alpacaConnectResult" style="font-size:10px;align-self:center;color:var(--text-2)"></span>
-            </div>
-          </div>
-        </div>
-
-        <!-- API Keys -->
-        <div class="panel panel--api-keys">
-          <div class="panel-header">
-            <span class="panel-title">DATA SOURCE API CREDENTIALS</span>
-            <span class="panel-tag">ENCRYPTED AT REST</span>
-          </div>
-          <div class="api-key-list">
-            <div class="api-key-item">
-              <div class="api-key-name">ALPHA VANTAGE</div>
-              <input type="password" class="form-input form-input--sm" placeholder="••••••••••••" />
-              <span class="api-key-link"><a href="https://www.alphavantage.co/support/#api-key" target="_blank">FREE KEY →</a></span>
-            </div>
-            <div class="api-key-item">
-              <div class="api-key-name">EODHD</div>
-              <input type="password" class="form-input form-input--sm" placeholder="••••••••••••" />
-              <span class="api-key-link"><a href="https://eodhd.com/register" target="_blank">FREE KEY →</a></span>
-            </div>
-            <div class="api-key-item">
-              <div class="api-key-name">FINNHUB</div>
-              <input type="password" class="form-input form-input--sm" placeholder="••••••••••••" />
-              <span class="api-key-link"><a href="https://finnhub.io/register" target="_blank">FREE KEY →</a></span>
-            </div>
-            <div class="api-key-item">
-              <div class="api-key-name">NEWSAPI</div>
-              <input type="password" class="form-input form-input--sm" placeholder="••••••••••••" />
-              <span class="api-key-link"><a href="https://newsapi.org/register" target="_blank">FREE KEY →</a></span>
-            </div>
-            <div class="api-key-item">
-              <div class="api-key-name">TRADING ECONOMICS</div>
-              <input type="password" class="form-input form-input--sm" placeholder="••••••••••••" />
-              <span class="api-key-link"><a href="https://tradingeconomics.com/api/" target="_blank">FREE KEY →</a></span>
-            </div>
-          </div>
-          <button class="btn-primary btn--full" onclick="saveApiKeys()">💾 SAVE CREDENTIALS</button>
-        </div>
-
         <!-- DATA SOURCE API KEYS panel stays here -->
 
 
@@ -2054,29 +2080,6 @@
 
 
   <!-- ── Broker Setup Wizard ───────────────────────────────── -->
-  <div class="bwiz-overlay hidden" id="bwizOverlay" onclick="closeBrokerWizard(event)">
-    <div class="bwiz-box" onclick="event.stopPropagation()">
-      <div class="bwiz-header">
-        <div>
-          <div class="bwiz-title">⚡ BROKER SETUP WIZARD</div>
-          <div class="bwiz-broker-tag" id="bwizBrokerTag">SELECT A BROKER</div>
-        </div>
-        <button class="bwiz-close" onclick="closeBrokerWizard()">✕</button>
-      </div>
-      <div class="bwiz-steps" id="bwizSteps">
-        <!-- injected by JS -->
-      </div>
-      <div class="bwiz-body" id="bwizBody">
-        <!-- injected by JS -->
-      </div>
-      <div class="bwiz-footer">
-        <button class="bwiz-back" id="bwizBackBtn" onclick="bwizBack()">← BACK</button>
-        <span class="bwiz-result" id="bwizResult"></span>
-        <button class="bwiz-next" id="bwizNextBtn" onclick="bwizNext()">NEXT →</button>
-      </div>
-    </div>
-  </div>
-
   <button class="tut-launch-btn" onclick="openTutorial()" title="Help — what does each tab do?">?</button>
 </body>
 </html>
