@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260406q" />
+  <link rel="stylesheet" href="/static/style.css?v=20260406r" />
 </head>
 <body>
   <!-- Scanline overlay -->
@@ -135,57 +135,60 @@
          TAB 1: COMMAND CENTER
     ───────────────────────────────────── -->
     <section id="tab-command-center" class="tab-panel active">
+      <div class="tab-desc">
+        <strong>Command Center</strong> — Your dashboard overview. See portfolio value, daily P&L, equity curve, and market status at a glance. Click <strong>Run Cycle</strong> to trigger a full market scan across all assets.
+      </div>
       <div class="panel-grid panel-grid--cc-hub">
 
         <!-- ROW 1: Full-width portfolio stats bar -->
         <div class="panel panel--cc-statsbar">
           <div class="cc-statsbar-inner">
-            <div class="cc-sb-stat">
+            <div class="cc-sb-stat" title="Net Asset Value — total portfolio worth (cash + investments)">
               <div class="cc-sb-label">TOTAL NAV</div>
               <div class="cc-sb-val acc" id="ccTotalVal">$1,000.00</div>
             </div>
             <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat">
+            <div class="cc-sb-stat" title="Available cash not invested in any position">
               <div class="cc-sb-label">CASH</div>
               <div class="cc-sb-val" id="ccCash">$1,000.00</div>
             </div>
             <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat">
+            <div class="cc-sb-stat" title="Total market value of all open positions">
               <div class="cc-sb-label">INVESTED</div>
               <div class="cc-sb-val" id="ccInvested">$0.00</div>
             </div>
             <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat">
+            <div class="cc-sb-stat" title="Profit/loss on positions still open (not yet sold)">
               <div class="cc-sb-label">UNREALISED P&amp;L</div>
               <div class="cc-sb-val" id="ccUnrealPnl">$0.00</div>
             </div>
             <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat">
+            <div class="cc-sb-stat" title="Overall portfolio return as a percentage of starting capital">
               <div class="cc-sb-label">TOTAL RETURN</div>
               <div class="cc-sb-val" id="ccReturn">0.00%</div>
             </div>
             <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat">
+            <div class="cc-sb-stat" title="Number of currently open positions">
               <div class="cc-sb-label">POSITIONS</div>
               <div class="cc-sb-val acc" id="ccOpenCount">0</div>
             </div>
             <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat">
+            <div class="cc-sb-stat" title="Percentage of closed trades that were profitable">
               <div class="cc-sb-label">WIN RATE</div>
               <div class="cc-sb-val" id="ccWinRate">--%</div>
             </div>
             <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat">
+            <div class="cc-sb-stat" title="Total number of completed (closed) trades">
               <div class="cc-sb-label">TOTAL TRADES</div>
               <div class="cc-sb-val" id="ccTotalTrades">0</div>
             </div>
             <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat">
+            <div class="cc-sb-stat" title="Profit/loss from trades that have been closed">
               <div class="cc-sb-label">REALISED P&amp;L</div>
               <div class="cc-sb-val" id="ccRealisedPnl">$0.00</div>
             </div>
             <div class="cc-sb-divider"></div>
-            <div class="cc-sb-stat">
+            <div class="cc-sb-stat" title="Current economic regime detected by the AI (e.g. Rising Growth + Rising Inflation)">
               <div class="cc-sb-label">REGIME</div>
               <div class="cc-sb-val acc" id="ccRegimeBadge" style="font-size:11px">--</div>
             </div>
@@ -410,6 +413,9 @@
          TAB 2: SIGNAL OPS
     ───────────────────────────────────── -->
     <section id="tab-signal-ops" class="tab-panel">
+      <div class="tab-desc">
+        <strong>Signal Ops</strong> — AI-generated trade signals ranked by confidence. Each card shows entry price, stop loss, take profit, and risk/reward ratio. Click any card to see the full AI justification. Use <strong>Scan Now</strong> to refresh signals or <strong>Run Cycle</strong> for a full analysis pass. Click <strong>TRADE</strong> on any signal to open an order.
+      </div>
 
       <!-- Strong signal in-page alert (per-tab version) -->
       <div id="strongSignalInPage" class="strong-signal-inpage hidden">
@@ -498,6 +504,9 @@
          TAB 3: INTEL CENTER
     ───────────────────────────────────── -->
     <section id="tab-intel-center" class="tab-panel">
+      <div class="tab-desc">
+        <strong>Intel Center</strong> — Real-time sentiment analysis powered by FinBERT AI. Monitors news articles for each economic quadrant, tracks geopolitical risk (conflict articles), and shows overall market mood. <strong>Red ring</strong> = elevated risk, shift toward safe-haven assets. Green headlines are bullish, red are bearish.
+      </div>
       <div class="panel-grid panel-grid--intel">
 
         <!-- Conflict Risk Meter -->
@@ -597,6 +606,9 @@
          TAB 4: HOLY GRAIL
     ───────────────────────────────────── -->
     <section id="tab-holy-grail" class="tab-panel">
+      <div class="tab-desc">
+        <strong>Holy Grail</strong> — Ray Dalio's diversification principle: hold 15+ uncorrelated assets to reduce risk without sacrificing returns. The <strong>correlation matrix</strong> shows how assets move together (dark = independent = good). The <strong>meter</strong> tracks your diversification score, and <strong>risk-parity weights</strong> suggest how to allocate so each asset contributes equal risk.
+      </div>
       <div class="panel-grid panel-grid--grail">
 
         <!-- Diversification Status -->
@@ -688,6 +700,9 @@
          TAB 5: RISK MATRIX
     ───────────────────────────────────── -->
     <section id="tab-risk-matrix" class="tab-panel">
+      <div class="tab-desc">
+        <strong>Risk Matrix</strong> — Safety controls for your portfolio. The <strong>circuit breaker</strong> auto-halts trading if daily loss exceeds 2% or total drawdown exceeds 10%. Monitor Sharpe ratio (risk-adjusted return), Sortino (downside risk), win rate, and max drawdown. Open positions show live P&L — green is profit, red is loss.
+      </div>
       <div class="panel-grid panel-grid--risk">
 
         <!-- Circuit Breaker -->
@@ -897,6 +912,9 @@
          TAB 7: ASX SCANNER
     ───────────────────────────────────── -->
     <section id="tab-asx-scanner" class="tab-panel">
+      <div class="tab-desc">
+        <strong>ASX Scanner</strong> — Live prices for Australian Stock Exchange equities. Filter by ticker, name, or sector. Click column headers to sort. Green rows are up today, red are down. Click <strong>TRADE</strong> to open an order for any stock. Add assets to your watchlist with the star button.
+      </div>
       <div class="scanner-wrap">
         <div class="scanner-toolbar">
           <div class="scanner-title">🇦🇺 ASX MARKET SCANNER</div>
@@ -944,6 +962,9 @@
          TAB 8: CRYPTO SCANNER
     ───────────────────────────────────── -->
     <section id="tab-crypto-scanner" class="tab-panel">
+      <div class="tab-desc">
+        <strong>Crypto Scanner</strong> — Live cryptocurrency prices from CoinGecko. Shows price, 24h change, volume, and market cap. Click <strong>TRADE</strong> to open an order. Prices update automatically — first load may take 5-15 seconds.
+      </div>
       <div class="scanner-wrap">
         <div class="scanner-toolbar">
           <div class="scanner-title">₿ CRYPTO MARKET SCANNER</div>
@@ -979,6 +1000,9 @@
          TAB 9: COMMODITIES SCANNER
     ───────────────────────────────────── -->
     <section id="tab-commodities-scanner" class="tab-panel">
+      <div class="tab-desc">
+        <strong>Commodities Scanner</strong> — Track gold, silver, oil, natural gas, and other commodity prices in real-time. These assets are key to the All-Weather strategy as hedges against inflation and geopolitical risk. Click <strong>TRADE</strong> to place an order.
+      </div>
       <div class="scanner-wrap">
         <div class="scanner-toolbar">
           <div class="scanner-title">⛏ COMMODITIES SCANNER</div>
@@ -1013,6 +1037,9 @@
          TAB 10: PAPER TRADING
     ───────────────────────────────────── -->
     <section id="tab-paper-trading" class="tab-panel">
+      <div class="tab-desc">
+        <strong>Paper Trading</strong> — Practice trading with simulated money. Place orders, track your portfolio, and see P&L without risking real funds. Use <strong>Signal Quick-Trade</strong> for 1-click orders from AI signals. Your equity curve tracks performance over time. Reset anytime to start fresh.
+      </div>
       <div class="panel-grid panel-grid--paper">
 
         <!-- ── ORDER ENTRY ── -->
@@ -1170,6 +1197,9 @@
          TAB 8: LIVE TRADING
     ───────────────────────────────────── -->
     <section id="tab-live-trading" class="tab-panel">
+      <div class="tab-desc">
+        <strong>Live Trading</strong> — Real money trading through your connected broker. The <strong>broker bar</strong> shows connection status and account balance. View your live portfolio, P&L, and position heatmap. Click any signal in <strong>Quick-Trade</strong> to open an order. Configure your broker in the <strong>Settings</strong> tab first.
+      </div>
       <div class="panel-grid panel-grid--live">
 
         <!-- ── BROKER STATUS BAR (full width) ── -->
@@ -1275,6 +1305,9 @@
          SETTINGS TAB
     ───────────────────────────────────── -->
     <section id="tab-comms-config" class="tab-panel">
+      <div class="tab-desc">
+        <strong>Settings</strong> — Connect your broker or exchange accounts for live trading. Click <strong>CONFIGURE</strong> on any broker to enter your API keys. Use <strong>TEST</strong> to verify the connection, then <strong>SAVE</strong> to store credentials. Saved keys are masked for security. You can also configure notifications and system preferences below.
+      </div>
       <div class="panel-grid panel-grid--settings">
 
         <!-- ── BROKER & EXCHANGE CONNECTIONS (moved to top) ── -->
@@ -2035,7 +2068,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=20260406q"></script>
+  <script src="/static/app.js?v=20260406r"></script>
 
   <!-- ═══════════════════════════════════════════════
        SPEECH BUBBLE SPOTLIGHT TOOLTIP
