@@ -1839,8 +1839,8 @@ function switchBrokerTab(cat, btn) {
 }
 
 async function connectAlpaca() {
-  const key    = el('alpacaKey')?.value?.trim();
-  const secret = el('alpacaSecret')?.value?.trim();
+  const key    = el('settAlpacaKey')?.value?.trim();
+  const secret = el('settAlpacaSecret')?.value?.trim();
   const env    = el('alpacaEnv')?.value;
   const result = el('alpacaConnectResult');
   if (!key || !secret) { if (result) result.textContent = '⚠ Enter API key and secret first'; return; }
@@ -3445,8 +3445,8 @@ async function connectBroker() {
   if (btn) { btn.textContent = '⌛ CONNECTING...'; btn.classList.add('loading'); }
   let payload = { broker };
   if (broker === 'alpaca') {
-    payload.api_key    = el('alpacaKey')?.value?.trim();
-    payload.api_secret = el('alpacaSecret')?.value?.trim();
+    payload.api_key    = el('settAlpacaKey')?.value?.trim();
+    payload.api_secret = el('settAlpacaSecret')?.value?.trim();
     payload.base_url   = el('alpacaUrl')?.value;
     if (!payload.api_key || !payload.api_secret) {
       if (res) res.innerHTML = '<span style="color:var(--red)">API key and secret required</span>';
