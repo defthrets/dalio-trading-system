@@ -1249,24 +1249,89 @@ function initCharts() {
   // Prediction chart (slim, full width row 1)
   const pctx = el('predictionChart')?.getContext('2d');
   if (pctx) {
+    // Gradient fills for actual equity and confidence band
+    const predGradActual = pctx.createLinearGradient(0, 0, 0, 160);
+    predGradActual.addColorStop(0, 'rgba(0,204,68,0.25)');
+    predGradActual.addColorStop(0.6, 'rgba(0,204,68,0.06)');
+    predGradActual.addColorStop(1, 'rgba(0,204,68,0)');
+
+    const predGradBand = pctx.createLinearGradient(0, 0, 0, 160);
+    predGradBand.addColorStop(0, 'rgba(0,212,255,0.12)');
+    predGradBand.addColorStop(0.5, 'rgba(0,212,255,0.04)');
+    predGradBand.addColorStop(1, 'rgba(0,212,255,0)');
+
+    const predGradPredLine = pctx.createLinearGradient(0, 0, 0, 160);
+    predGradPredLine.addColorStop(0, 'rgba(0,212,255,0.18)');
+    predGradPredLine.addColorStop(1, 'rgba(0,212,255,0)');
+
     charts.prediction = new Chart(pctx, {
       type: 'line',
       data: {
         labels: [],
         datasets: [
-          { label: 'Actual', data: [], borderColor: '#00cc44', borderWidth: 2, fill: false, tension: 0.3, pointRadius: 0, order: 2 },
-          { label: 'Predicted', data: [], borderColor: '#00d4ff', borderWidth: 1.5, borderDash: [5,3], fill: false, tension: 0.4, pointRadius: 0, order: 1 },
-          { label: 'Upper Band', data: [], borderColor: 'transparent', borderWidth: 0, fill: '+1', backgroundColor: 'rgba(0,204,68,0.06)', tension: 0.4, pointRadius: 0, order: 3 },
-          { label: 'Lower Band', data: [], borderColor: 'transparent', borderWidth: 0, fill: false, backgroundColor: 'rgba(0,204,68,0.06)', tension: 0.4, pointRadius: 0, order: 4 },
+          {
+            label: 'Actual', data: [], borderColor: '#00cc44', borderWidth: 2.5,
+            fill: true, backgroundColor: predGradActual,
+            tension: 0.35, pointRadius: 0, pointHoverRadius: 4,
+            pointHoverBackgroundColor: '#00cc44', pointHoverBorderColor: '#fff', order: 2,
+          },
+          {
+            label: 'Predicted', data: [], borderColor: '#00d4ff', borderWidth: 2,
+            borderDash: [6,3], fill: true, backgroundColor: predGradPredLine,
+            tension: 0.4, pointRadius: 0, pointHoverRadius: 3,
+            pointHoverBackgroundColor: '#00d4ff', order: 1,
+          },
+          {
+            label: 'Upper Band', data: [], borderColor: 'rgba(0,212,255,0.3)', borderWidth: 1,
+            borderDash: [2,4], fill: '+1', backgroundColor: predGradBand,
+            tension: 0.4, pointRadius: 0, order: 3,
+          },
+          {
+            label: 'Lower Band', data: [], borderColor: 'rgba(0,212,255,0.3)', borderWidth: 1,
+            borderDash: [2,4], fill: false, backgroundColor: predGradBand,
+            tension: 0.4, pointRadius: 0, order: 4,
+          },
         ],
       },
       options: {
         ...CHART_DEFAULTS,
         maintainAspectRatio: false,
-        plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false } },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: false },
+          tooltip: {
+            ...CHART_DEFAULTS.plugins?.tooltip,
+            backgroundColor: 'rgba(10,18,12,0.95)',
+            borderColor: 'rgba(255,140,0,0.3)',
+            borderWidth: 1,
+            titleFont: { family: 'JetBrains Mono', size: 10 },
+            bodyFont: { family: 'JetBrains Mono', size: 10 },
+            callbacks: {
+              label: ctx => {
+                if (ctx.raw == null) return null;
+                const lbl = ctx.dataset.label;
+                return `${lbl}: $${ctx.raw.toLocaleString()}`;
+              },
+            },
+          },
+        },
         scales: {
-          x: { display: false },
-          y: { ticks: { color: '#5a8a65', font: { family: 'JetBrains Mono', size: 9 }, callback: v => '$' + v.toLocaleString() }, grid: { color: 'rgba(10,24,16,0.5)' } },
+          x: {
+            display: true,
+            ticks: { color: 'rgba(90,138,101,0.5)', font: { family: 'JetBrains Mono', size: 7 }, maxTicksLimit: 8, maxRotation: 0 },
+            grid: { color: 'rgba(255,140,0,0.04)', drawTicks: false },
+          },
+          y: {
+            min: 0,
+            ticks: {
+              color: '#5a8a65',
+              font: { family: 'JetBrains Mono', size: 9 },
+              callback: v => '$' + v.toLocaleString(),
+              maxTicksLimit: 6,
+            },
+            grid: { color: 'rgba(255,140,0,0.06)', drawTicks: false },
+          },
         },
       },
     });
