@@ -3,7 +3,7 @@ Dalio AI Agent — The Autonomous Orchestrator.
 
 This is the brain of the system. It coordinates all engines and
 produces actionable, justified trade decisions based on:
-  - Ray Dalio's All Weather / Economic Machine principles
+  - All Weather / Economic Machine principles
   - Real-time macro + news data
   - Correlation & risk parity constraints
   - Technical signals
@@ -13,7 +13,7 @@ to Discord/Telegram via the notifications module.
 
 Dalio Principles Encoded:
   "The greatest mistake of the individual investor is to think
-   that a market that did well is a good market." — Ray Dalio
+   that a market that did well is a good market." 
 
   1. Diversify across uncorrelated return streams (Holy Grail).
   2. Balance risk, not dollars, across all economic environments.
@@ -39,7 +39,7 @@ from config.settings import get_settings
 
 class DalioAgent:
     """
-    Autonomous trading agent that embodies Ray Dalio's principles.
+    Autonomous trading agent that embodies DALIOS principles.
 
     Lifecycle:
       boot()       → initialise all engines

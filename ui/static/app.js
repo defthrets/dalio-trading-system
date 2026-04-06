@@ -1173,7 +1173,7 @@ function updateWeightsChart(weights) {
 // Per-tab spot definitions — each spot targets a CSS selector
 const SPOTS = {
   'command-center': [
-    { id:'cmd-quadrant', sel:'#quadrantPanel',      arrow:'right',  title:'📊 ECONOMIC QUADRANT',    text:'The glowing cell shows Ray Dalio\'s current economic regime. It tells you exactly what assets to buy or avoid right now.' },
+    { id:'cmd-quadrant', sel:'#quadrantPanel',      arrow:'right',  title:'📊 ECONOMIC QUADRANT',    text:'The glowing cell shows the current economic regime. It tells you exactly what assets to buy or avoid right now.' },
     { id:'cmd-equity',   sel:'#equityPanel',        arrow:'bottom', title:'📈 EQUITY CURVE',          text:'Your portfolio value over time. A rising line = the strategy is working. Each data point is a live portfolio snapshot.' },
     { id:'cmd-vitals',   sel:'.panel--gauges',      arrow:'left',   title:'❤ PORTFOLIO VITALS',       text:'Daily P&L and drawdown at a glance. If drawdown hits 10%, the system auto-halts all trading to protect your capital.' },
     { id:'cmd-cycle',    sel:'#runCycleBtn',        arrow:'bottom', title:'▶ RUN A SCAN NOW',         text:'Click to trigger an immediate market scan across all ASX, crypto, and commodity assets. New signals appear in seconds.' },

@@ -20,7 +20,7 @@ echo " ██║  ██║██╔══██║██║     ██║██
 echo " ██████╔╝██║  ██║███████╗██║╚██████╔╝███████║"
 echo " ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝ ╚═════╝ ╚══════╝"
 echo -e "${RESET}"
-echo -e "${AMBER} AUTOMATED TRADING FRAMEWORK — RAY DALIO PRINCIPLES${RESET}"
+echo -e "${AMBER} AUTOMATED TRADING FRAMEWORK — DALIOS PRINCIPLES${RESET}"
 echo " ═══════════════════════════════════════════════════"
 echo ""
 echo -e "${CYAN}[*] Starting DALIOS server → http://localhost:8000${RESET}"

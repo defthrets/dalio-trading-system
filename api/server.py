@@ -213,7 +213,7 @@ def _calc_atr(closes: list, period: int = 14) -> float:
 
 app = FastAPI(
     title="Dalios -- Automated Trading Framework",
-    description="Ray Dalio All Weather + Economic Machine -- Autonomous ASX & Commodities Trading",
+    description="DALIOS All Weather + Economic Machine -- Autonomous ASX & Commodities Trading",
     version="1.0.0",
 )
 

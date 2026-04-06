@@ -1,6 +1,6 @@
 # DALIOS — Automated Trading Framework
 
-> A Ray Dalio All-Weather strategy trading system with live market scanning, signal generation, paper trading, and real-time portfolio tracking.
+> An All-Weather strategy trading system with live market scanning, signal generation, paper trading, and real-time portfolio tracking.
 
 ![Status](https://img.shields.io/badge/status-operational-brightgreen)
 ![Mode](https://img.shields.io/badge/mode-paper%20%7C%20live-blue)
@@ -10,7 +10,7 @@
 
 ## What It Does
 
-DALIOS is a self-contained trading intelligence platform built around Ray Dalio's All-Weather portfolio principles. It scans ASX equities, cryptocurrencies, and commodities in real time, generates RSI + trend-based signals, tracks paper and live trades, and monitors portfolio risk — all from a single military-style web UI.
+DALIOS is a self-contained trading intelligence platform built around All-Weather portfolio principles. It scans ASX equities, cryptocurrencies, and commodities in real time, generates RSI + trend-based signals, tracks paper and live trades, and monitors portfolio risk — all from a single military-style web UI.
 
 - **Signal scanner** across 200+ tickers (ASX, Crypto, Commodities)
 - **Economic quadrant engine** — detects the current macro regime (rising/falling growth + inflation) and scores every signal against it
