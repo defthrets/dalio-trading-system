@@ -716,12 +716,19 @@ function renderOpportunities(opps, meta = {}) {
   const actionColour = { BUY:'var(--green)', LONG:'var(--green)', SELL:'var(--red)', SHORT:'var(--red)', WATCH:'var(--amber)' };
 
   list.innerHTML = opps.map((o, i) => {
-    const chgSign  = o.change_pct >= 0 ? '+' : '';
-    const chgCol   = o.change_pct >= 0 ? 'var(--green)' : 'var(--red)';
+    const chg      = Number(o.change_pct) || 0;
+    const score    = Number(o.score) || 0;
+    const rsi      = Number(o.rsi) || 50;
+    const rr       = Number(o.rr_ratio) || 0;
+    const price    = Number(o.price) || 0;
+    const sl       = Number(o.stop_loss) || 0;
+    const tp       = Number(o.take_profit) || 0;
+    const chgSign  = chg >= 0 ? '+' : '';
+    const chgCol   = chg >= 0 ? 'var(--green)' : 'var(--red)';
     const fitCol   = fitColour[o.quadrant_fit] || 'var(--text-2)';
     const actCol   = actionColour[o.action]    || 'var(--text-1)';
-    const rsiCol   = o.rsi < 35 ? 'var(--green)' : o.rsi > 65 ? 'var(--red)' : 'var(--amber)';
-    const scoreBar = Math.min(Math.round(o.score), 100);
+    const rsiCol   = rsi < 35 ? 'var(--green)' : rsi > 65 ? 'var(--red)' : 'var(--amber)';
+    const scoreBar = Math.min(Math.round(score), 100);
     const reasons  = (o.reasoning || []).slice(0, 3);
 
     return `<div class="opp-card opp-card--rich" onclick="this.classList.toggle('opp-expanded')">
@@ -730,20 +737,20 @@ function renderOpportunities(opps, meta = {}) {
         <span class="opp-ticker" style="color:${actCol}">${o.ticker}</span>
         <span class="opp-badge" style="color:${actCol};border-color:${actCol}">${o.action}</span>
         <span class="opp-market">${(o.market||'').toUpperCase()}</span>
-        <span class="opp-price">$${o.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}</span>
-        <span style="color:${chgCol};font-size:9px">${chgSign}${o.change_pct.toFixed(2)}%</span>
+        <span class="opp-price">$${price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}</span>
+        <span style="color:${chgCol};font-size:9px">${chgSign}${chg.toFixed(2)}%</span>
         <span class="opp-fit-badge" style="color:${fitCol};border-color:${fitCol}">${(o.quadrant_fit||'').toUpperCase()}</span>
         <div class="opp-score-bar"><div class="opp-score-fill" style="width:${scoreBar}%;background:${fitCol}"></div></div>
-        <span class="opp-score-val">${o.score.toFixed(0)}</span>
+        <span class="opp-score-val">${score.toFixed(0)}</span>
       </div>
       <div class="opp-metrics">
-        <span>RSI <b style="color:${rsiCol}">${o.rsi.toFixed(0)}</b></span>
-        <span>TREND <b>${o.trend}</b></span>
+        <span>RSI <b style="color:${rsiCol}">${rsi.toFixed(0)}</b></span>
+        <span>TREND <b>${o.trend || '--'}</b></span>
         <span>SMA20 <b style="color:${o.above_sma20?'var(--green)':'var(--red)'}">${o.above_sma20?'↑ ABOVE':'↓ BELOW'}</b></span>
-        <span>52W <b>${o.pct_from_lo >= 0 ? '+' : ''}${o.pct_from_lo}% FROM LOW</b></span>
-        <span>SL <b style="color:var(--red)">$${o.stop_loss.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}</b></span>
-        <span>TP <b style="color:var(--green)">$${o.take_profit.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}</b></span>
-        <span>R:R <b style="color:var(--primary)">${o.rr_ratio.toFixed(1)}x</b></span>
+        <span>52W <b>${(Number(o.pct_from_lo)||0) >= 0 ? '+' : ''}${Number(o.pct_from_lo)||0}% FROM LOW</b></span>
+        <span>SL <b style="color:var(--red)">$${sl.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}</b></span>
+        <span>TP <b style="color:var(--green)">$${tp.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:4})}</b></span>
+        <span>R:R <b style="color:var(--primary)">${rr.toFixed(1)}x</b></span>
         <span>VOL <b>${o.volume_fmt||'--'}</b></span>
       </div>
       <div class="opp-reasons">
@@ -1479,7 +1486,7 @@ const SPOTS = {
     { id:'lt-signals',  sel:'.panel--live-signals',  arrow:'top',    title:'\u26a1 QUICK-TRADE',            text:"One-click trading from AI signals with real money. No mucking around \u2014 click a signal and the order fires off to your broker. Beauty!" },
   ],
   'signal-ops': [
-    { id:'sig-banner',   sel:'#strongSignalInPage', arrow:'bottom', title:'\u26a1 STRONG SIGNAL ALERT',   text:"When confidence hits 82%+, this puppy lights up like a Christmas tree. It\'s basically screaming \'OI, CHECK THIS OUT!\' Top-shelf signal, mate." },
+    { id:'sig-banner',   sel:'#strongSignalInPage', arrow:'bottom', title:'\u26a1 STRONG SIGNAL ALERT',   text:"When confidence hits 82%+, this lights up. It\'s basically screaming \'CHECK THIS OUT!\' — a top-shelf signal worth acting on." },
     { id:'sig-grid',     sel:'#signalGrid',         arrow:'top',    title:'\ud83c\udccf SIGNAL CARDS',           text:"Each card is a trade idea. Green = BUY/LONG, Red = SELL/SHORT. They\'re sorted best-first so the top ones are the real bangers." },
     { id:'sig-rr',       sel:'.signal-controls',    arrow:'bottom', title:'\ud83c\udf9a FILTER SIGNALS',         text:"Crank the confidence slider up to 75%+ if ya only want the high-conviction plays. You can also filter by market \u2014 ASX, Crypto, or everything." },
     { id:'sig-just',     sel:'#justificationPanel', arrow:'left',   title:'\ud83e\udde0 AI JUSTIFICATION',       text:"Click any signal card and the AI spills the beans \u2014 why it reckons this trade\'s a goer. Economic fit, sentiment, RSI, the full Dalio breakdown." },
@@ -1502,7 +1509,7 @@ const SPOTS = {
   'backtest-lab': [
     { id:'bt-summary',   sel:'.panel--bt-summary',  arrow:'right',  title:'\ud83d\udcc8 BACKTEST RESULTS',       text:"Walk-forward testing \u2014 the system trains on 12 months, then tests on 3 months it\'s never seen. No peeking at answers, keeps things fair dinkum." },
     { id:'bt-chart',     sel:'.panel--wf-chart',    arrow:'bottom', title:'\ud83d\udcca PERIOD CHART',            text:"Each bar = one test window. Green = made money, Red = lost money. You wanna see consistent green bars \u2014 that means the strat\'s legit, not just lucky." },
-    { id:'bt-table',     sel:'.panel--period-table', arrow:'top',   title:'\ud83d\udccb PERIOD BREAKDOWN',        text:"Drill into each period for the nitty gritty \u2014 returns, Sharpe, drawdown, win rate. Consistent Sharpe above 1.0 is the dream, mate." },
+    { id:'bt-table',     sel:'.panel--period-table', arrow:'top',   title:'\ud83d\udccb PERIOD BREAKDOWN',        text:"Drill into each period for the nitty gritty \u2014 returns, Sharpe, drawdown, win rate. Consistent Sharpe above 1.0 is the dream." },
   ],
   'asx-scanner': [
     { id:'asx-table',    sel:'.scanner-wrap',       arrow:'bottom', title:'\ud83c\udde6\ud83c\uddfa ASX SCANNER',            text:"Live prices for Aussie stocks! Filter by ticker, name, or sector. Green rows = up today, red = down. Click TRADE to have a crack at any stock." },
@@ -2004,7 +2011,7 @@ function resetAllTutorials() {
   localStorage.removeItem('dalios_welcome_never');
   _saveSetting('tutorials_off', false);
   const btn = el('settTutorialBtn'); if (btn) { btn.textContent = 'ON'; btn.classList.add('on'); }
-  // Show the G'DAY welcome overlay
+  // Show the welcome overlay
   const overlay = el('welcomeOverlay');
   if (overlay) {
     overlay.classList.remove('hidden');
@@ -5573,7 +5580,7 @@ function restartGuidedTour() {
   localStorage.removeItem('dalios_welcome_done');
   localStorage.removeItem('dalios_welcome_never');
 
-  // Show the welcome G'DAY overlay first
+  // Show the welcome overlay first
   const overlay = el('welcomeOverlay');
   if (overlay) {
     overlay.classList.remove('hidden');

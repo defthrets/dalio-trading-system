@@ -2240,7 +2240,15 @@ canvas { display: block; max-width: 100%; }
 }
 .spot-bubble.hidden { display: none; }
 
-/* Mascot behind bubble */
+/* Mascot behind bubble — floating */
+@keyframes mascotFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-12px); }
+}
+@keyframes mascotFloatFlip {
+  0%, 100% { transform: scaleX(-1) translateY(0); }
+  50%      { transform: scaleX(-1) translateY(-12px); }
+}
 .spot-mascot {
   position: absolute;
   width: 800px;
@@ -2248,19 +2256,18 @@ canvas { display: block; max-width: 100%; }
   bottom: -120px;
   pointer-events: none;
   filter: drop-shadow(0 3px 10px rgba(0,0,0,0.6));
-  transition: transform 0.3s ease;
   z-index: -1;
   opacity: 0.45;
 }
 .spot-mascot.mascot-left {
   right: 20px;
   left: auto;
-  transform: scaleX(1);
+  animation: mascotFloat 3s ease-in-out infinite;
 }
 .spot-mascot.mascot-right {
   left: 20px;
   right: auto;
-  transform: scaleX(-1);
+  animation: mascotFloatFlip 3s ease-in-out infinite;
 }
 @keyframes bubble-pop {
   from { opacity: 0; transform: scale(0.88); }
