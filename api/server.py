@@ -287,11 +287,50 @@ async def toggle_pause(body: dict):
 
 @app.get("/api/portfolio/health")
 async def portfolio_health():
-    data = _gen_portfolio_health()
+    if TRADING_MODE == "live" and ACTIVE_BROKER and ACTIVE_BROKER.is_connected():
+        try:
+            data = await _gen_live_portfolio_health()
+        except Exception:
+            data = _gen_portfolio_health()
+    else:
+        data = _gen_portfolio_health()
     STATE.last_health = data
     STATE.equity_history.append({"t": datetime.utcnow().strftime("%Y-%m-%d %H:%M"), "v": data["equity"]})
     STATE.equity_history = STATE.equity_history[-500:]
     return data
+
+
+async def _gen_live_portfolio_health() -> dict:
+    """Portfolio health from connected broker."""
+    acct = await ACTIVE_BROKER.get_account()
+    positions = await ACTIVE_BROKER.get_positions()
+    equity = float(acct.get("account_value") or acct.get("equity") or 0)
+    cash = float(acct.get("cash") or acct.get("buying_power") or 0)
+    initial = float(acct.get("initial_equity") or equity)
+    daily_pnl = float(acct.get("daily_pnl") or 0)
+    open_count = len(positions) if positions else 0
+    roi = round((equity / initial - 1) * 100, 2) if initial > 0 else 0.0
+    positions_list = [
+        {"ticker": p.get("symbol", p.get("ticker", "?")),
+         "side": p.get("side", "LONG"),
+         "size_pct": round(abs(float(p.get("market_value", 0))) / max(equity, 1) * 100, 1),
+         "unrealised_pnl_pct": round(float(p.get("unrealized_plpc", p.get("unrealised_pnl_pct", 0))) * 100, 2)}
+        for p in (positions or [])
+    ]
+    return {
+        "timestamp": datetime.utcnow().isoformat(), "equity": round(equity, 2),
+        "initial_equity": round(initial, 2), "cash": round(cash, 2),
+        "total_return_pct": roi,
+        "daily_pnl": round(daily_pnl, 2),
+        "daily_pnl_pct": round(daily_pnl / equity * 100, 3) if equity else 0.0,
+        "drawdown_pct": 0.0, "open_positions": open_count,
+        "dalio_diversification_met": open_count >= 3,
+        "selected_portfolio_size": open_count,
+        "circuit_breaker_active": False,
+        "daily_limit_pct": 2.0, "max_drawdown_pct": 10.0,
+        "sharpe_ratio": 0.0, "positions": positions_list,
+        "source": "live",
+    }
 
 
 @app.get("/api/portfolio/equity_history")
