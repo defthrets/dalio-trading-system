@@ -887,11 +887,30 @@ class CoinSpotBroker(BrokerBase):
         return self._connected
 
     def _sign_request(self, data: dict):
+        """Sign a CoinSpot API request.
+        
+        CoinSpot is picky about JSON format:
+        - nonce must be an integer (not string), always increasing
+        - Compact JSON separators (no spaces) — signed body must match posted body exactly
+        - Float values must avoid scientific notation (e.g. 0.00019 not 1.9e-04)
+        """
         import time as _t, hmac as _hmac, hashlib as _hs
-        nonce = str(int(_t.time() * 1000))
+
+        nonce = int(_t.time() * 1000)
         data["nonce"] = nonce
-        body  = json.dumps(data, separators=(",", ":"))
-        sig   = _hmac.new(self._api_secret.encode(), body.encode(), _hs.sha512).hexdigest()
+
+        # Force all float values to fixed-point strings to avoid scientific notation
+        # CoinSpot expects "amount":"0.00019" not "amount":1.9e-04
+        cleaned = {}
+        for k, v in data.items():
+            if isinstance(v, float):
+                # Format to 8 decimal places, strip trailing zeros
+                cleaned[k] = f"{v:.8f}".rstrip("0").rstrip(".")
+            else:
+                cleaned[k] = v
+
+        body = json.dumps(cleaned, separators=(",", ":"))
+        sig  = _hmac.new(self._api_secret.encode("utf-8"), body.encode("utf-8"), _hs.sha512).hexdigest()
         return body, sig
 
     async def _post(self, endpoint: str, payload: dict) -> dict:
@@ -899,13 +918,13 @@ class CoinSpotBroker(BrokerBase):
         headers   = {"Content-Type": "application/json",
                      "key":  self._api_key,
                      "sign": sig}
+        logger.debug(f"CoinSpot POST {endpoint} body={body[:200]}")
         timeout = aiohttp.ClientTimeout(total=12)
         async with aiohttp.ClientSession(timeout=timeout) as sess:
             async with sess.post(f"{self._BASE}{endpoint}", data=body, headers=headers) as resp:
                 result = await resp.json(content_type=None)
-                if result.get("status") not in ("ok", "error"):
-                    pass  # some endpoints return non-standard status
                 if result.get("status") == "error":
+                    logger.warning(f"CoinSpot error on {endpoint}: {result.get('message','unknown')} | body={body[:200]}")
                     raise RuntimeError(f"CoinSpot error: {result.get('message','unknown')}")
                 return result
 
