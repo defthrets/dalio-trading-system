@@ -797,6 +797,96 @@ _MODE_LOCK      = asyncio.Lock()
 _WATCHLIST_LOCK  = asyncio.Lock()
 
 
+# ── Position sizing / risk parameters ─────────────────────────────
+_RISK_MAX_POS_SIZE_PCT  = 10.0   # max % of portfolio in a single position
+_RISK_MAX_OPEN          = 20     # max number of concurrent open positions
+_RISK_MAX_DAILY_LOSS    = 2.0    # max daily loss % before blocking new buys
+
+if SETTINGS_AVAILABLE:
+    try:
+        _s = get_settings()
+        _RISK_MAX_POS_SIZE_PCT = getattr(_s, "max_pos_size_pct", 10.0)
+        _RISK_MAX_OPEN         = getattr(_s, "max_open_positions", 20)
+        _RISK_MAX_DAILY_LOSS   = getattr(_s, "max_daily_loss_pct", 2.0)
+    except Exception:
+        pass  # keep defaults
+
+
+def _calculate_position_size(ticker: str, price: float, side: str,
+                             portfolio: PaperPortfolio,
+                             prices: dict) -> dict:
+    """Calculate the maximum allowed quantity for a trade based on risk limits.
+
+    Returns dict with keys: max_allowed_qty, position_pct, reason.
+    Raises ValueError if the trade is completely blocked.
+    """
+    total_value = portfolio.total_value(prices)
+    if total_value <= 0:
+        raise ValueError("Portfolio value is zero or negative -- cannot size position")
+
+    # --- SELL orders: no position sizing restrictions ---
+    if side != "BUY":
+        existing = portfolio.positions.get(ticker)
+        return {
+            "max_allowed_qty": existing["qty"] if existing else 0,
+            "position_pct": 0.0,
+            "reason": "sell_no_limit",
+        }
+
+    # --- Check max open positions ---
+    if ticker not in portfolio.positions and len(portfolio.positions) >= _RISK_MAX_OPEN:
+        raise ValueError(
+            f"Max open positions reached ({_RISK_MAX_OPEN}). "
+            f"Close an existing position before opening a new one."
+        )
+
+    # --- Check daily loss limit ---
+    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    today_pnl = sum(
+        t["pnl"] for t in portfolio.history
+        if t.get("timestamp", "").startswith(today_str)
+    )
+    if total_value > 0:
+        daily_loss_pct = abs(min(0, today_pnl)) / total_value * 100
+        if daily_loss_pct >= _RISK_MAX_DAILY_LOSS:
+            raise ValueError(
+                f"Daily loss limit reached ({daily_loss_pct:.1f}% >= {_RISK_MAX_DAILY_LOSS}%). "
+                f"No new BUY orders allowed today."
+            )
+
+    # --- Calculate max position value ---
+    max_position_value = total_value * (_RISK_MAX_POS_SIZE_PCT / 100.0)
+
+    # Account for existing position in same ticker
+    existing = portfolio.positions.get(ticker)
+    current_position_value = 0.0
+    if existing and existing["side"] == "LONG":
+        current_position_value = existing["qty"] * prices.get(ticker, existing["entry_price"])
+
+    remaining_allowance = max(0, max_position_value - current_position_value)
+
+    if remaining_allowance <= 0:
+        raise ValueError(
+            f"Position in {ticker} already at max size "
+            f"(${current_position_value:,.2f} >= {_RISK_MAX_POS_SIZE_PCT}% of portfolio ${total_value:,.2f})"
+        )
+
+    # Also cap by available cash
+    max_by_cash = portfolio.cash / price if price > 0 else 0
+    max_by_risk = remaining_allowance / price if price > 0 else 0
+    max_allowed_qty = min(max_by_cash, max_by_risk)
+
+    position_pct = 0.0
+    if total_value > 0:
+        position_pct = round((current_position_value + max_allowed_qty * price) / total_value * 100, 2)
+
+    return {
+        "max_allowed_qty": round(max_allowed_qty, 8),
+        "position_pct": min(position_pct, _RISK_MAX_POS_SIZE_PCT),
+        "reason": "ok",
+    }
+
+
 # ── Stop-Loss / Take-Profit monitoring ────────────────────────────
 
 async def _check_stop_loss_take_profit():
@@ -3661,6 +3751,22 @@ async def _run_cmd(message: str) -> dict:
                 _sl_val = round(float(price) - _sl_offset, 4)
                 _tp_val = round(float(price) + _tp_offset, 4)
             async with _PAPER_LOCK:
+                # ── Position sizing enforcement ──
+                _tks_pre = list(set(list(PAPER.positions.keys()) + [tkr]))
+                _prc_pre = await _prices_for_positions(_tks_pre) if _tks_pre else {}
+                _prc_pre[tkr] = float(price)
+                sizing = _calculate_position_size(tkr, float(price), side, PAPER, _prc_pre)
+                max_allowed = sizing["max_allowed_qty"]
+                original_qty = qty
+                cap_msg = ""
+                if side == "BUY" and qty > max_allowed:
+                    if max_allowed <= 0:
+                        raise ValueError(
+                            f"Position sizing blocked: max allowed qty is 0 "
+                            f"(max {_RISK_MAX_POS_SIZE_PCT}% per position)")
+                    qty = max_allowed
+                    cap_msg = f"\n  [RISK] Qty capped from {original_qty} to {qty:.8g} (max {_RISK_MAX_POS_SIZE_PCT}% per position)"
+
                 result = PAPER.place_order(tkr, side, qty, float(price),
                                            stop_loss=_sl_val, take_profit=_tp_val)
                 _tks = list(PAPER.positions.keys())
@@ -3671,7 +3777,8 @@ async def _run_cmd(message: str) -> dict:
             await WS_MANAGER.broadcast({"type":"PAPER_ORDER","data":result})
             return {"type":"order","message":(
                 f"Order placed: {side} {qty} {tkr} @ ${price:.4f}\n"
-                f"  ID: #{result['order_id']} | Cost: ${qty*price:,.2f} | Cash left: ${PAPER.cash:,.2f}"),
+                f"  ID: #{result['order_id']} | Cost: ${qty*price:,.2f} | Cash left: ${PAPER.cash:,.2f}"
+                f"{cap_msg}"),
                 "data":result}
         except ValueError as exc:
             return {"type":"error","message":f"Order failed: {exc}"}
@@ -3862,11 +3969,44 @@ async def place_paper_order(payload: dict):
         tp = float(tp)
 
     async with _PAPER_LOCK:
+        # ── Position sizing enforcement ──
+        _tickers_pre = list(set(list(PAPER.positions.keys()) + [ticker]))
+        _prices_pre  = await _prices_for_positions(_tickers_pre) if _tickers_pre else {}
+        _prices_pre[ticker] = price  # ensure current ticker price is available
+
+        try:
+            sizing = _calculate_position_size(ticker, price, side, PAPER, _prices_pre)
+        except ValueError as e:
+            raise HTTPException(400, f"Position sizing blocked: {e}")
+
+        max_allowed_qty = sizing["max_allowed_qty"]
+        position_pct    = sizing["position_pct"]
+
+        # Cap qty to max allowed for BUY orders
+        original_qty = qty
+        if side == "BUY" and qty > max_allowed_qty:
+            qty = max_allowed_qty
+            if qty <= 0:
+                raise HTTPException(400,
+                    f"Position sizing: requested {original_qty} but max allowed is 0 "
+                    f"(max {_RISK_MAX_POS_SIZE_PCT}% of portfolio per position)")
+
         try:
             result = PAPER.place_order(ticker, side, qty, price,
                                        stop_loss=sl, take_profit=tp)
         except ValueError as e:
             raise HTTPException(400, str(e))
+
+        # Add position sizing info to result
+        result["max_allowed_qty"] = max_allowed_qty
+        result["position_pct"]    = position_pct
+        if side == "BUY" and original_qty > max_allowed_qty:
+            result["qty_capped"]     = True
+            result["requested_qty"]  = original_qty
+            result["cap_reason"]     = (
+                f"Capped from {original_qty} to {qty:.8g} "
+                f"(max {_RISK_MAX_POS_SIZE_PCT}% of portfolio per position)"
+            )
 
         # Equity snapshot + persist
         _tickers = list(PAPER.positions.keys())

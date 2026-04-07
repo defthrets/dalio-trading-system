@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     max_drawdown_pct: float = Field(default=10.0, alias="MAX_DRAWDOWN_PCT")
     max_portfolio_correlation: float = Field(default=0.3, alias="MAX_PORTFOLIO_CORRELATION")
     min_diversification_assets: int = Field(default=15, alias="MIN_DIVERSIFICATION_ASSETS")
+    max_pos_size_pct: float = Field(default=10.0, alias="MAX_POS_SIZE_PCT")     # max % of portfolio in single position
+    max_open_positions: int = Field(default=20, alias="MAX_OPEN_POSITIONS")       # max concurrent open positions
 
     # --- Trading Mode ---
     trading_mode: str = Field(default="paper", alias="TRADING_MODE")
