@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT))
 # ── Settings / DB availability ──────────────────────────
 try:
     from config.settings import get_settings
-    from data.storage.models import init_db, get_session, Trade, EquitySnapshot, PaperPosition
+    from data.storage.models import init_db, get_session, Trade, EquitySnapshot, PaperPosition, RealEquitySnapshot
     SETTINGS_AVAILABLE = True
 except ImportError:
     SETTINGS_AVAILABLE = False
@@ -160,6 +160,10 @@ _WATCHLIST_LOCK = asyncio.Lock()
 
 # ── Real equity curve ───────────────────────────────────
 def _load_real_equity() -> list:
+    """Load live equity from DB first, fall back to JSON file."""
+    db_curve = _db_get_real_equity_curve(2000)
+    if db_curve:
+        return db_curve
     if not REAL_EQUITY_FILE.exists():
         return []
     try:
@@ -280,6 +284,43 @@ def _db_get_equity_curve(limit: int = 2000) -> list[dict]:
         return result
     except Exception as exc:
         logger.warning(f"DB: failed to get equity curve: {exc}")
+        return []
+
+
+def _db_save_real_equity_snapshot(value: float) -> None:
+    """Insert a single live equity data-point into the DB."""
+    if not SETTINGS_AVAILABLE:
+        return
+    try:
+        session = get_session()
+        record = RealEquitySnapshot(value=value, timestamp=datetime.utcnow())
+        session.add(record)
+        session.commit()
+        session.close()
+    except Exception as exc:
+        logger.warning(f"DB: failed to save real equity snapshot: {exc}")
+
+
+def _db_get_real_equity_curve(limit: int = 2000) -> list[dict]:
+    """Query live equity history from DB, oldest first."""
+    if not SETTINGS_AVAILABLE:
+        return []
+    try:
+        session = get_session()
+        rows = (
+            session.query(RealEquitySnapshot)
+            .order_by(RealEquitySnapshot.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+        result = [
+            {"t": r.timestamp.isoformat() if r.timestamp else None, "v": r.value}
+            for r in reversed(rows)
+        ]
+        session.close()
+        return result
+    except Exception as exc:
+        logger.warning(f"DB: failed to get real equity curve: {exc}")
         return []
 
 

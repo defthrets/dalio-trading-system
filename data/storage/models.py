@@ -179,6 +179,15 @@ class EquitySnapshot(Base):
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 
 
+class RealEquitySnapshot(Base):
+    """Point-in-time live broker equity value (persists across restarts)."""
+    __tablename__ = "real_equity_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    value = Column(Float, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
+
 class PaperPosition(Base):
     """Current open paper-trading position (mirrors PAPER.positions dict)."""
     __tablename__ = "paper_positions"

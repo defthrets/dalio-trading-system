@@ -119,6 +119,61 @@ class RateLimiter:
             return True
 
 
+# ── Data source rate limiter ──────────────────────────────
+class SourceRateLimiter:
+    """Per-data-source rate limiter with concurrency control."""
+
+    def __init__(self):
+        self._limits = {
+            "yfinance":  {"max_per_min": 30, "max_concurrent": 5},
+            "coingecko": {"max_per_min": 10, "max_concurrent": 2},
+        }
+        self._timestamps: dict[str, list[float]] = {}
+        self._semaphores: dict[str, asyncio.Semaphore] = {}
+        self._lock = threading.Lock()
+
+    def _get_semaphore(self, source: str) -> asyncio.Semaphore:
+        if source not in self._semaphores:
+            limit = self._limits.get(source, {}).get("max_concurrent", 5)
+            self._semaphores[source] = asyncio.Semaphore(limit)
+        return self._semaphores[source]
+
+    async def acquire(self, source: str):
+        sem = self._get_semaphore(source)
+        await sem.acquire()
+        max_rpm = self._limits.get(source, {}).get("max_per_min", 60)
+        now = time.time()
+        with self._lock:
+            ts = self._timestamps.get(source, [])
+            ts = [t for t in ts if t > now - 60]
+            if len(ts) >= max_rpm:
+                sem.release()
+                await asyncio.sleep(2.0)
+                await sem.acquire()
+            now = time.time()
+            ts = self._timestamps.get(source, [])
+            ts = [t for t in ts if t > now - 60]
+            ts.append(now)
+            self._timestamps[source] = ts
+
+    def release(self, source: str):
+        sem = self._semaphores.get(source)
+        if sem:
+            sem.release()
+
+
+SOURCE_LIMITER = SourceRateLimiter()
+
+
+def _cache_get_with_age(key: str):
+    """Return (value, age_seconds) or (None, 0) if not cached."""
+    with _CACHE_LOCK:
+        e = _DATA_CACHE.get(key)
+    if e and (time.time() - e["t"]) < CACHE_TTL:
+        return e["v"], int(time.time() - e["t"])
+    return None, 0
+
+
 # ── Technical Indicators ──────────────────────────────────
 
 def _calc_rsi(closes: list, period: int = 14) -> float:

@@ -33,7 +33,7 @@ from loguru import logger
 
 # ── Module imports ─────────────────────────────────────────
 from api.utils import (
-    _cache_get, _cache_set, _get_prices, _EXECUTOR, _fmt_vol,
+    _cache_get, _cache_set, _cache_get_with_age, _get_prices, _EXECUTOR, _fmt_vol,
     YF_AVAILABLE, _normalize_ticker, _get_aud_usd_rate,
     RateLimiter,
 )
@@ -44,6 +44,7 @@ from api.state import (
     TRADING_MODE, _save_trading_mode, _MODE_LOCK,
     REAL_EQUITY_CURVE, _load_real_equity, _save_real_equity,
     _db_save_trade, _db_save_equity_snapshot, _db_get_trades, _db_get_equity_curve,
+    _db_save_real_equity_snapshot, _db_get_real_equity_curve,
     _PAPER_LOCK,
 )
 from api.scanners import (
@@ -297,6 +298,11 @@ async def portfolio_health():
     STATE.last_health = data
     STATE.equity_history.append({"t": datetime.utcnow().strftime("%Y-%m-%d %H:%M"), "v": data["equity"]})
     STATE.equity_history = STATE.equity_history[-500:]
+    if data.get("source") == "live":
+        import api.state as _state_mod
+        _state_mod.REAL_EQUITY_CURVE.append({"t": datetime.utcnow().isoformat(), "v": data["equity"]})
+        _state_mod.REAL_EQUITY_CURVE = _state_mod.REAL_EQUITY_CURVE[-2000:]
+        _db_save_real_equity_snapshot(data["equity"])
     return data
 
 
@@ -317,18 +323,43 @@ async def _gen_live_portfolio_health() -> dict:
          "unrealised_pnl_pct": round(float(p.get("unrealized_plpc", p.get("unrealised_pnl_pct", 0))) * 100, 2)}
         for p in (positions or [])
     ]
+    # Drawdown from live equity curve
+    import api.state as _state_mod
+    drawdown_pct = 0.0
+    peak_equity = equity
+    if _state_mod.REAL_EQUITY_CURVE:
+        all_vals = [pt["v"] for pt in _state_mod.REAL_EQUITY_CURVE if pt.get("v", 0) > 0]
+        if all_vals:
+            peak_equity = max(all_vals)
+            if peak_equity > 0 and equity < peak_equity:
+                drawdown_pct = round((peak_equity - equity) / peak_equity * 100, 2)
+    # Circuit breaker
+    cb_active = drawdown_pct > 9.5
+    if CIRCUIT_BREAKER is not None and CIRCUIT_BREAKER._trading_halted:
+        cb_active = True
+    # Sharpe from live equity history
+    sharpe = 0.0
+    if len(_state_mod.REAL_EQUITY_CURVE) >= 10:
+        try:
+            eq_arr = np.array([e["v"] for e in _state_mod.REAL_EQUITY_CURVE], dtype=float)
+            rets = np.diff(eq_arr) / eq_arr[:-1]
+            if rets.std() > 0:
+                sharpe = round(float((rets.mean() / rets.std()) * (252 ** 0.5)), 2)
+        except Exception:
+            pass
     return {
         "timestamp": datetime.utcnow().isoformat(), "equity": round(equity, 2),
         "initial_equity": round(initial, 2), "cash": round(cash, 2),
         "total_return_pct": roi,
         "daily_pnl": round(daily_pnl, 2),
         "daily_pnl_pct": round(daily_pnl / equity * 100, 3) if equity else 0.0,
-        "drawdown_pct": 0.0, "open_positions": open_count,
+        "drawdown_pct": drawdown_pct, "open_positions": open_count,
         "dalio_diversification_met": open_count >= 3,
         "selected_portfolio_size": open_count,
-        "circuit_breaker_active": False,
+        "circuit_breaker_active": cb_active,
         "daily_limit_pct": 2.0, "max_drawdown_pct": 10.0,
-        "sharpe_ratio": 0.0, "positions": positions_list,
+        "sharpe_ratio": sharpe, "positions": positions_list,
+        "peak_equity": round(peak_equity, 2),
         "source": "live",
     }
 
@@ -347,11 +378,15 @@ async def equity_history():
 
 @app.get("/api/signals")
 async def get_signals():
+    # Check cache freshness before generating
+    cached_val, cache_age = _cache_get_with_age("signals_17")
     all_sigs = await _gen_signals(17)
     return {
         "signals": all_sigs[:12],
         "new_opportunities": all_sigs[12:17] or all_sigs[:5],
         "timestamp": datetime.utcnow().isoformat(),
+        "cached": cached_val is not None,
+        "cache_age": cache_age,
     }
 
 
@@ -1261,7 +1296,42 @@ async def broker_connect(payload: dict):
 
     _brokers_mod.ACTIVE_BROKER = broker
     STATE.add_alert("BROKER", f"{broker_name.upper()} connected", "INFO")
+    _ensure_broker_heartbeat()
     return {"status": "connected", "broker": broker_name}
+
+
+_heartbeat_task_started = False
+
+
+def _ensure_broker_heartbeat():
+    global _heartbeat_task_started
+    if _heartbeat_task_started:
+        return
+    _heartbeat_task_started = True
+    asyncio.get_event_loop().create_task(_broker_heartbeat_loop())
+
+
+async def _broker_heartbeat_loop():
+    """Check broker health every 60s, auto-reconnect on failure."""
+    global _heartbeat_task_started
+    while True:
+        await asyncio.sleep(60)
+        import api.brokers as _b
+        broker = _b.ACTIVE_BROKER
+        if broker is None:
+            continue
+        if not broker.is_connected():
+            if broker._last_credentials and broker._reconnect_attempts < broker._max_reconnect:
+                logger.warning(f"Broker {broker.name} disconnected, attempting reconnect...")
+                success = await broker._auto_reconnect()
+                if success:
+                    STATE.add_alert("BROKER", f"{broker.name.upper()} reconnected", "INFO")
+                else:
+                    STATE.add_alert("BROKER", f"{broker.name.upper()} reconnect failed (attempt {broker._reconnect_attempts})", "WARNING")
+            continue
+        ok = await broker._heartbeat()
+        if not ok:
+            STATE.add_alert("BROKER", f"{broker.name.upper()} heartbeat failed, will retry", "WARNING")
 
 
 def _broker_required_fields(broker_name: str) -> list[str]:
@@ -1344,6 +1414,40 @@ async def get_real_portfolio():
         raise HTTPException(502, f"Broker error: {e}")
 
 
+@app.get("/api/real/suggested_qty")
+async def get_suggested_qty(ticker: str = "", confidence: float = 50):
+    """Suggest position size based on broker buying power and signal confidence."""
+    if ACTIVE_BROKER is None or not ACTIVE_BROKER.is_connected():
+        raise HTTPException(503, "No broker connected")
+    ticker = ticker.upper().strip()
+    if not ticker:
+        raise HTTPException(400, "ticker required")
+    confidence = max(0, min(100, confidence))
+    try:
+        acct = await ACTIVE_BROKER.get_account()
+        buying_power = float(acct.get("buying_power") or acct.get("cash") or 0)
+    except Exception as e:
+        raise HTTPException(502, f"Broker error: {e}")
+    # Scale: 1% at confidence 50 → 5% at confidence 90+
+    pct = 1.0 + (min(confidence, 90) - 50) * (4.0 / 40.0)  # 1% to 5%
+    pct = max(0.5, min(5.0, pct))
+    alloc = buying_power * (pct / 100.0)
+    # Get current price
+    prices = await _get_prices([ticker])
+    price = prices.get(ticker, 0)
+    if price <= 0:
+        return {"ticker": ticker, "suggested_qty": 0, "price": 0,
+                "allocation_pct": round(pct, 2), "buying_power": buying_power}
+    qty = alloc / price
+    # Round appropriately: whole shares for stocks, 4 decimals for crypto
+    if ticker.endswith("-USD") or ticker.startswith("BTC") or ticker.startswith("ETH"):
+        qty = round(qty, 4)
+    else:
+        qty = max(1, int(qty))
+    return {"ticker": ticker, "suggested_qty": qty, "price": round(price, 4),
+            "allocation_pct": round(pct, 2), "buying_power": round(buying_power, 2)}
+
+
 @app.post("/api/real/order")
 async def place_real_order(payload: dict):
     _require_live()
@@ -1376,6 +1480,7 @@ async def place_real_order(payload: dict):
         current_equity = acct.get("account_value", 0)
         _state_mod.REAL_EQUITY_CURVE.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
         _save_real_equity(_state_mod.REAL_EQUITY_CURVE[-2000:])
+        _db_save_real_equity_snapshot(current_equity)
         if CIRCUIT_BREAKER is not None:
             CIRCUIT_BREAKER.state.current_equity = current_equity
             if current_equity > CIRCUIT_BREAKER.state.peak_equity:
@@ -1420,8 +1525,10 @@ async def close_real_position(payload: dict):
     import api.state as _state_mod
     try:
         acct = await ACTIVE_BROKER.get_account()
-        _state_mod.REAL_EQUITY_CURVE.append({"t": datetime.utcnow().isoformat(), "v": acct.get("account_value", 0)})
+        eq_val = acct.get("account_value", 0)
+        _state_mod.REAL_EQUITY_CURVE.append({"t": datetime.utcnow().isoformat(), "v": eq_val})
         _save_real_equity(_state_mod.REAL_EQUITY_CURVE[-2000:])
+        _db_save_real_equity_snapshot(eq_val)
     except Exception:
         pass
     STATE.add_alert("LIVE", f"Closed {ticker}", "INFO")
@@ -1432,7 +1539,10 @@ async def close_real_position(payload: dict):
 @app.get("/api/real/equity_curve")
 async def get_real_equity_curve():
     import api.state as _state_mod
-    return {"equity_curve": _state_mod.REAL_EQUITY_CURVE, "count": len(_state_mod.REAL_EQUITY_CURVE)}
+    curve = _state_mod.REAL_EQUITY_CURVE
+    if not curve:
+        curve = _db_get_real_equity_curve(2000)
+    return {"equity_curve": curve, "count": len(curve)}
 
 
 # ─────────────────────────────────────────────

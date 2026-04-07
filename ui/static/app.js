@@ -465,6 +465,15 @@ async function loadSignals() {
     STATE.signals = d.signals || [];
     renderSignalGrid(STATE.signals);
     renderOpportunities(d.new_opportunities || []);
+    // Phase 6: cache freshness indicator
+    const cacheTag = el('signalCacheAge');
+    if (cacheTag && d.cached) {
+      cacheTag.textContent = `(updated ${d.cache_age}s ago)`;
+      cacheTag.style.display = '';
+    } else if (cacheTag) {
+      cacheTag.textContent = '(live)';
+      cacheTag.style.display = '';
+    }
   } catch (e) {
     grid.innerHTML = `<div class="signal-loading"><span>⚠ SCAN ERROR — ${escHtml(e.message || 'server unreachable')}</span></div>`;
     setEl('signalCount', '0 SIGNALS');
@@ -2970,6 +2979,18 @@ function openOrderModal(ticker, side, price) {
   updateOmBrokerStatus();
   setOrderModalMode(_omMode);
   document.addEventListener('keydown', _omEscHandler);
+  // Phase 7: fetch suggested qty from broker when in live mode
+  if (_omMode === 'live' && _omTicker) {
+    fetchJSON(`/api/real/suggested_qty?ticker=${encodeURIComponent(_omTicker)}&confidence=70`)
+      .then(d => {
+        if (d.suggested_qty > 0 && _omTicker === d.ticker) {
+          const qtyEl = el('omQty');
+          if (qtyEl) { qtyEl.value = d.suggested_qty; updateOmEstimate(); }
+          const hint = el('omSuggestedHint');
+          if (hint) hint.textContent = `Suggested: ${d.suggested_qty} (${d.allocation_pct}% of buying power)`;
+        }
+      }).catch(() => {});
+  }
 }
 
 function closeOrderModal() {
@@ -3062,6 +3083,13 @@ async function submitOrderModal() {
   if (!_omTicker) { if (res) res.innerHTML = `<span style="color:var(--red)">Enter a ticker</span>`; return; }
   if (!qty || qty <= 0) { if (res) res.innerHTML = `<span style="color:var(--red)">Enter quantity</span>`; return; }
 
+  // Phase 8: confirmation modal for live orders
+  if (_omMode === 'live' && !_omConfirmed) {
+    _showTradeConfirmation(_omTicker, _omSide, qty, price);
+    return;
+  }
+  _omConfirmed = false;  // reset for next order
+
   const endpoint = _omMode === 'live' ? '/api/real/order' : '/api/paper/order';
   const modeLabel = _omMode === 'live' ? 'LIVE' : 'PAPER';
   if (btn) { btn.textContent = '⌛ PLACING...'; btn.disabled = true; }
@@ -3080,6 +3108,39 @@ async function submitOrderModal() {
       btn.textContent = _omMode === 'live' ? '◆ PLACE LIVE ORDER' : '▷ PLACE PAPER ORDER';
     }
   }
+}
+
+let _omConfirmed = false;
+
+function _showTradeConfirmation(ticker, side, qty, price) {
+  const overlay = el('tradeConfirmOverlay');
+  if (!overlay) { _omConfirmed = true; submitOrderModal(); return; }
+  const estCost = (price || _omQuotePrice) * qty;
+  el('tcTicker').textContent = ticker;
+  el('tcSide').textContent = side;
+  el('tcSide').style.color = side === 'BUY' ? 'var(--green)' : 'var(--red)';
+  el('tcQty').textContent = qty;
+  el('tcEstCost').textContent = estCost > 0 ? `~$${estCost.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}` : '—';
+  // Show drawdown warning if available
+  const warn = el('tcDrawdownWarn');
+  if (warn && STATE.health && STATE.health.drawdown_pct > 5) {
+    warn.textContent = `⚠ Current drawdown: ${STATE.health.drawdown_pct.toFixed(1)}%`;
+    warn.style.display = '';
+  } else if (warn) {
+    warn.style.display = 'none';
+  }
+  overlay.style.display = 'flex';
+}
+
+function confirmTradeYes() {
+  el('tradeConfirmOverlay').style.display = 'none';
+  _omConfirmed = true;
+  submitOrderModal();
+}
+
+function confirmTradeNo() {
+  el('tradeConfirmOverlay').style.display = 'none';
+  _omConfirmed = false;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -4595,15 +4656,19 @@ async function _loadCcLiveEquityCurve() {
 async function loadCcRecommendations() {
   const list = el('ccRecsList');
   if (!list) return;
-  list.innerHTML = '<div style="padding:14px;color:var(--text-muted);font-size:10px;animation:blink 1s infinite">⟳ RUNNING AI ANALYSIS…</div>';
+  // Phase 9: loading state on ANALYSE button
+  const btn = el('ccAnalyseBtn');
+  if (btn) { btn.textContent = '⌛ ANALYSING...'; btn.disabled = true; btn.classList.add('loading'); }
+  list.innerHTML = '<div style="padding:14px;color:var(--text-muted);font-size:10px"><div class="loading-spinner" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:8px"></div>RUNNING AI ANALYSIS…</div>';
   try {
     const d = await fetchJSON('/api/recommendations?n=6');
     renderCcRecommendations(d.recommendations || [], d.regime_label || '');
-    // Update regime badge in stats bar
     const rb = el('ccRegimeBadge');
     if (rb && d.regime_label) rb.textContent = d.regime_label.toUpperCase();
   } catch(e) {
     list.innerHTML = `<div style="padding:14px;color:var(--red);font-size:10px">ANALYSIS FAILED: ${escHtml(e.message)}</div>`;
+  } finally {
+    if (btn) { btn.textContent = '↻ ANALYSE'; btn.disabled = false; btn.classList.remove('loading'); }
   }
 }
 

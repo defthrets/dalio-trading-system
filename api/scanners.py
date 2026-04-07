@@ -16,7 +16,7 @@ from loguru import logger
 
 from api.utils import (
     _cache_get, _cache_set, _get_prices, _fmt_vol, _EXECUTOR,
-    YF_AVAILABLE, _is_crypto,
+    YF_AVAILABLE, _is_crypto, SOURCE_LIMITER,
 )
 from api.state import WATCHLIST
 
@@ -481,6 +481,14 @@ async def _scan_yfinance(tickers: list, market: str) -> list:
     """Fetch OHLCV for non-crypto markets."""
     if not YF_AVAILABLE:
         return []
+    await SOURCE_LIMITER.acquire("yfinance")
+    try:
+        return await _scan_yfinance_inner(tickers, market)
+    finally:
+        SOURCE_LIMITER.release("yfinance")
+
+
+async def _scan_yfinance_inner(tickers: list, market: str) -> list:
     import yfinance as yf
     loop = asyncio.get_running_loop()
     results: dict = {}
@@ -576,6 +584,14 @@ async def _scan_yfinance(tickers: list, market: str) -> list:
 
 async def _scan_coingecko(tickers: list) -> list:
     """Fetch crypto prices: CoinGecko free API first, yfinance fallback."""
+    await SOURCE_LIMITER.acquire("coingecko")
+    try:
+        return await _scan_coingecko_inner(tickers)
+    finally:
+        SOURCE_LIMITER.release("coingecko")
+
+
+async def _scan_coingecko_inner(tickers: list) -> list:
     cg_ids: list = []
     id_to_ticker: dict = {}
     for t in tickers:
