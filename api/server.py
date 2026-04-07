@@ -760,6 +760,7 @@ class PaperPortfolio:
                 "exit_price": round(price, 4), "pnl": round(pnl, 2),
                 "pnl_pct": round(pnl / (pos["entry_price"] * close_qty) * 100, 2),
                 "fees": round(buy_fee + sell_fee, 2),
+                "entry_time": pos.get("entry_time", ts),
                 "timestamp": ts,
             })
             pos["qty"] -= close_qty
@@ -3799,6 +3800,97 @@ async def place_paper_order(payload: dict):
 @app.get("/api/paper/history")
 async def get_paper_history():
     return {"trades": PAPER.history[:100], "total": len(PAPER.history)}
+
+
+@app.get("/api/paper/analytics")
+async def get_paper_analytics():
+    """Compute trade performance metrics from actual closed-trade history."""
+    trades = PAPER.history
+    total_trades = len(trades)
+
+    if total_trades == 0:
+        return {
+            "total_trades": 0, "winning_trades": 0, "losing_trades": 0,
+            "win_rate": 0.0, "avg_win": 0.0, "avg_loss": 0.0,
+            "profit_factor": 0.0, "avg_holding_period_hours": 0.0,
+            "largest_win": 0.0, "largest_loss": 0.0,
+            "total_pnl": 0.0, "total_fees": 0.0, "expectancy": 0.0,
+            "max_consecutive_wins": 0, "max_consecutive_losses": 0,
+        }
+
+    wins  = [t for t in trades if t["pnl"] > 0]
+    losses = [t for t in trades if t["pnl"] < 0]
+
+    winning_trades = len(wins)
+    losing_trades  = len(losses)
+    win_rate       = round(winning_trades / total_trades * 100, 2)
+
+    avg_win  = round(sum(t["pnl"] for t in wins) / winning_trades, 2) if winning_trades else 0.0
+    avg_loss = round(sum(t["pnl"] for t in losses) / losing_trades, 2) if losing_trades else 0.0
+
+    sum_wins   = sum(t["pnl"] for t in wins)
+    sum_losses = abs(sum(t["pnl"] for t in losses))
+    if sum_losses > 0:
+        profit_factor = round(sum_wins / sum_losses, 2)
+    else:
+        profit_factor = 999.0 if sum_wins > 0 else 0.0
+
+    # Average holding period
+    holding_hours = []
+    for t in trades:
+        entry_t = t.get("entry_time")
+        exit_t  = t.get("timestamp")
+        if entry_t and exit_t:
+            try:
+                dt_entry = datetime.fromisoformat(entry_t)
+                dt_exit  = datetime.fromisoformat(exit_t)
+                holding_hours.append((dt_exit - dt_entry).total_seconds() / 3600)
+            except (ValueError, TypeError):
+                pass
+    avg_holding_period_hours = round(sum(holding_hours) / len(holding_hours), 2) if holding_hours else 0.0
+
+    largest_win  = round(max((t["pnl"] for t in trades), default=0.0), 2)
+    largest_loss = round(min((t["pnl"] for t in trades), default=0.0), 2)
+
+    total_pnl  = round(sum(t["pnl"] for t in trades), 2)
+    total_fees = round(sum(t.get("fees", 0) for t in trades), 2)
+
+    # Expectancy: (win_rate_frac * avg_win) - ((1 - win_rate_frac) * abs(avg_loss))
+    wr_frac    = winning_trades / total_trades
+    expectancy = round((wr_frac * avg_win) - ((1 - wr_frac) * abs(avg_loss)), 2)
+
+    # Consecutive streaks (history is newest-first, reverse for chronological order)
+    sorted_trades = list(reversed(trades))
+    max_con_wins = max_con_losses = cur_wins = cur_losses = 0
+    for t in sorted_trades:
+        if t["pnl"] > 0:
+            cur_wins += 1
+            cur_losses = 0
+        elif t["pnl"] < 0:
+            cur_losses += 1
+            cur_wins = 0
+        else:
+            cur_wins = cur_losses = 0
+        max_con_wins   = max(max_con_wins, cur_wins)
+        max_con_losses = max(max_con_losses, cur_losses)
+
+    return {
+        "total_trades": total_trades,
+        "winning_trades": winning_trades,
+        "losing_trades": losing_trades,
+        "win_rate": win_rate,
+        "avg_win": avg_win,
+        "avg_loss": avg_loss,
+        "profit_factor": profit_factor,
+        "avg_holding_period_hours": avg_holding_period_hours,
+        "largest_win": largest_win,
+        "largest_loss": largest_loss,
+        "total_pnl": total_pnl,
+        "total_fees": total_fees,
+        "expectancy": expectancy,
+        "max_consecutive_wins": max_con_wins,
+        "max_consecutive_losses": max_con_losses,
+    }
 
 
 @app.post("/api/paper/close")
