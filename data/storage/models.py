@@ -151,6 +151,48 @@ class BacktestResult(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class Trade(Base):
+    """Closed paper-trade record."""
+    __tablename__ = "trades"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ticker = Column(String(20), nullable=False, index=True)
+    side = Column(String(10), nullable=False)   # BUY / SELL
+    qty = Column(Float, nullable=False)
+    price = Column(Float, nullable=False)
+    fees = Column(Float, default=0)
+    pnl = Column(Float, nullable=True)          # only on SELL
+    pnl_pct = Column(Float, nullable=True)
+    entry_price = Column(Float, nullable=True)
+    exit_price = Column(Float, nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
+    __table_args__ = (Index("ix_trades_ticker_ts", "ticker", "timestamp"),)
+
+
+class EquitySnapshot(Base):
+    """Point-in-time portfolio equity value."""
+    __tablename__ = "equity_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    value = Column(Float, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class PaperPosition(Base):
+    """Current open paper-trading position (mirrors PAPER.positions dict)."""
+    __tablename__ = "paper_positions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ticker = Column(String(20), nullable=False, unique=True, index=True)
+    side = Column(String(10), nullable=False)
+    qty = Column(Float, nullable=False)
+    entry_price = Column(Float, nullable=False)
+    stop_loss = Column(Float, nullable=True)
+    take_profit = Column(Float, nullable=True)
+    entry_time = Column(DateTime, default=datetime.utcnow)
+
+
 class PriceCache(Base):
     __tablename__ = "price_cache"
 

@@ -33,7 +33,7 @@ sys.path.insert(0, str(ROOT))
 
 try:
     from config.settings import get_settings
-    from data.storage.models import init_db
+    from data.storage.models import init_db, get_session, Trade, EquitySnapshot, PaperPosition
     SETTINGS_AVAILABLE = True
 except ImportError:
     SETTINGS_AVAILABLE = False
@@ -585,6 +585,8 @@ def _save_paper_state() -> None:
         PAPER_STATE_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     except Exception as exc:
         logger.warning(f"Failed to save paper state: {exc}")
+    # Also sync open positions to DB
+    _db_sync_positions(PAPER.positions)
 
 
 def _load_paper_state() -> None:
@@ -601,6 +603,143 @@ def _load_paper_state() -> None:
                     f"{len(PAPER.positions)} positions, {len(PAPER.equity_history)} equity pts")
     except Exception as exc:
         logger.warning(f"Failed to load paper state (starting fresh): {exc}")
+
+
+# ─────────────────────────────────────────────
+# Database persistence helpers (dual write)
+# ─────────────────────────────────────────────
+
+def _db_save_trade(trade_dict: dict) -> None:
+    """Insert a single closed-trade record into the DB."""
+    if not SETTINGS_AVAILABLE:
+        return
+    try:
+        session = get_session()
+        ts = trade_dict.get("timestamp")
+        if isinstance(ts, str):
+            try:
+                ts = datetime.fromisoformat(ts)
+            except (ValueError, TypeError):
+                ts = datetime.utcnow()
+        record = Trade(
+            ticker=trade_dict.get("ticker", ""),
+            side=trade_dict.get("side", "SELL"),
+            qty=float(trade_dict.get("qty", 0)),
+            price=float(trade_dict.get("exit_price", trade_dict.get("price", 0))),
+            fees=float(trade_dict.get("fees", 0)),
+            pnl=trade_dict.get("pnl"),
+            pnl_pct=trade_dict.get("pnl_pct"),
+            entry_price=trade_dict.get("entry_price"),
+            exit_price=trade_dict.get("exit_price"),
+            timestamp=ts,
+        )
+        session.add(record)
+        session.commit()
+        session.close()
+    except Exception as exc:
+        logger.warning(f"DB: failed to save trade: {exc}")
+
+
+def _db_save_equity_snapshot(value: float) -> None:
+    """Insert a single equity data-point into the DB."""
+    if not SETTINGS_AVAILABLE:
+        return
+    try:
+        session = get_session()
+        record = EquitySnapshot(value=value, timestamp=datetime.utcnow())
+        session.add(record)
+        session.commit()
+        session.close()
+    except Exception as exc:
+        logger.warning(f"DB: failed to save equity snapshot: {exc}")
+
+
+def _db_get_trades(limit: int = 100) -> list[dict]:
+    """Query recent closed trades from DB, newest first."""
+    if not SETTINGS_AVAILABLE:
+        return []
+    try:
+        session = get_session()
+        rows = (
+            session.query(Trade)
+            .order_by(Trade.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+        result = []
+        for r in rows:
+            result.append({
+                "id": r.id,
+                "ticker": r.ticker,
+                "side": r.side,
+                "qty": r.qty,
+                "price": r.price,
+                "fees": r.fees,
+                "pnl": r.pnl,
+                "pnl_pct": r.pnl_pct,
+                "entry_price": r.entry_price,
+                "exit_price": r.exit_price,
+                "timestamp": r.timestamp.isoformat() if r.timestamp else None,
+            })
+        session.close()
+        return result
+    except Exception as exc:
+        logger.warning(f"DB: failed to get trades: {exc}")
+        return []
+
+
+def _db_get_equity_curve(limit: int = 2000) -> list[dict]:
+    """Query equity history from DB, oldest first (for charting)."""
+    if not SETTINGS_AVAILABLE:
+        return []
+    try:
+        session = get_session()
+        rows = (
+            session.query(EquitySnapshot)
+            .order_by(EquitySnapshot.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+        # Reverse so oldest is first (for chart rendering)
+        result = [
+            {"t": r.timestamp.isoformat() if r.timestamp else None, "v": r.value}
+            for r in reversed(rows)
+        ]
+        session.close()
+        return result
+    except Exception as exc:
+        logger.warning(f"DB: failed to get equity curve: {exc}")
+        return []
+
+
+def _db_sync_positions(positions: dict) -> None:
+    """Replace all paper_positions rows with current in-memory state."""
+    if not SETTINGS_AVAILABLE:
+        return
+    try:
+        session = get_session()
+        session.query(PaperPosition).delete()
+        for ticker, pos in positions.items():
+            entry_time = pos.get("entry_time")
+            if isinstance(entry_time, str):
+                try:
+                    entry_time = datetime.fromisoformat(entry_time)
+                except (ValueError, TypeError):
+                    entry_time = datetime.utcnow()
+            record = PaperPosition(
+                ticker=ticker,
+                side=pos.get("side", "LONG"),
+                qty=float(pos.get("qty", 0)),
+                entry_price=float(pos.get("entry_price", 0)),
+                stop_loss=pos.get("stop_loss"),
+                take_profit=pos.get("take_profit"),
+                entry_time=entry_time,
+            )
+            session.add(record)
+        session.commit()
+        session.close()
+    except Exception as exc:
+        logger.warning(f"DB: failed to sync positions: {exc}")
 
 
 def _load_real_equity() -> list:
@@ -932,6 +1071,10 @@ async def _check_stop_loss_take_profit():
             PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
             PAPER.equity_history = PAPER.equity_history[-2000:]
             _save_paper_state()
+            # DB: persist trade + equity snapshot
+            if PAPER.history:
+                _db_save_trade(PAPER.history[0])
+            _db_save_equity_snapshot(current_equity)
         # Alert + broadcast
         pnl = PAPER.history[0]["pnl"] if PAPER.history else 0
         level_str = f"{triggered} hit"
@@ -2813,7 +2956,11 @@ async def portfolio_health():
 
 @app.get("/api/portfolio/equity_history")
 async def equity_history():
-    return {"history": STATE.equity_history}
+    # Try DB first, fall back to in-memory STATE
+    db_curve = _db_get_equity_curve(limit=2000)
+    if db_curve:
+        return {"history": db_curve, "source": "db"}
+    return {"history": STATE.equity_history, "source": "json"}
 
 
 @app.get("/api/signals")
@@ -3568,6 +3715,9 @@ async def _run_cmd(message: str) -> dict:
             qty = PAPER.positions[tkr]["qty"]
             result = PAPER.place_order(tkr, "SELL", qty, float(price))
             _save_paper_state()
+            # DB: persist trade
+            if PAPER.history:
+                _db_save_trade(PAPER.history[0])
         await WS_MANAGER.broadcast({"type":"PAPER_CLOSE","data":result})
         pnl = result.get("pnl", PAPER.history[0]["pnl"] if PAPER.history else 0)
         return {"type":"close","message":(
@@ -3771,9 +3921,14 @@ async def _run_cmd(message: str) -> dict:
                                            stop_loss=_sl_val, take_profit=_tp_val)
                 _tks = list(PAPER.positions.keys())
                 _prc = await _prices_for_positions(_tks) if _tks else {}
-                PAPER.equity_history.append({"t":datetime.utcnow().isoformat(),"v":PAPER.total_value(_prc)})
+                _eq_val_cli = PAPER.total_value(_prc)
+                PAPER.equity_history.append({"t":datetime.utcnow().isoformat(),"v":_eq_val_cli})
                 PAPER.equity_history = PAPER.equity_history[-2000:]
                 _save_paper_state()
+                # DB: persist trade (SELL) + equity snapshot
+                if side == "SELL" and PAPER.history:
+                    _db_save_trade(PAPER.history[0])
+                _db_save_equity_snapshot(_eq_val_cli)
             await WS_MANAGER.broadcast({"type":"PAPER_ORDER","data":result})
             return {"type":"order","message":(
                 f"Order placed: {side} {qty} {tkr} @ ${price:.4f}\n"
@@ -4015,6 +4170,10 @@ async def place_paper_order(payload: dict):
         PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
         PAPER.equity_history = PAPER.equity_history[-2000:]
         _save_paper_state()
+        # DB: persist trade (SELL) + equity snapshot
+        if side == "SELL" and PAPER.history:
+            _db_save_trade(PAPER.history[0])
+        _db_save_equity_snapshot(current_equity)
 
     # ── Update circuit breaker with new equity ──
     if CIRCUIT_BREAKER is not None:
@@ -4036,7 +4195,11 @@ async def place_paper_order(payload: dict):
 
 @app.get("/api/paper/history")
 async def get_paper_history():
-    return {"trades": PAPER.history[:100], "total": len(PAPER.history)}
+    # Try DB first, fall back to in-memory JSON
+    db_trades = _db_get_trades(limit=100)
+    if db_trades:
+        return {"trades": db_trades, "total": len(db_trades), "source": "db"}
+    return {"trades": PAPER.history[:100], "total": len(PAPER.history), "source": "json"}
 
 
 @app.get("/api/paper/analytics")
@@ -4145,9 +4308,14 @@ async def close_paper_position(payload: dict):
 
         _tickers = list(PAPER.positions.keys())
         _prices  = await _prices_for_positions(_tickers) if _tickers else {}
-        PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": PAPER.total_value(_prices)})
+        _eq_val = PAPER.total_value(_prices)
+        PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": _eq_val})
         PAPER.equity_history = PAPER.equity_history[-2000:]
         _save_paper_state()
+        # DB: persist trade + equity snapshot
+        if PAPER.history:
+            _db_save_trade(PAPER.history[0])
+        _db_save_equity_snapshot(_eq_val)
 
     await WS_MANAGER.broadcast({"type": "PAPER_CLOSE", "data": result})
     return result
@@ -4731,11 +4899,15 @@ async def get_paper_equity_curve():
                 last60 = closes[-60:]
                 pos_perf[tkr] = [round((p / entry - 1) * 100, 2) for p in last60]
 
+    # Use DB equity curve if available, fall back to in-memory JSON
+    db_curve = _db_get_equity_curve(limit=2000)
+    curve = db_curve if db_curve else PAPER.equity_history
     return {
-        "equity_curve": PAPER.equity_history,
-        "count": len(PAPER.equity_history),
+        "equity_curve": curve,
+        "count": len(curve),
         "position_performance": pos_perf,
         "starting_cash": PAPER_STARTING_CASH,
+        "source": "db" if db_curve else "json",
     }
 
 
