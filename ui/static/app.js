@@ -2314,6 +2314,7 @@ function _applyStoredTheme() {
     const btn = document.querySelector(`[data-theme="${s.theme}"]`);
     if (btn) setTheme(s.theme, btn);
   }
+  _updateThemeToggleBtn(s.theme || 'cyber');
 }
 
 // ─── Save general settings ─────────────────────────────────
@@ -5829,9 +5830,38 @@ window.setTheme = function(name, btn) {
   document.querySelectorAll('.sett-theme-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   _saveSetting('theme', name);
+  _updateThemeToggleBtn(name);
   pushAlert('SETTINGS', `Theme set to ${name.toUpperCase()}`, 'info');
 };
 
+// ═══════════════════════════════════════════════════════════
+// LIGHT / DARK MODE TOGGLE (header button)
+// ═══════════════════════════════════════════════════════════
+
+function toggleLightDark() {
+  const current = _loadSettings().theme || 'cyber';
+  const isLight = current === 'light';
+  // Toggle: if currently light → go to previous dark theme (or default 'cyber'), else → light
+  const prevDark = localStorage.getItem('dalios_prev_dark_theme') || 'cyber';
+  const next = isLight ? prevDark : 'light';
+  // Remember the dark theme so we can restore it
+  if (!isLight) localStorage.setItem('dalios_prev_dark_theme', current);
+  const btn = document.querySelector(`[data-theme="${next}"]`);
+  setTheme(next, btn);
+}
+
+function _updateThemeToggleBtn(themeName) {
+  const icon = document.getElementById('themeIcon');
+  const label = document.getElementById('themeLabel');
+  if (!icon || !label) return;
+  if (themeName === 'light') {
+    icon.textContent = '☀️';
+    label.textContent = 'LIGHT';
+  } else {
+    icon.textContent = '🌙';
+    label.textContent = 'DARK';
+  }
+}
 
 // ═══════════════════════════════════════════════════════════
 // TUTORIAL RESTART FROM SETTINGS
