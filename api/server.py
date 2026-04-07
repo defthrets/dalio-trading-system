@@ -12,6 +12,7 @@ import random
 import sys
 import threading
 import time
+import aiohttp
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional
@@ -746,7 +747,7 @@ class CoinbaseBroker(BrokerBase):
 class CoinSpotBroker(BrokerBase):
     """CoinSpot Australian crypto exchange — REST API v2."""
     name = "coinspot"
-    _BASE = "https://www.coinspot.com.au"
+    _BASE = "https://www.coinspot.com.au/api/v2"
 
     def __init__(self):
         self._api_key:    Optional[str] = None
@@ -788,7 +789,7 @@ class CoinSpotBroker(BrokerBase):
         logger.info("CoinSpot connected")
 
     async def get_account(self) -> dict:
-        result  = await self._post("/api/v2/my/balances", {})
+        result  = await self._post("/ro/my/balances", {})
         bals    = result.get("balances", [])
         total   = sum(float(v.get("audbalance", 0))
                       for b in bals if isinstance(b, dict)
@@ -799,16 +800,16 @@ class CoinSpotBroker(BrokerBase):
     async def place_order(self, ticker: str, side: str, qty: float,
                           price: Optional[float] = None) -> dict:
         coin     = ticker.replace("-AUD", "").replace("-USD", "").upper()
-        endpoint = ("/api/v2/my/coin/buy/now"
+        endpoint = ("/my/buy/now"
                     if side.upper() in ("BUY", "LONG")
-                    else "/api/v2/my/coin/sell/now")
+                    else "/my/sell/now")
         result   = await self._post(endpoint, {"cointype": coin, "amount": qty, "amounttype": "coin"})
         return {"order_id": result.get("id", f"cs_{int(datetime.utcnow().timestamp())}"),
                 "ticker": ticker, "side": side, "qty": qty, "price": price,
                 "timestamp": datetime.utcnow().isoformat()}
 
     async def get_positions(self) -> list:
-        result = await self._post("/api/v2/my/balances", {})
+        result = await self._post("/ro/my/balances", {})
         out    = []
         for b in result.get("balances", []):
             if not isinstance(b, dict): continue
@@ -823,7 +824,7 @@ class CoinSpotBroker(BrokerBase):
         return out
 
     async def get_history(self) -> list:
-        result = await self._post("/api/v2/my/orders/completed", {})
+        result = await self._post("/ro/my/orders/completed", {})
         rows   = []
         for o in result.get("buyorders", []):
             rows.append({"ticker": f"{o.get('cointype','')}-AUD", "side": "BUY",
@@ -3855,6 +3856,13 @@ async def broker_connect(payload: dict):
     broker: BrokerBase = _BROKER_MAP[broker_name]()
     try:
         kwargs = {k: v for k, v in payload.items() if k != "broker"}
+        # Auto-load saved credentials if not provided
+        if not kwargs:
+            creds = _load_broker_creds()
+            if broker_name in creds:
+                kwargs = creds[broker_name]
+                logger.info(f"Auto-loaded saved credentials for {broker_name}: {list(kwargs.keys())}")
+        logger.info(f"Connecting to {broker_name} with kwargs: {list(kwargs.keys())}")
         await broker.connect(**kwargs)
     except ImportError as e:
         raise HTTPException(422, str(e))

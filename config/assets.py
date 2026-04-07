@@ -56,6 +56,24 @@ DEFENSIVE_ETFS = {
     "VAS.AX": {"name": "Vanguard Australian Shares", "type": "equity_etf", "quadrant_bias": "rising_growth"},
 }
 
+# Cryptocurrencies (CoinSpot AUD pairs)
+CRYPTO = {
+    "BTC-AUD": {"name": "Bitcoin", "type": "crypto", "quadrant_bias": "rising_inflation"},
+    "ETH-AUD": {"name": "Ethereum", "type": "crypto", "quadrant_bias": "rising_growth"},
+    "LTC-AUD": {"name": "Litecoin", "type": "crypto", "quadrant_bias": "rising_inflation"},
+    "SOL-AUD": {"name": "Solana", "type": "crypto", "quadrant_bias": "rising_growth"},
+    "XRP-AUD": {"name": "Ripple", "type": "crypto", "quadrant_bias": "rising_growth"},
+    "ADA-AUD": {"name": "Cardano", "type": "crypto", "quadrant_bias": "rising_growth"},
+    "DOGE-AUD": {"name": "Dogecoin", "type": "crypto", "quadrant_bias": "rising_growth"},
+    "BNB-AUD": {"name": "Binance Coin", "type": "crypto", "quadrant_bias": "rising_growth"},
+    "AVAX-AUD": {"name": "Avalanche", "type": "crypto", "quadrant_bias": "rising_growth"},
+    "DOT-AUD": {"name": "Polkadot", "type": "crypto", "quadrant_bias": "rising_growth"},
+    "LINK-AUD": {"name": "Chainlink", "type": "crypto", "quadrant_bias": "rising_growth"},
+    "MATIC-AUD": {"name": "Polygon", "type": "crypto", "quadrant_bias": "rising_growth"},
+    "SHIB-AUD": {"name": "Shiba Inu", "type": "crypto", "quadrant_bias": "rising_growth"},
+    "UNI-AUD": {"name": "Uniswap", "type": "crypto", "quadrant_bias": "rising_growth"},
+    "ATOM-AUD": {"name": "Cosmos", "type": "crypto", "quadrant_bias": "rising_growth"},
+}
 
 def get_all_assets() -> dict:
     """Return the full asset universe."""
@@ -63,6 +81,7 @@ def get_all_assets() -> dict:
     all_assets.update(ASX_EQUITIES)
     all_assets.update(COMMODITIES)
     all_assets.update(DEFENSIVE_ETFS)
+    all_assets.update(CRYPTO)
     return all_assets
 
 
