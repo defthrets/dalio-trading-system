@@ -23,6 +23,7 @@ data/broker_credentials.json.backup
 data/paper_portfolio.json
 data/real_equity.json
 data/paper_config.json
+data/trading_mode.json
 
 # Environment files with secrets
 .env

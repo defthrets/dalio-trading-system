@@ -61,7 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initNotifications();
   initTradingMode();
   loadWatchlist();
-  _applyStoredTheme();
   _restoreSound();
   _restoreFilters();
   loadAll();
@@ -2316,38 +2315,12 @@ function requestNotificationPermission() {
   }, 1500);
 }
 
-// ─── Theme switcher ────────────────────────────────────────
-const _THEMES = {
-  cyber:  { primary: '#00d4ff', green: '#00cc44', red: '#ff3355', amber: '#ffb000', bg0: '#04080e' },
-  matrix: { primary: '#00cc44', green: '#00cc44', red: '#ff3355', amber: '#ccff00', bg0: '#000d02' },
-  void:   { primary: '#c084fc', green: '#a3e635', red: '#f87171', amber: '#fbbf24', bg0: '#06020f' },
-  amber:  { primary: '#ffb000', green: '#00cc44', red: '#ff3355', amber: '#ffb000', bg0: '#0c0700' },
-};
-
-function setTheme(name, btn) {
-  const t = _THEMES[name]; if (!t) return;
-  const root = document.documentElement;
-  root.style.setProperty('--primary',      t.primary);
-  root.style.setProperty('--green',        t.green);
-  root.style.setProperty('--red',          t.red);
-  root.style.setProperty('--amber',        t.amber);
-  root.style.setProperty('--bg-0',         t.bg0);
-  root.style.setProperty('--primary-glow', t.primary + '40');
-  root.style.setProperty('--green-glow',   t.green + '40');
-  document.querySelectorAll('.sett-theme-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  _saveSetting('theme', name);
-  pushAlert('SETTINGS', `Theme set to ${name.toUpperCase()}`, 'info');
-}
-
-function _applyStoredTheme() {
-  const s = _loadSettings();
-  if (s.theme && s.theme !== 'cyber') {
-    const btn = document.querySelector(`[data-theme="${s.theme}"]`);
-    if (btn) setTheme(s.theme, btn);
-  }
-  _updateThemeToggleBtn(s.theme || 'cyber');
-}
+// ─── Theme (fixed: light mode) ────────────────────────────
+// Theme switching removed — light mode is the permanent theme.
+// Legacy stubs kept so any remaining onclick refs don't throw.
+const _THEMES = {};
+function setTheme() {}
+function _applyStoredTheme() {}
 
 // ─── Restore signal filters + slider from localStorage ────
 function _restoreFilters() {
@@ -5838,96 +5811,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
-// ═══════════════════════════════════════════════════════════
-// LIGHT THEME
-// ═══════════════════════════════════════════════════════════
-
-// Add light theme to _THEMES
-_THEMES.light = {
-  primary: '#d97706', green: '#16a34a', red: '#dc2626', amber: '#d97706', bg0: '#f5f5f4',
-  text1: '#1c1917', text2: '#78716c', textMuted: '#a8a29e',
-  bgPanel: '#ffffff', border: '#e7e5e4', borderHi: '#d6d3d1',
-};
-
-const _origSetTheme = setTheme;
-window.setTheme = function(name, btn) {
-  const t = _THEMES[name]; if (!t) return;
-  const root = document.documentElement;
-  root.style.setProperty('--primary', t.primary);
-  root.style.setProperty('--green', t.green);
-  root.style.setProperty('--red', t.red);
-  root.style.setProperty('--amber', t.amber);
-  root.style.setProperty('--bg-0', t.bg0);
-  root.style.setProperty('--primary-glow', t.primary + '40');
-  root.style.setProperty('--green-glow', t.green + '40');
-
-  // Light theme overrides
-  if (name === 'light') {
-    root.style.setProperty('--bg-1', '#eeeeee');
-    root.style.setProperty('--bg-2', '#e5e5e5');
-    root.style.setProperty('--bg-panel', '#ffffff');
-    root.style.setProperty('--bg-panel-2', '#fafaf9');
-    root.style.setProperty('--bg-card', '#ffffff');
-    root.style.setProperty('--bg-row-hover', '#f5f5f4');
-    root.style.setProperty('--text-primary', '#1c1917');
-    root.style.setProperty('--text-1', '#292524');
-    root.style.setProperty('--text-2', '#78716c');
-    root.style.setProperty('--text-muted', '#a8a29e');
-    root.style.setProperty('--border', '#e7e5e4');
-    root.style.setProperty('--border-hi', '#d6d3d1');
-    root.classList.add('light-theme');
-  } else {
-    // Reset to dark defaults
-    root.style.setProperty('--bg-1', '#0a0a0a');
-    root.style.setProperty('--bg-2', '#141414');
-    root.style.setProperty('--bg-panel', '#0d0d0d');
-    root.style.setProperty('--bg-panel-2', '#111111');
-    root.style.setProperty('--bg-card', '#0f0f0f');
-    root.style.setProperty('--bg-row-hover', '#1a1a1a');
-    root.style.setProperty('--text-primary', '#f0e8e0');
-    root.style.setProperty('--text-1', '#e0d6cc');
-    root.style.setProperty('--text-2', '#8a7e72');
-    root.style.setProperty('--text-muted', '#5a524a');
-    root.style.setProperty('--border', '#222222');
-    root.style.setProperty('--border-hi', '#333333');
-    root.classList.remove('light-theme');
-  }
-
-  document.querySelectorAll('.sett-theme-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  _saveSetting('theme', name);
-  _updateThemeToggleBtn(name);
-  pushAlert('SETTINGS', `Theme set to ${name.toUpperCase()}`, 'info');
-};
-
-// ═══════════════════════════════════════════════════════════
-// LIGHT / DARK MODE TOGGLE (header button)
-// ═══════════════════════════════════════════════════════════
-
-function toggleLightDark() {
-  const current = _loadSettings().theme || 'cyber';
-  const isLight = current === 'light';
-  // Toggle: if currently light → go to previous dark theme (or default 'cyber'), else → light
-  const prevDark = localStorage.getItem('dalios_prev_dark_theme') || 'cyber';
-  const next = isLight ? prevDark : 'light';
-  // Remember the dark theme so we can restore it
-  if (!isLight) localStorage.setItem('dalios_prev_dark_theme', current);
-  const btn = document.querySelector(`[data-theme="${next}"]`);
-  setTheme(next, btn);
-}
-
-function _updateThemeToggleBtn(themeName) {
-  const icon = document.getElementById('themeIcon');
-  const label = document.getElementById('themeLabel');
-  if (!icon || !label) return;
-  if (themeName === 'light') {
-    icon.textContent = '☀️';
-    label.textContent = 'LIGHT';
-  } else {
-    icon.textContent = '🌙';
-    label.textContent = 'DARK';
-  }
-}
+// (Theme switching removed — light mode is permanent)
 
 // ═══════════════════════════════════════════════════════════
 // TUTORIAL RESTART FROM SETTINGS

@@ -1246,8 +1246,31 @@ class WebullBroker(GenericCryptoBroker):
 
 
 ACTIVE_BROKER: Optional[BrokerBase] = None
-TRADING_MODE:  str = "paper"           # "paper" | "live"
 REAL_EQUITY_CURVE: list = []
+
+# ─── Trading mode persistence ─────────────────
+_MODE_FILE = Path(__file__).parent.parent / "data" / "trading_mode.json"
+
+def _load_trading_mode() -> str:
+    """Load persisted trading mode, default to 'paper'."""
+    try:
+        if _MODE_FILE.exists():
+            import json as _json
+            return _json.loads(_MODE_FILE.read_text()).get("mode", "paper")
+    except Exception:
+        pass
+    return "paper"
+
+def _save_trading_mode(mode: str):
+    """Persist trading mode to disk."""
+    try:
+        import json as _json
+        _MODE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _MODE_FILE.write_text(_json.dumps({"mode": mode}))
+    except Exception:
+        pass
+
+TRADING_MODE: str = _load_trading_mode()
 
 
 # ─────────────────────────────────────────────
@@ -2522,12 +2545,8 @@ async def root():
 
 @app.get("/api/status")
 async def get_status():
-    mode = "PAPER"
-    if SETTINGS_AVAILABLE:
-        try:
-            mode = get_settings().trading_mode.upper()
-        except Exception:
-            pass
+    # Use the in-memory TRADING_MODE (set by POST /api/mode) — not the .env default
+    mode = TRADING_MODE.upper() if TRADING_MODE else "PAPER"
     return {
         "status": "PAUSED" if getattr(STATE, 'paused', False) else "OPERATIONAL",
         "mode": mode,
@@ -4335,6 +4354,7 @@ async def set_trading_mode(payload: dict):
         raise HTTPException(400, "mode must be 'paper' or 'live'")
     broker_connected = ACTIVE_BROKER is not None and ACTIVE_BROKER.is_connected()
     TRADING_MODE = new_mode
+    _save_trading_mode(new_mode)
     if new_mode == "live" and not broker_connected:
         STATE.add_alert("SYSTEM", "⚠ LIVE MODE — No broker configured. Trading halted until broker connected.", "WARNING")
     else:

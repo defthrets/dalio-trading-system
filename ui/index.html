@@ -81,11 +81,6 @@
     <div class="header-right">
       <div class="live-clock" id="liveClock"></div>
 
-      <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleLightDark()" title="Toggle light/dark mode" aria-label="Toggle light or dark mode">
-        <span class="theme-icon" id="themeIcon">🌙</span>
-        <span class="theme-label" id="themeLabel">DARK</span>
-      </button>
-
       <button class="sound-toggle-btn" id="soundToggleBtn" onclick="toggleSound()" title="Toggle sound alerts" aria-label="Toggle sound alerts">
         🔇 SOUND
       </button>
@@ -2097,14 +2092,7 @@
               </div>
             </div>
 
-            <div class="sett-section-label" style="margin-top:16px">THEME</div>
-            <div class="sett-theme-row">
-              <button class="sett-theme-btn active" data-theme="cyber" onclick="setTheme('cyber',this)">⚡ CYBER</button>
-              <button class="sett-theme-btn" data-theme="matrix" onclick="setTheme('matrix',this)">◈ MATRIX</button>
-              <button class="sett-theme-btn" data-theme="void" onclick="setTheme('void',this)">◉ VOID</button>
-              <button class="sett-theme-btn" data-theme="amber" onclick="setTheme('amber',this)">⬡ AMBER</button>
-              <button class="sett-theme-btn" data-theme="light" onclick="setTheme('light',this)">☀ LIGHT</button>
-            </div>
+            <!-- Theme is fixed to light mode -->
 
             <button class="btn-primary btn--full" style="margin-top:14px" onclick="saveUiSettings()">💾 SAVE UI SETTINGS</button>
           </div>
