@@ -67,9 +67,9 @@
       </div>
       <div class="header-divider"></div>
       <div class="system-badges">
-        <span class="badge badge--green" id="statusBadge" onclick="toggleSystemStatus()" title="Click to pause/resume trading">● OPERATIONAL</span>
+        <button class="badge badge--green" id="statusBadge" onclick="toggleSystemStatus()" title="Click to pause/resume trading" aria-label="Toggle system status">● OPERATIONAL</button>
         <div class="mode-dropdown" id="modeDropdown">
-          <span class="badge badge--red" id="modeBadge" onclick="toggleModeDropdown()" title="Click to switch LIVE / PAPER trading mode">MODE: LIVE ▾</span>
+          <button class="badge badge--red" id="modeBadge" onclick="toggleModeDropdown()" title="Click to switch LIVE / PAPER trading mode" aria-label="Toggle trading mode" aria-haspopup="true">MODE: LIVE ▾</button>
           <div class="mode-dropdown-menu hidden" id="modeDropdownMenu">
             <button class="mode-drop-opt" id="modeOptPaper" onclick="selectMode('paper')">📄 PAPER</button>
             <button class="mode-drop-opt" id="modeOptLive"  onclick="selectMode('live')">🔴 LIVE</button>
@@ -81,7 +81,7 @@
     <div class="header-right">
       <div class="live-clock" id="liveClock"></div>
 
-      <button class="sound-toggle-btn" id="soundToggleBtn" onclick="toggleSound()" title="Toggle sound alerts">
+      <button class="sound-toggle-btn" id="soundToggleBtn" onclick="toggleSound()" title="Toggle sound alerts" aria-label="Toggle sound alerts">
         🔇 SOUND
       </button>
       <div class="ws-indicator" id="wsIndicator" title="WebSocket Status">
@@ -104,44 +104,44 @@
   <!-- ═══════════════════════════════════════════════
        NAVIGATION TABS
   ═══════════════════════════════════════════════ -->
-  <nav class="tab-nav">
-    <button class="tab-btn active" data-tab="command-center">
-      <span class="tab-icon">⬡</span> COMMAND CENTER
+  <nav class="tab-nav" role="tablist" aria-label="Main navigation">
+    <button class="tab-btn active" data-tab="command-center" role="tab" aria-selected="true" aria-controls="tab-command-center">
+      <span class="tab-icon" aria-hidden="true">⬡</span> COMMAND CENTER
     </button>
-    <button class="tab-btn" data-tab="live-trading">
-      <span class="tab-icon">◆</span> LIVE TRADING
+    <button class="tab-btn" data-tab="live-trading" role="tab" aria-selected="false" aria-controls="tab-live-trading">
+      <span class="tab-icon" aria-hidden="true">◆</span> LIVE TRADING
     </button>
-    <button class="tab-btn" data-tab="signal-ops">
-      <span class="tab-icon">⟁</span> SIGNAL OPS
+    <button class="tab-btn" data-tab="signal-ops" role="tab" aria-selected="false" aria-controls="tab-signal-ops">
+      <span class="tab-icon" aria-hidden="true">⟁</span> SIGNAL OPS
     </button>
-    <button class="tab-btn" data-tab="intel-center">
-      <span class="tab-icon">◉</span> INTEL CENTER
+    <button class="tab-btn" data-tab="intel-center" role="tab" aria-selected="false" aria-controls="tab-intel-center">
+      <span class="tab-icon" aria-hidden="true">◉</span> INTEL CENTER
     </button>
-    <button class="tab-btn" data-tab="holy-grail">
-      <span class="tab-icon">⬢</span> HOLY GRAIL
+    <button class="tab-btn" data-tab="holy-grail" role="tab" aria-selected="false" aria-controls="tab-holy-grail">
+      <span class="tab-icon" aria-hidden="true">⬢</span> HOLY GRAIL
     </button>
-    <button class="tab-btn" data-tab="risk-matrix">
-      <span class="tab-icon">△</span> RISK MATRIX
+    <button class="tab-btn" data-tab="risk-matrix" role="tab" aria-selected="false" aria-controls="tab-risk-matrix">
+      <span class="tab-icon" aria-hidden="true">△</span> RISK MATRIX
     </button>
-    <button class="tab-btn" data-tab="backtest-lab">
-      <span class="tab-icon">◈</span> BACKTEST LAB
+    <button class="tab-btn" data-tab="backtest-lab" role="tab" aria-selected="false" aria-controls="tab-backtest-lab">
+      <span class="tab-icon" aria-hidden="true">◈</span> BACKTEST LAB
     </button>
-    <button class="tab-btn" data-tab="asx-scanner">
-      <span class="tab-icon">▣</span> ASX
+    <button class="tab-btn" data-tab="asx-scanner" role="tab" aria-selected="false" aria-controls="tab-asx-scanner">
+      <span class="tab-icon" aria-hidden="true">▣</span> ASX
     </button>
-    <button class="tab-btn" data-tab="crypto-scanner">
-      <span class="tab-icon">₿</span> CRYPTO
+    <button class="tab-btn" data-tab="crypto-scanner" role="tab" aria-selected="false" aria-controls="tab-crypto-scanner">
+      <span class="tab-icon" aria-hidden="true">₿</span> CRYPTO
     </button>
-    <button class="tab-btn" data-tab="commodities-scanner">
-      <span class="tab-icon">▤</span> COMMODITIES
+    <button class="tab-btn" data-tab="commodities-scanner" role="tab" aria-selected="false" aria-controls="tab-commodities-scanner">
+      <span class="tab-icon" aria-hidden="true">▤</span> COMMODITIES
     </button>
-    <button class="tab-btn" data-tab="paper-trading">
-      <span class="tab-icon">▷</span> PAPER TRADING
+    <button class="tab-btn" data-tab="paper-trading" role="tab" aria-selected="false" aria-controls="tab-paper-trading">
+      <span class="tab-icon" aria-hidden="true">▷</span> PAPER TRADING
     </button>
-    <button class="tab-btn" data-tab="comms-config">
-      <span class="tab-icon">⚙</span> SETTINGS
+    <button class="tab-btn" data-tab="comms-config" role="tab" aria-selected="false" aria-controls="tab-comms-config">
+      <span class="tab-icon" aria-hidden="true">⚙</span> SETTINGS
     </button>
-    <button class="tab-help-btn" id="helpBtn" title="Show tutorial for this page" onclick="openCurrentTutorial()">?</button>
+    <button class="tab-help-btn" id="helpBtn" title="Show tutorial for this page" aria-label="Show tutorial" onclick="openCurrentTutorial()">?</button>
     <button class="search-nav-btn" onclick="openSearch()" title="Search all assets (Ctrl+K)">◎ SEARCH 71 ASSETS <span style="opacity:0.5;font-size:11px;margin-left:4px">Ctrl+K</span></button>
   </nav>
 
@@ -332,7 +332,7 @@
               </div>
             </div>
           </div>
-          <div class="intel-ov-link" onclick="document.querySelector('[data-tab=intel-center]').click()">VIEW FULL INTEL CENTER →</div>
+          <button class="intel-ov-link" onclick="document.querySelector('[data-tab=intel-center]').click()" aria-label="Open Intel Center tab">VIEW FULL INTEL CENTER →</button>
         </div>
 
         <!-- ROW 2 COL 4: Quadrant (compact) -->
@@ -530,7 +530,7 @@
               <label class="ctrl-label">MIN CONFIDENCE</label>
               <input type="range" class="ctrl-slider" id="minConfidence" min="50" max="95" value="50"
                      oninput="document.getElementById('minConfVal').textContent=this.value+'%'" />
-              <span class="ctrl-val" id="minConfVal">60%</span>
+              <span class="ctrl-val" id="minConfVal">50%</span>
             </div>
             <div class="control-group">
               <label class="ctrl-label">SIGNAL TYPE</label>

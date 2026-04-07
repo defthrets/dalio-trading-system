@@ -1,7 +1,22 @@
 /* ═══════════════════════════════════════════════════════════
    DALIOS — Automated Trading Framework
    Orange Terminal UI — Modern & Clean
-   ═══════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════
+
+   Z-INDEX LAYER MAP (documented to prevent stacking conflicts):
+   ────────────────────────────────────────────────────────────
+     2        — hover cells, panel overlays
+     100      — header bar
+     900      — CLI bar
+     6000     — quick positions panel, tutorial launch button
+     7000     — strong signal banner
+     8500     — spot bubble (tutorial tips)
+     9000     — modals (order modal, tutorial overlay)
+     9100     — search modal
+     9998     — noise/scanlines overlays (pointer-events: none)
+     9999     — mode dropdown menu
+     10000    — welcome overlay
+   ──────────────────────────────────────────────────────────── */
 
 /* ─── Variables ─── */
 :root {
@@ -38,7 +53,7 @@
   --text-primary:#f0e8e0;
   --text-1:      #e0d6cc;
   --text-2:      #8a7e72;
-  --text-muted:  #5a524a;
+  --text-muted:  #8a7e72;
 
   /* ── Borders: subtle warm gray ── */
   --border:      #222222;
@@ -129,6 +144,7 @@
 }
 .data-table tbody tr {
   animation: rowSlideIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
+  transition: background 0.2s ease, transform 0.15s ease;
 }
 .data-table tbody tr:nth-child(1)  { animation-delay: 0.02s; }
 .data-table tbody tr:nth-child(2)  { animation-delay: 0.04s; }
@@ -147,9 +163,7 @@
   from { opacity: 0; transform: scale(0.92) translateY(10px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
-.signal-card {
-  animation: cardPopIn 0.35s cubic-bezier(0.22,1,0.36,1) both;
-}
+/* signal-card animation delays (main styles at ~line 1439) */
 .signal-card:nth-child(1)  { animation-delay: 0.03s; }
 .signal-card:nth-child(2)  { animation-delay: 0.08s; }
 .signal-card:nth-child(3)  { animation-delay: 0.13s; }
@@ -175,9 +189,7 @@
 .paper-sig-row:nth-child(n+7) { animation-delay: 0.20s; }
 
 /* ─── Table Row Hover Effects ─── */
-.data-table tbody tr {
-  transition: background 0.2s ease, transform 0.15s ease;
-}
+/* data-table row hover (animation + transition consolidated above) */
 .data-table tbody tr:hover {
   background: var(--bg-row-hover);
   transform: translateX(2px);
@@ -313,9 +325,7 @@ canvas {
 .cc-sb-stat:nth-child(19) { animation-delay: 0.30s; }
 
 /* ─── Signal Card Hover ─── */
-.signal-card {
-  transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.2s ease;
-}
+/* signal-card hover transition (consolidated into main .signal-card rule) */
 .signal-card:hover {
   border-color: rgba(255,140,0,0.45);
   box-shadow: 0 0 8px rgba(255,140,0,0.15), 0 0 20px rgba(255,140,0,0.06);
@@ -925,7 +935,6 @@ a:hover { color: var(--primary); text-decoration: underline; }
   align-items: center;
   height: 100%;
   gap: 0;
-  will-change: transform;
   animation: ticker-scroll 90s linear infinite;   /* fallback; JS overrides with content-aware duration */
 }
 .ticker-strip:hover .ticker-inner { animation-play-state: paused; }
@@ -1427,7 +1436,8 @@ canvas { display: block; max-width: 100%; }
   border-radius: 2px;
   padding: 10px;
   cursor: pointer;
-  transition: all var(--transition);
+  transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.2s ease;
+  animation: cardPopIn 0.35s cubic-bezier(0.22,1,0.36,1) both;
   position: relative;
   overflow: hidden;
 }
@@ -1526,7 +1536,7 @@ canvas { display: block; max-width: 100%; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.opportunity-list { padding: 10px; display: flex; flex-direction: column; gap: 6px; max-height: 480px; overflow-y: auto; }
+/* opportunity-list styles consolidated below */
 .opp-card {
   padding: 8px 10px;
   border: 1px solid var(--border-hi);
@@ -2110,14 +2120,7 @@ canvas { display: block; max-width: 100%; }
   letter-spacing: .5px;
 }
 
-.tutorial-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,.7);
-  z-index: 8000;
-  display: flex; align-items: center; justify-content: center;
-  backdrop-filter: blur(4px);
-}
-.tutorial-overlay.hidden { display: none; }
+/* tutorial-overlay styles consolidated below (line ~2790) */
 .tutorial-box {
   background: var(--bg-panel);
   border: 1px solid var(--primary-dim);
@@ -3306,7 +3309,7 @@ canvas { display: block; max-width: 100%; }
   padding: 12px 14px;
   gap: 10px;
   border-radius: 6px;
-  border: 1px solid var(--border-bright);
+  border: 1px solid var(--border-hi);
   background: var(--bg-1);
 }
 .paper-signal-grid .paper-sig-row:hover {
@@ -4585,7 +4588,7 @@ body.cli-expanded { padding-bottom: 272px; }
   .order-modal { width: 95vw !important; max-width: 95vw !important; }
 
   /* Search modal full width */
-  .search-modal-content { width: 95vw !important; max-width: 95vw !important; }
+  .search-box { width: 95vw !important; max-width: 95vw !important; }
 }
 
 @media (max-width: 640px) {
@@ -4682,7 +4685,7 @@ body.cli-expanded { padding-bottom: 272px; }
   border-color: var(--border);
 }
 
-.light-theme .search-modal-content {
+.light-theme .search-box {
   background: var(--bg-panel);
   border-color: var(--border);
 }

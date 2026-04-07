@@ -8,6 +8,8 @@ Serves the military/hacker UI from /ui/index.html.
 
 import json
 import asyncio
+import base64
+import os
 import random
 import sys
 import threading
@@ -19,7 +21,7 @@ from typing import Optional
 from pathlib import Path
 
 import numpy as np
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -64,6 +66,55 @@ def _cache_set(key: str, val):
         _DATA_CACHE[key] = {"v": val, "t": time.time()}
 
 
+# ── Basic credential obfuscation ────────────────────────
+_CRED_APP_KEY = b"DaLiOs_AlLwEaThEr_2024!"
+
+
+def _xor_bytes(data: bytes, key: bytes) -> bytes:
+    return bytes(b ^ key[i % len(key)] for i, b in enumerate(data))
+
+
+def _encrypt_value(plaintext: str) -> str:
+    """XOR + base64 obfuscation for stored credentials."""
+    xored = _xor_bytes(plaintext.encode("utf-8"), _CRED_APP_KEY)
+    return base64.b64encode(xored).decode("ascii")
+
+
+def _decrypt_value(encoded: str) -> str:
+    """Reverse XOR + base64 obfuscation."""
+    xored = base64.b64decode(encoded.encode("ascii"))
+    return _xor_bytes(xored, _CRED_APP_KEY).decode("utf-8")
+
+
+def _encrypt_creds(creds: dict) -> dict:
+    """Encrypt all string values in a broker credentials dict."""
+    result = {}
+    for broker, data in creds.items():
+        result[broker] = {}
+        for k, v in data.items():
+            if isinstance(v, str):
+                result[broker][k] = {"_enc": _encrypt_value(v)}
+            else:
+                result[broker][k] = v
+    return result
+
+
+def _decrypt_creds(creds: dict) -> dict:
+    """Decrypt all encrypted values in a broker credentials dict."""
+    result = {}
+    for broker, data in creds.items():
+        result[broker] = {}
+        for k, v in data.items():
+            if isinstance(v, dict) and "_enc" in v:
+                try:
+                    result[broker][k] = _decrypt_value(v["_enc"])
+                except Exception:
+                    result[broker][k] = v
+            else:
+                result[broker][k] = v
+    return result
+
+
 def _yf_fetch_sync(tickers: list, period: str = "3mo") -> Optional[dict]:
     """Blocking yfinance download → dict[ticker → list[float]] of closing prices."""
     if not YF_AVAILABLE or not tickers:
@@ -102,13 +153,20 @@ def _yf_fetch_sync(tickers: list, period: str = "3mo") -> Optional[dict]:
         return None
 
 
+_VALID_PERIODS = {'1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max'}
+_VALID_INTERVALS = {'1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1wk', '1mo', '3mo'}
+
+
 async def _get_prices(tickers: list, period: str = "3mo") -> Optional[dict]:
     """Async wrapper around yfinance; caches 5 min. Times out in 12s."""
+    if period not in _VALID_PERIODS:
+        logger.warning(f"Invalid period '{period}', returning empty")
+        return None
     key = f"px_{hash(tuple(sorted(tickers)))}_{period}"
     cached = _cache_get(key)
     if cached is not None:
         return cached
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     try:
         result = await asyncio.wait_for(
             loop.run_in_executor(_EXECUTOR, _yf_fetch_sync, tickers, period),
@@ -168,23 +226,24 @@ async def _get_aud_usd_rate() -> float:
         _AUD_USD_RATE = cached
         return cached
     # Try yfinance first
-    try:
-        loop = asyncio.get_event_loop()
+    if YF_AVAILABLE:
+        try:
+            loop = asyncio.get_running_loop()
 
-        def _fetch_fx():
-            import yfinance as _yf_fx
-            hist = _yf_fx.Ticker("AUDUSD=X").history(period="5d")
-            if hist is not None and not hist.empty and "Close" in hist.columns:
-                return float(hist["Close"].iloc[-1])
-            return None
-        rate = await asyncio.wait_for(
-            loop.run_in_executor(_EXECUTOR, _fetch_fx), timeout=8.0)
-        if rate and 0.3 < rate < 1.2:  # sanity check
-            _AUD_USD_RATE = rate
-            _cache_set("aud_usd_rate", rate)
-            return rate
-    except Exception:
-        pass
+            def _fetch_fx():
+                import yfinance as _yf_fx
+                hist = _yf_fx.Ticker("AUDUSD=X").history(period="5d")
+                if hist is not None and not hist.empty and "Close" in hist.columns:
+                    return float(hist["Close"].iloc[-1])
+                return None
+            rate = await asyncio.wait_for(
+                loop.run_in_executor(_EXECUTOR, _fetch_fx), timeout=8.0)
+            if rate and 0.3 < rate < 1.2:  # sanity check
+                _AUD_USD_RATE = rate
+                _cache_set("aud_usd_rate", rate)
+                return rate
+        except Exception:
+            pass
     # Fallback: CoinGecko BTC price comparison
     try:
         import aiohttp as _aio_fx
@@ -317,6 +376,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Optional API key authentication ─────────────────────
+_DALIOS_API_KEY = os.environ.get("DALIOS_API_KEY")
+
+
+@app.middleware("http")
+async def api_key_middleware(request: Request, call_next):
+    """If DALIOS_API_KEY env var is set, require X-API-Key header on /api/ routes."""
+    if _DALIOS_API_KEY:
+        path = request.url.path
+        if path.startswith("/api/"):
+            provided = request.headers.get("X-API-Key")
+            if provided != _DALIOS_API_KEY:
+                return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key"})
+    return await call_next(request)
+
 
 UI_DIR = ROOT / "ui"
 STATIC_DIR = UI_DIR / "static"
@@ -642,14 +717,14 @@ class IBKRBroker(BrokerBase):
         except ImportError:
             raise ImportError("ib_insync not installed. Run: pip install ib_insync")
         ib = IB()
-        await asyncio.get_event_loop().run_in_executor(_EXECUTOR, lambda: ib.connect(host, int(port), clientId=int(client_id), timeout=10))
+        await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: ib.connect(host, int(port), clientId=int(client_id), timeout=10))
         self._ib = ib
         self._connected = True
         logger.info(f"IBKR connected -- {host}:{port}")
 
     async def get_account(self) -> dict:
         if not self.is_connected(): raise RuntimeError("IBKR not connected")
-        summary = await asyncio.get_event_loop().run_in_executor(_EXECUTOR, self._ib.accountSummary)
+        summary = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._ib.accountSummary)
         vals = {row.tag: row.value for row in summary}
         return {"broker": "ibkr", "account_value": float(vals.get("NetLiquidation", 0)),
                 "buying_power": float(vals.get("BuyingPower", 0)), "cash": float(vals.get("TotalCashValue", 0)), "currency": "AUD"}
@@ -659,19 +734,19 @@ class IBKRBroker(BrokerBase):
         from ib_insync import Stock, MarketOrder, LimitOrder
         contract = Stock(ticker, "SMART", "USD")
         order = LimitOrder(side.upper(), qty, price) if price else MarketOrder(side.upper(), qty)
-        trade = await asyncio.get_event_loop().run_in_executor(_EXECUTOR, self._ib.placeOrder, contract, order)
+        trade = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._ib.placeOrder, contract, order)
         return {"order_id": trade.order.orderId, "ticker": ticker, "side": side, "qty": qty,
                 "price": price, "status": trade.orderStatus.status, "timestamp": datetime.utcnow().isoformat()}
 
     async def get_positions(self) -> list:
         if not self.is_connected(): raise RuntimeError("IBKR not connected")
-        raw = await asyncio.get_event_loop().run_in_executor(_EXECUTOR, self._ib.positions)
+        raw = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._ib.positions)
         return [{"ticker": p.contract.symbol, "qty": p.position, "avg_cost": round(p.avgCost, 4),
                  "market_val": None, "pnl": None, "side": "LONG" if p.position > 0 else "SHORT"} for p in raw]
 
     async def get_history(self) -> list:
         if not self.is_connected(): raise RuntimeError("IBKR not connected")
-        fills = await asyncio.get_event_loop().run_in_executor(_EXECUTOR, self._ib.fills)
+        fills = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._ib.fills)
         return [{"ticker": f.contract.symbol, "side": f.execution.side, "qty": f.execution.shares,
                  "price": f.execution.price, "timestamp": str(f.execution.time)} for f in fills]
 
@@ -700,21 +775,21 @@ class AlpacaBroker(BrokerBase):
         except ImportError:
             raise ImportError("alpaca-trade-api not installed. Run: pip install alpaca-trade-api")
         api = tradeapi.REST(api_key, api_secret, base_url, api_version="v2")
-        await asyncio.get_event_loop().run_in_executor(_EXECUTOR, api.get_account)
+        await asyncio.get_running_loop().run_in_executor(_EXECUTOR, api.get_account)
         self._api = api
         self._connected = True
         logger.info(f"Alpaca connected -- {base_url}")
 
     async def get_account(self) -> dict:
         if not self.is_connected(): raise RuntimeError("Alpaca not connected")
-        acct = await asyncio.get_event_loop().run_in_executor(_EXECUTOR, self._api.get_account)
+        acct = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._api.get_account)
         return {"broker": "alpaca", "account_value": float(acct.portfolio_value),
                 "buying_power": float(acct.buying_power), "cash": float(acct.cash),
                 "currency": "USD", "status": acct.status}
 
     async def place_order(self, ticker: str, side: str, qty: float, price: Optional[float] = None) -> dict:
         if not self.is_connected(): raise RuntimeError("Alpaca not connected")
-        order = await asyncio.get_event_loop().run_in_executor(_EXECUTOR, lambda: self._api.submit_order(
+        order = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._api.submit_order(
             symbol=ticker, qty=qty, side=side.lower(),
             type="limit" if price else "market",
             time_in_force="gtc",
@@ -725,21 +800,21 @@ class AlpacaBroker(BrokerBase):
 
     async def get_positions(self) -> list:
         if not self.is_connected(): raise RuntimeError("Alpaca not connected")
-        raw = await asyncio.get_event_loop().run_in_executor(_EXECUTOR, self._api.list_positions)
+        raw = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._api.list_positions)
         return [{"ticker": p.symbol, "qty": float(p.qty), "avg_cost": float(p.avg_entry_price),
                  "market_val": float(p.market_value), "pnl": float(p.unrealized_pl),
                  "pnl_pct": round(float(p.unrealized_plpc) * 100, 2), "side": p.side} for p in raw]
 
     async def get_history(self) -> list:
         if not self.is_connected(): raise RuntimeError("Alpaca not connected")
-        raw = await asyncio.get_event_loop().run_in_executor(_EXECUTOR, lambda: self._api.list_orders(status="filled", limit=100))
+        raw = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._api.list_orders(status="filled", limit=100))
         return [{"ticker": o.symbol, "side": o.side, "qty": float(o.filled_qty or 0),
                  "price": float(o.filled_avg_price) if o.filled_avg_price else None,
                  "timestamp": o.filled_at.isoformat() if o.filled_at else None} for o in raw]
 
     async def close_position(self, ticker: str) -> dict:
         if not self.is_connected(): raise RuntimeError("Alpaca not connected")
-        order = await asyncio.get_event_loop().run_in_executor(_EXECUTOR, lambda: self._api.close_position(ticker))
+        order = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._api.close_position(ticker))
         return {"order_id": str(order.id), "ticker": ticker, "side": "SELL",
                 "status": order.status, "timestamp": datetime.utcnow().isoformat()}
 
@@ -760,14 +835,14 @@ class BinanceBroker(BrokerBase):
         except ImportError:
             raise ImportError("python-binance not installed. Run: pip install python-binance")
         client = BinanceClient(api_key, api_secret, testnet=testnet)
-        await asyncio.get_event_loop().run_in_executor(_EXECUTOR, client.get_account)
+        await asyncio.get_running_loop().run_in_executor(_EXECUTOR, client.get_account)
         self._client = client
         self._connected = True
         logger.info(f"Binance connected -- {'testnet' if testnet else 'live'}")
 
     async def get_account(self) -> dict:
         if not self.is_connected(): raise RuntimeError("Binance not connected")
-        acct = await asyncio.get_event_loop().run_in_executor(_EXECUTOR, self._client.get_account)
+        acct = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._client.get_account)
         usdt = next((float(b["free"]) + float(b["locked"]) for b in acct.get("balances", []) if b["asset"] == "USDT"), 0.0)
         free_usdt = next((float(b["free"]) for b in acct.get("balances", []) if b["asset"] == "USDT"), 0.0)
         return {"broker": "binance", "account_value": usdt, "buying_power": free_usdt, "cash": free_usdt, "currency": "USDT"}
@@ -779,13 +854,13 @@ class BinanceBroker(BrokerBase):
         if price:
             params["price"] = str(price)
             params["timeInForce"] = "GTC"
-        order = await asyncio.get_event_loop().run_in_executor(_EXECUTOR, lambda: self._client.create_order(**params))
+        order = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._client.create_order(**params))
         return {"order_id": str(order["orderId"]), "ticker": ticker, "side": side, "qty": qty,
                 "price": price, "status": order.get("status"), "timestamp": datetime.utcnow().isoformat()}
 
     async def get_positions(self) -> list:
         if not self.is_connected(): raise RuntimeError("Binance not connected")
-        acct = await asyncio.get_event_loop().run_in_executor(_EXECUTOR, self._client.get_account)
+        acct = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._client.get_account)
         return [{"ticker": b["asset"], "qty": float(b["free"]) + float(b["locked"]),
                  "avg_cost": None, "market_val": None, "pnl": None, "side": "LONG"}
                 for b in acct.get("balances", [])
@@ -793,7 +868,7 @@ class BinanceBroker(BrokerBase):
 
     async def get_history(self) -> list:
         if not self.is_connected(): raise RuntimeError("Binance not connected")
-        orders = await asyncio.get_event_loop().run_in_executor(_EXECUTOR, lambda: self._client.get_all_orders(symbol="BTCUSDT", limit=50))
+        orders = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._client.get_all_orders(symbol="BTCUSDT", limit=50))
         return [{"ticker": o["symbol"], "side": o["side"], "qty": float(o["executedQty"]),
                  "price": float(o["price"]) if o["price"] else None, "timestamp": str(o["time"])}
                 for o in orders if o["status"] == "FILLED"]
@@ -822,14 +897,14 @@ class CoinbaseBroker(BrokerBase):
         except ImportError:
             raise ImportError("coinbase-advanced-py not installed. Run: pip install coinbase-advanced-py")
         client = RESTClient(api_key=api_key, api_secret=api_secret)
-        await asyncio.get_event_loop().run_in_executor(_EXECUTOR, client.get_accounts)
+        await asyncio.get_running_loop().run_in_executor(_EXECUTOR, client.get_accounts)
         self._client = client
         self._connected = True
         logger.info("Coinbase Advanced Trade connected")
 
     async def get_account(self) -> dict:
         if not self.is_connected(): raise RuntimeError("Coinbase not connected")
-        accounts = await asyncio.get_event_loop().run_in_executor(_EXECUTOR, self._client.get_accounts)
+        accounts = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._client.get_accounts)
         acct_list = accounts.accounts if hasattr(accounts, "accounts") else []
         cash = sum(float(getattr(a, "available_balance", type("", (), {"value": "0"})).value)
                    for a in acct_list if getattr(a, "currency", "") in ("USD", "USDC"))
@@ -842,7 +917,7 @@ class CoinbaseBroker(BrokerBase):
         client_order_id = str(uuid.uuid4())
         cfg = {"limit_limit_gtc": {"base_size": str(qty), "limit_price": str(price)}} if price \
               else {"market_market_ioc": {"base_size": str(qty)}}
-        order = await asyncio.get_event_loop().run_in_executor(
+        order = await asyncio.get_running_loop().run_in_executor(
             _EXECUTOR, lambda: self._client.create_order(
                 client_order_id=client_order_id, product_id=product_id, side=side.upper(), order_configuration=cfg))
         return {"order_id": getattr(order, "order_id", client_order_id), "ticker": ticker, "side": side,
@@ -851,7 +926,7 @@ class CoinbaseBroker(BrokerBase):
 
     async def get_positions(self) -> list:
         if not self.is_connected(): raise RuntimeError("Coinbase not connected")
-        accounts = await asyncio.get_event_loop().run_in_executor(_EXECUTOR, self._client.get_accounts)
+        accounts = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._client.get_accounts)
         acct_list = accounts.accounts if hasattr(accounts, "accounts") else []
         return [{"ticker": getattr(a, "currency", ""), "qty": float(getattr(a, "available_balance", type("", (), {"value": "0"})).value),
                  "avg_cost": None, "market_val": None, "pnl": None, "side": "LONG"}
@@ -860,7 +935,7 @@ class CoinbaseBroker(BrokerBase):
 
     async def get_history(self) -> list:
         if not self.is_connected(): raise RuntimeError("Coinbase not connected")
-        orders = await asyncio.get_event_loop().run_in_executor(_EXECUTOR, lambda: self._client.list_orders(order_status=["FILLED"], limit=50))
+        orders = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._client.list_orders(order_status=["FILLED"], limit=50))
         return [{"ticker": getattr(o, "product_id", ""), "side": getattr(o, "side", ""),
                  "qty": float(getattr(o, "filled_size", 0) or 0), "price": float(getattr(o, "average_filled_price", 0) or 0),
                  "timestamp": str(getattr(o, "created_time", ""))} for o in (orders.orders if hasattr(orders, "orders") else [])]
@@ -918,13 +993,13 @@ class CoinSpotBroker(BrokerBase):
         headers   = {"Content-Type": "application/json",
                      "key":  self._api_key,
                      "sign": sig}
-        logger.debug(f"CoinSpot POST {endpoint} body={body[:200]}")
+        logger.debug(f"CoinSpot POST {endpoint} body=[REDACTED]")
         timeout = aiohttp.ClientTimeout(total=12)
         async with aiohttp.ClientSession(timeout=timeout) as sess:
             async with sess.post(f"{self._BASE}{endpoint}", data=body, headers=headers) as resp:
                 result = await resp.json(content_type=None)
                 if result.get("status") == "error":
-                    logger.warning(f"CoinSpot error on {endpoint}: {result.get('message','unknown')} | body={body[:200]}")
+                    logger.warning(f"CoinSpot error on {endpoint}: {result.get('message','unknown')} | body=[REDACTED]")
                     raise RuntimeError(f"CoinSpot error: {result.get('message','unknown')}")
                 return result
 
@@ -1423,9 +1498,9 @@ async def _gen_signals(n: int = 12) -> list[dict]:
 
     # Crypto fallback: if yfinance returned nothing for crypto, try individual fetches
     crypto_missing = [t for t in crypto_cands if t not in prices_map]
-    if crypto_missing:
+    if crypto_missing and YF_AVAILABLE:
         logger.info(f"Crypto signal fallback: fetching {len(crypto_missing)} tickers individually")
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         import yfinance as _yf_sig
 
         def _fetch_single_crypto(tkr):
@@ -1715,8 +1790,8 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
 
     # Crypto individual fallback for any that bulk missed
     crypto_missing = [t for t in cand_by_mkt.get("crypto", []) if t not in history_map]
-    if crypto_missing:
-        loop = asyncio.get_event_loop()
+    if crypto_missing and YF_AVAILABLE:
+        loop = asyncio.get_running_loop()
         import yfinance as _yf_opp
 
         def _fetch_one_opp(tkr):
@@ -2089,7 +2164,7 @@ async def _fetch_real_news() -> list[dict]:
     Returns headlines scored by Dalio quadrant + sentiment.
     Falls back to HEADLINE_POOL if all feeds fail.
     """
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     articles: list[dict] = []
 
     def _parse_one_feed(feed_name: str, url: str) -> list[dict]:
@@ -2857,9 +2932,67 @@ async def _live_price(ticker: str) -> Optional[float]:
 
 
 async def _prices_for_positions(tickers: list) -> dict:
-    """Return {ticker: price} for all open position tickers."""
+    """Return {ticker: price} for all open position tickers.
+    Batch-fetches from Binance (crypto) and yfinance (others) first,
+    then falls back to individual lookups for any that failed.
+    """
+    if not tickers:
+        return {}
     result = {}
-    for t in tickers:
+
+    # 1. Batch-fetch crypto prices from Binance
+    crypto_tickers = [t for t in tickers if t.endswith("-USD") or t.endswith("-AUD")]
+    if crypto_tickers:
+        bn_prices = await _fetch_binance_prices()
+        for t in crypto_tickers:
+            lookup = t.replace("-AUD", "-USD") if t.endswith("-AUD") else t
+            if lookup in bn_prices:
+                result[t] = bn_prices[lookup]
+
+    # 2. Batch-fetch remaining tickers via yfinance download
+    remaining = [t for t in tickers if t not in result]
+    if remaining and YF_AVAILABLE:
+        try:
+            loop = asyncio.get_running_loop()
+
+            def _batch_yf():
+                import yfinance as _yf_batch
+                try:
+                    raw = _yf_batch.download(
+                        remaining if len(remaining) > 1 else remaining[0],
+                        period="5d", auto_adjust=True, progress=False,
+                        threads=True, timeout=10,
+                    )
+                    if raw is None or raw.empty:
+                        return {}
+                    import pandas as _pd_batch
+                    if isinstance(raw.columns, _pd_batch.MultiIndex):
+                        close = raw["Close"] if "Close" in raw.columns.get_level_values(0) else None
+                    elif "Close" in raw.columns:
+                        close = _pd_batch.DataFrame({remaining[0]: raw["Close"]})
+                    else:
+                        return {}
+                    if close is None or close.empty:
+                        return {}
+                    prices = {}
+                    for t in remaining:
+                        if t in close.columns:
+                            col = close[t].dropna()
+                            if not col.empty:
+                                prices[t] = float(col.iloc[-1])
+                    return prices
+                except Exception:
+                    return {}
+
+            batch_prices = await asyncio.wait_for(
+                loop.run_in_executor(_EXECUTOR, _batch_yf), timeout=12.0)
+            result.update(batch_prices)
+        except (asyncio.TimeoutError, Exception):
+            pass
+
+    # 3. Individual fallback for any tickers still missing
+    still_missing = [t for t in tickers if t not in result]
+    for t in still_missing:
         p = await _live_price(t)
         if p is not None:
             result[t] = p
@@ -3650,8 +3783,10 @@ async def _scan_yfinance(tickers: list, market: str) -> list:
     Strategy: bulk yf.download first (fast), then individual Ticker.history() fallback
     for any ticker that bulk missed — handles new yfinance multi-index DataFrame format.
     """
+    if not YF_AVAILABLE:
+        return []
     import yfinance as yf
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     results: dict = {}   # ticker -> (price, change_pct, volume)
 
     # ── 1. Bulk download attempt ──────────────────────────────────────────
@@ -3810,7 +3945,7 @@ async def _scan_coingecko(tickers: list) -> list:
     # ── CoinGecko API (async aiohttp) ─────────────────────────────────────
     if cg_ids:
         try:
-            connector = aiohttp.TCPConnector(ssl=False, limit=5)
+            connector = aiohttp.TCPConnector(ssl=True, limit=5)
             timeout   = aiohttp.ClientTimeout(total=20)
             headers   = {"User-Agent": "DALIOS/1.0", "Accept": "application/json"}
             async with aiohttp.ClientSession(connector=connector, timeout=timeout, headers=headers) as session:
@@ -3977,7 +4112,7 @@ async def chart_data(ticker: str, period: str = "6mo", interval: str = "1d"):
     if cached is not None:
         return cached
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     def _fetch():
         try:
@@ -4220,14 +4355,16 @@ _BROKER_CREDS_FILE = DATA_DIR / "broker_credentials.json"
 def _load_broker_creds() -> dict:
     if _BROKER_CREDS_FILE.exists():
         try:
-            return json.loads(_BROKER_CREDS_FILE.read_text())
+            raw = json.loads(_BROKER_CREDS_FILE.read_text())
+            return _decrypt_creds(raw)
         except Exception:
             return {}
     return {}
 
 
 def _save_broker_creds(creds: dict):
-    _BROKER_CREDS_FILE.write_text(json.dumps(creds, indent=2))
+    encrypted = _encrypt_creds(creds)
+    _BROKER_CREDS_FILE.write_text(json.dumps(encrypted, indent=2))
 
 
 @app.post("/api/broker/save")
@@ -4467,6 +4604,11 @@ async def websocket_endpoint(ws: WebSocket):
         heartbeat = 0
         while True:
             await asyncio.sleep(15)
+            # Detect client disconnect early
+            try:
+                await asyncio.wait_for(ws.receive_text(), timeout=0.1)
+            except asyncio.TimeoutError:
+                pass  # No message from client -- expected
             heartbeat += 1
             await ws.send_json({
                 "type": "HEARTBEAT",

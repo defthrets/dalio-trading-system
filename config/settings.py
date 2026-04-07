@@ -12,17 +12,17 @@ from pydantic import Field
 class Settings(BaseSettings):
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
-    # --- Market Data APIs ---
-    alpha_vantage_api_key: str = Field(default="", alias="ALPHA_VANTAGE_API_KEY")
-    itick_api_key: str = Field(default="", alias="ITICK_API_KEY")
+    # --- Market Data APIs (None = not configured, logs warning instead of silent fail) ---
+    alpha_vantage_api_key: str | None = Field(default=None, alias="ALPHA_VANTAGE_API_KEY")
+    itick_api_key: str | None = Field(default=None, alias="ITICK_API_KEY")
 
     # --- Macro Economic Data ---
-    eodhd_api_key: str = Field(default="", alias="EODHD_API_KEY")
-    trading_economics_api_key: str = Field(default="", alias="TRADING_ECONOMICS_API_KEY")
+    eodhd_api_key: str | None = Field(default=None, alias="EODHD_API_KEY")
+    trading_economics_api_key: str | None = Field(default=None, alias="TRADING_ECONOMICS_API_KEY")
 
     # --- News APIs ---
-    finnhub_api_key: str = Field(default="", alias="FINNHUB_API_KEY")
-    newsapi_api_key: str = Field(default="", alias="NEWSAPI_API_KEY")
+    finnhub_api_key: str | None = Field(default=None, alias="FINNHUB_API_KEY")
+    newsapi_api_key: str | None = Field(default=None, alias="NEWSAPI_API_KEY")
 
     # --- Notifications ---
     discord_webhook_url: str = Field(default="", alias="DISCORD_WEBHOOK_URL")

@@ -1,29 +1,29 @@
 # ─── Dalios Trading System — Runtime Dependencies ───────────────────
-fastapi>=0.110.0
-uvicorn[standard]>=0.27.0
-python-multipart>=0.0.9
-numpy>=1.25.0
-pandas>=1.5.0
-yfinance>=0.2.40
-requests>=2.31.0
-aiohttp>=3.9.0
-loguru>=0.7.2
-feedparser>=6.0.0
+fastapi>=0.110.0,<1.0.0
+uvicorn[standard]>=0.27.0,<1.0.0
+python-multipart>=0.0.9,<1.0.0
+numpy>=1.25.0,<3.0.0
+pandas>=1.5.0,<3.0.0
+yfinance>=0.2.40,<1.0.0
+requests>=2.31.0,<3.0.0
+aiohttp>=3.9.0,<4.0.0
+loguru>=0.7.2,<1.0.0
+feedparser>=6.0.0,<7.0.0
 
 # ─── Configuration & Database ────────────────────────────────────────
-pydantic>=2.0.0
-pydantic-settings>=2.0.0
-sqlalchemy>=2.0.0
+pydantic>=2.0.0,<3.0.0
+pydantic-settings>=2.0.0,<3.0.0
+sqlalchemy>=2.0.0,<3.0.0
 
 # ─── Technical Analysis & ML ─────────────────────────────────────────
-ta>=0.11.0
-transformers>=4.30.0
-torch>=2.0.0
-riskfolio-lib>=6.0.0
+ta>=0.11.0,<1.0.0
+transformers>=4.30.0,<5.0.0
+torch>=2.0.0,<3.0.0
+riskfolio-lib>=6.0.0,<7.0.0
 
 # ─── Scheduling ─────────────────────────────────────────────────────
-apscheduler>=3.10.0
-python-dateutil>=2.8.0
+apscheduler>=3.10.0,<4.0.0
+python-dateutil>=2.8.0,<3.0.0
 
 # ─── Broker integrations (install whichever you use) ─────────────────
 # Binance — crypto spot/futures trading

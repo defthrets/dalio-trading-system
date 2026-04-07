@@ -11,6 +11,13 @@ let wsReconnectTimer = null;
 let charts = {};
 let selectedSignal = null;
 
+// ─── XSS escape helper ───────────────────────────────────
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/'/g,'&#39;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ─── Guards ───────────────────────────────────────────────
+let _loadHealthInFlight = false;
+let _searchDebounce = null;
+
 // ─── Global state cache ───────────────────────────────────
 const STATE = {
   status:    null,
@@ -58,12 +65,13 @@ document.addEventListener('DOMContentLoaded', () => {
   loadAll();
   loadMarketSummary();
   setTimeout(initWelcomeTutorial, 1500);  // Show welcome popup after initial load
-  setInterval(loadAll, 30_000);           // Refresh all data every 30s
-  setInterval(updateClock, 1000);
-  setInterval(loadHealth, 10_000);        // Health every 10s
-  setInterval(loadMarketSummary, 60_000); // Ticker strip every 60s
-  setInterval(pollLivePnl, 15_000);       // Live P&L every 15s (global)
-  setInterval(autoRefreshNews, 300_000);  // Live news refresh every 5 min
+  window._intervals = [];
+  window._intervals.push(setInterval(loadAll, 30_000));           // Refresh all data every 30s
+  window._intervals.push(setInterval(updateClock, 1000));
+  window._intervals.push(setInterval(loadHealth, 10_000));        // Health every 10s
+  window._intervals.push(setInterval(loadMarketSummary, 60_000)); // Ticker strip every 60s
+  window._intervals.push(setInterval(pollLivePnl, 15_000));       // Live P&L every 15s (global)
+  window._intervals.push(setInterval(autoRefreshNews, 300_000));  // Live news refresh every 5 min
 });
 
 // ─── Tab Navigation ───────────────────────────────────────
@@ -194,6 +202,7 @@ function handleWsMessage(msg) {
 
 function setWsState(state) {
   const dot = document.querySelector('.ws-dot');
+  if (!dot) return;
   dot.className = 'ws-dot ' + (state === 'connected' ? 'connected' : state === 'error' ? 'error' : '');
 }
 
@@ -235,11 +244,13 @@ async function loadStatus() {
     document.getElementById('uptimeBadge').textContent = `UPTIME: ${formatUptime(d.uptime_seconds)}`;
     const cfgMode = document.getElementById('cfgMode');
     if (cfgMode) cfgMode.value = d.mode.toLowerCase();
-  } catch {}
+  } catch (e) { console.debug('loadStatus failed:', e); }
 }
 
 // ─── Health ───────────────────────────────────────────────
 async function loadHealth() {
+  if (_loadHealthInFlight) return;
+  _loadHealthInFlight = true;
   try {
     const d = await fetchJSON('/api/portfolio/health');
     applyHealth(d);
@@ -251,7 +262,7 @@ async function loadHealth() {
       const hist = await fetchJSON('/api/portfolio/equity_history');
       updateEquityChart(hist.history);
     }
-  } catch {}
+  } catch (e) { console.debug('loadHealth failed:', e); } finally { _loadHealthInFlight = false; }
 }
 
 function applyHealth(d) {
@@ -336,7 +347,7 @@ async function loadQuadrant() {
     const d = await fetchJSON('/api/quadrant');
     STATE.quadrant = d;
     applyQuadrant(d);
-  } catch {}
+  } catch (e) { console.debug('loadQuadrant failed:', e); }
 }
 
 function applyQuadrant(d) {
@@ -648,7 +659,7 @@ function signalCardHTML(s) {
         <span class="sc-ticker">${s.ticker.replace('-USD','')}</span>
         <span class="sc-action ${s.action}">${actionVerb(s.action)}</span>
         ${srcBadge}
-        <button class="sc-trade-btn" onclick="event.stopPropagation();openOrderModal('${s.ticker}','${['BUY','LONG'].includes(s.action)?'BUY':'SELL'}',${s.price||0})" title="Open order form">◆ TRADE</button>
+        <button class="sc-trade-btn" onclick="event.stopPropagation();openOrderModal('${escHtml(s.ticker)}','${['BUY','LONG'].includes(s.action)?'BUY':'SELL'}',${s.price||0})" title="Open order form">◆ TRADE</button>
       </div>
       <div class="sc-price">
         <strong style="font-size:13px">${fmtSignalPrice(s)}</strong>
@@ -759,8 +770,8 @@ function renderOpportunities(opps, meta = {}) {
         ${reasons.map(r => `<div class="opp-reason-line">▸ ${r}</div>`).join('')}
       </div>
       <div class="opp-actions">
-        <button class="scan-trade-btn" onclick="event.stopPropagation();scannerOpenTrade('${o.ticker}',${o.price})">▲ TRADE</button>
-        <button class="scan-wl-btn"    onclick="event.stopPropagation();toggleWatchlist('${o.ticker}',this)">☆ WATCH</button>
+        <button class="scan-trade-btn" onclick="event.stopPropagation();scannerOpenTrade('${escHtml(o.ticker)}',${o.price})">▲ TRADE</button>
+        <button class="scan-wl-btn"    onclick="event.stopPropagation();toggleWatchlist('${escHtml(o.ticker)}',this)">☆ WATCH</button>
       </div>
     </div>`;
   }).join('');
@@ -2239,7 +2250,8 @@ function closeSearch() {
 }
 
 function onSearchInput(val) {
-  renderSearchResults(val);
+  clearTimeout(_searchDebounce);
+  _searchDebounce = setTimeout(() => renderSearchResults(val), 150);
 }
 
 function renderSearchResults(q) {
@@ -2444,6 +2456,7 @@ async function fetchPoQuote(ticker) {
   if (res) res.textContent = '⌛ fetching price...';
   try {
     const d = await fetchJSON(`/api/paper/quote?ticker=${encodeURIComponent(ticker)}`);
+    if (_poTicker !== ticker) return; // stale response
     _poPrice  = d.price;
     // Update the input field if the server normalised the ticker (e.g. BTC → BTC-USD)
     if (d.ticker && d.ticker !== ticker) {
@@ -2570,7 +2583,7 @@ function renderPaperSignalList(signals) {
       </div>
       <div class="psr-right">
         <input type="number" class="po-input psr-qty" id="psrQty-${s.ticker}" value="${suggestQty}" min="0.0001" step="any"/>
-        <button class="psr-btn ${isBuy ? 'buy' : 'sell'}" onclick="quickTrade('${s.ticker}',${s.price},'${isBuy ? 'BUY' : 'SELL'}','psrQty-${s.ticker}')">
+        <button class="psr-btn ${isBuy ? 'buy' : 'sell'}" onclick="quickTrade('${escHtml(s.ticker)}',${s.price},'${isBuy ? 'BUY' : 'SELL'}','psrQty-${escHtml(s.ticker)}')">
           ${isBuy ? '▲ BUY' : '▼ SELL'}
         </button>
       </div>
@@ -2609,7 +2622,7 @@ function renderLiveSignalList(signals) {
     const actCol = isBuy ? 'var(--green)' : 'var(--red)';
     const conf = Number(s.confidence) || 0;
     const dalioScore = s.dalio_score != null ? `<span class="psr-conf" title="Dalio Fit">⬡ ${s.dalio_score}%</span>` : '';
-    return `<div class="paper-sig-row" style="cursor:pointer" onclick="openOrderModal('${s.ticker}',${isBuy ? "'BUY'" : "'SELL'"},${s.price})">
+    return `<div class="paper-sig-row" style="cursor:pointer" onclick="openOrderModal('${escHtml(s.ticker)}',${isBuy ? "'BUY'" : "'SELL'"},${s.price})">
       <div class="psr-left">
         <span class="psr-ticker">${s.ticker.replace('-USD','')}</span>
         <span class="psr-action" style="color:${actCol};font-size:11px">${s.action}</span>
@@ -2750,12 +2763,13 @@ async function onOmTickerInput(val) {
   if (!ticker || ticker.length < 1) { if (res) res.innerHTML = ''; return; }
   try {
     const d = await fetchJSON(`/api/paper/quote?ticker=${encodeURIComponent(ticker)}`);
+    if (_omTicker !== ticker) return; // stale response
     _omQuotePrice = d.price || 0;
     if (res && _omQuotePrice > 0) {
       res.innerHTML = `<span style="color:var(--green)">${ticker} — ${fmt$(_omQuotePrice)}</span>`;
     }
     updateOmEstimate();
-  } catch {}
+  } catch (e) { console.debug('onOmTickerInput failed:', e); }
 }
 
 function updateOmEstimate() {
@@ -2925,15 +2939,15 @@ function renderScanner(market, filterText = '', filterSector = '') {
       const nameShort = r.name.length > 20 ? r.name.slice(0,20) + '…' : r.name;
       const wlIcon   = r.in_watchlist ? '★' : '☆';
       const wlCls    = r.in_watchlist ? ' in' : '';
-      return `<div class="scanner-card" onclick="scannerOpenTrade('${ticker}',${r.price})">
+      return `<div class="scanner-card" onclick="scannerOpenTrade('${escHtml(ticker)}',${r.price})">
         <span class="sc-ticker">${dispName}</span>
-        <span class="sc-name" title="${r.name}">${nameShort}</span>
+        <span class="sc-name" title="${escHtml(r.name)}">${nameShort}</span>
         <span class="sc-price">${priceStr}</span>
         ${miniSparkSVG(ticker, r.change_pct)}
         <span class="sc-change ${dir}">${chgStr}</span>
         <span class="sc-actions">
-          <button class="sc-star-btn${wlCls}" onclick="event.stopPropagation();toggleWatchlist('${ticker}',this)">${wlIcon}</button>
-          <button class="sc-trade-btn" onclick="event.stopPropagation();scannerOpenTrade('${ticker}',${r.price})">▶</button>
+          <button class="sc-star-btn${wlCls}" onclick="event.stopPropagation();toggleWatchlist('${escHtml(ticker)}',this)">${wlIcon}</button>
+          <button class="sc-trade-btn" onclick="event.stopPropagation();scannerOpenTrade('${escHtml(ticker)}',${r.price})">▶</button>
         </span>
       </div>`;
     }).join('');
@@ -3661,7 +3675,7 @@ async function loadRealPortfolio() {
       hm.innerHTML = positions.map(p => {
         const pnlPct = p.pnl_pct || 0;
         const bg = pnlPct >= 0 ? `rgba(0,204,68,${Math.min(0.6, pnlPct/10)})` : `rgba(255,34,34,${Math.min(0.6, Math.abs(pnlPct)/10)})`;
-        return `<div class="hm-cell" style="background:${bg}" title="${p.ticker}: ${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%" onclick="openOrderModal('${p.ticker}','SELL',${p.market_val/p.qty||0})">
+        return `<div class="hm-cell" style="background:${bg}" title="${p.ticker}: ${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%" onclick="openOrderModal('${escHtml(p.ticker)}','SELL',${p.market_val/p.qty||0})">
           <span class="hm-ticker">${p.ticker.replace('-USD','').replace('.AX','')}</span>
           <span class="hm-pct" style="color:${pnlPct>=0?'var(--green)':'var(--red)'}">${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}%</span>
         </div>`;
@@ -3676,7 +3690,7 @@ async function loadRealPortfolio() {
       } else {
         body.innerHTML = positions.map(p => {
           const pnlCls = (p.pnl || 0) >= 0 ? 'td-green' : 'td-red';
-          return `<tr style="cursor:pointer" onclick="openOrderModal('${p.ticker}','SELL',${p.market_val/(p.qty||1)})">
+          return `<tr style="cursor:pointer" onclick="openOrderModal('${escHtml(p.ticker)}','SELL',${p.market_val/(p.qty||1)})">
             <td class="td-cyan" style="font-weight:700">${p.ticker}</td>
             <td class="${p.side === 'LONG' || p.side === 'long' ? 'td-green' : 'td-red'}">${p.side?.toUpperCase()}</td>
             <td>${typeof p.qty === 'number' ? (p.qty % 1 === 0 ? p.qty : p.qty.toFixed(4)) : p.qty}</td>
@@ -3684,12 +3698,12 @@ async function loadRealPortfolio() {
             <td>${fmt$(p.market_val || 0)}</td>
             <td class="${pnlCls}">${p.pnl != null ? ((p.pnl >= 0 ? '+' : '') + fmt$(p.pnl)) : '—'}</td>
             <td class="${pnlCls}">${p.pnl_pct != null ? ((p.pnl_pct >= 0 ? '+' : '') + p.pnl_pct.toFixed(2) + '%') : '—'}</td>
-            <td><button class="po-close-btn" onclick="event.stopPropagation();closeLivePosition('${p.ticker}')">✕</button></td>
+            <td><button class="po-close-btn" onclick="event.stopPropagation();closeLivePosition('${escHtml(p.ticker)}')">✕</button></td>
           </tr>`;
         }).join('');
       }
     }
-  } catch {}
+  } catch (e) { console.debug('loadRealPortfolio failed:', e); }
 }
 
 async function loadRealHistory() {
@@ -3717,9 +3731,11 @@ function setLivePoSide(side, btn) {
 
 function onLiveTickerInput(val) {
   _livePoTicker = val.toUpperCase().trim();
+  const queriedTicker = _livePoTicker;
   // Fetch price for estimate
   if (_livePoTicker.length >= 2) {
     fetchJSON(`/api/quote?ticker=${encodeURIComponent(_livePoTicker)}`).then(d => {
+      if (_livePoTicker !== queriedTicker) return; // stale response
       _liveQuotePrice = d.price || 0;
       const qr = el('livePoQuoteResult');
       if (qr && d.price) qr.innerHTML = `<span style="color:var(--cyan)">${_livePoTicker} — ${fmt$(d.price)}</span>`;
@@ -3809,12 +3825,12 @@ function scrollCliOutput() {
   if (out) out.scrollTop = out.scrollHeight;
 }
 
-function cliPrint(text, cls = '') {
+function cliPrint(text, cls = '', isHtml = false) {
   const out = el('cliOutput');
   if (!out) return;
   const div = document.createElement('div');
   div.className = 'cli-msg' + (cls ? ' cli-msg--' + cls : '');
-  div.innerHTML = text;
+  if (isHtml) { div.innerHTML = text; } else { div.textContent = text; }
   out.appendChild(div);
   scrollCliOutput();
 }
@@ -3828,16 +3844,16 @@ async function sendCliCommand() {
   _cliHistIdx = -1;
   _cliHistory.push(cmd);
 
-  cliPrint(`<span class="cli-prompt-echo">DALIOS&gt;</span> ${escHtml(cmd)}`, 'user');
+  cliPrint(`<span class="cli-prompt-echo">DALIOS&gt;</span> ${escHtml(cmd)}`, 'user', true);
 
   // Ensure CLI is open
   if (!_cliOpen) toggleCli();
 
   try {
     const d = await postJSON('/api/ai/chat', { message: cmd });
-    cliPrint(formatCliResponse(d.response || d.reply || d.message || JSON.stringify(d)), 'ai');
+    cliPrint(formatCliResponse(d.response || d.reply || d.message || JSON.stringify(d)), 'ai', true);
   } catch (e) {
-    cliPrint(`<span style="color:var(--red)">✗ ${escHtml(e.message || 'Error')}</span>`, 'error');
+    cliPrint(`<span style="color:var(--red)">✗ ${escHtml(e.message || 'Error')}</span>`, 'error', true);
   }
 }
 
@@ -4339,8 +4355,8 @@ function renderCcRecommendations(recs, regimeLabel) {
         ${riskHtml}
       </div>
       <div class="cc-rec-actions" style="display:none">
-        <button class="scan-trade-btn" onclick="event.stopPropagation();scannerOpenTrade('${r.ticker}',${r.price})">▲ TRADE</button>
-        <button class="scan-wl-btn"    onclick="event.stopPropagation();toggleWatchlist('${r.ticker}',this)">☆ WATCH</button>
+        <button class="scan-trade-btn" onclick="event.stopPropagation();scannerOpenTrade('${escHtml(r.ticker)}',${r.price})">▲ TRADE</button>
+        <button class="scan-wl-btn"    onclick="event.stopPropagation();toggleWatchlist('${escHtml(r.ticker)}',this)">☆ WATCH</button>
       </div>
     </div>`;
   }).join('');
@@ -4614,9 +4630,7 @@ function openTutorial(startIdx) {
   el('tutorialOverlay')?.classList.remove('hidden');
 }
 
-function closeTutorial() {
-  el('tutorialOverlay')?.classList.add('hidden');
-}
+// closeTutorial defined above (calls skipAllSpots)
 
 function nextTutorial() {
   _tutIdx = (_tutIdx + 1) % TUTORIAL_PAGES.length;
@@ -5024,14 +5038,14 @@ function initOpsTerminal() {
   }, 2500);
 
   // Spawn radar blips and signal symbols
-  setInterval(spawnRadarBlip, 3500);
-  setInterval(spawnRadarSignal, 2200);
+  window._intervals.push(setInterval(spawnRadarBlip, 3500));
+  window._intervals.push(setInterval(spawnRadarSignal, 2200));
 
   // Rotate radar status text
-  setInterval(cycleRadarStatus, 3000);
+  window._intervals.push(setInterval(cycleRadarStatus, 3000));
 
   // Speed test telemetry in radar background
-  setInterval(spawnTelemetryLine, 800);
+  window._intervals.push(setInterval(spawnTelemetryLine, 800));
 }
 
 const _RADAR_TICKERS = [
@@ -5055,7 +5069,7 @@ const _RADAR_STATUS_MSGS = [
   () => { const a = _scannerData.asx?.length ?? 0; const c = _scannerData.crypto?.length ?? 0; const m = _scannerData.commodities?.length ?? 0; return `UNIVERSE: ${a} ASX | ${c} CRYPTO | ${m} COMMODITIES`; },
   () => { const all = [...(_scannerData.asx||[]),...(_scannerData.crypto||[]),...(_scannerData.commodities||[])]; const up = all.filter(r=>r.change_pct>0).length; return all.length ? `MARKET PULSE: ${up}/${all.length} ASSETS GREEN (${(up/all.length*100).toFixed(0)}%)` : 'MARKET DATA LOADING'; },
   () => { const c = _scannerData.crypto || []; const top = c[0]; return top ? `CRYPTO LEAD: ${top.ticker.replace('-USD','')} $${Number(top.price).toLocaleString()} ${top.change_pct>=0?'+':''}${top.change_pct}%` : 'CRYPTO FEED STANDBY'; },
-  () => { const a = _scannerData.asx || []; const top = a.sort((x,y)=>y.change_pct-x.change_pct)[0]; return top ? `ASX MOVER: ${top.ticker} ${top.change_pct>=0?'+':''}${top.change_pct}%` : 'ASX FEED STANDBY'; },
+  () => { const a = _scannerData.asx || []; const top = [...a].sort((x,y)=>y.change_pct-x.change_pct)[0]; return top ? `ASX MOVER: ${top.ticker} ${top.change_pct>=0?'+':''}${top.change_pct}%` : 'ASX FEED STANDBY'; },
   // System health
   () => `UPTIME: ${((performance.now()/1000/60)).toFixed(0)} MIN | MEM: ${(performance.memory?.usedJSHeapSize/1024/1024)?.toFixed(0) ?? '?'}MB`,
   () => `WEBSOCKET: ${STATE._wsConnected ? 'CONNECTED' : 'DISCONNECTED'} | MODE: ${_tradingMode?.toUpperCase() ?? 'PAPER'}`,
@@ -5231,7 +5245,7 @@ function toggleSystemStatus() {
     playBeep(660, 0.1);
   }
   // Notify server
-  postJSON('/api/system/pause', { paused: _systemPaused }).catch(() => {});
+  postJSON('/api/system/pause', { paused: _systemPaused }).catch(() => pushAlert('SYSTEM', 'Failed to toggle pause', 'error'));
 }
 
 
