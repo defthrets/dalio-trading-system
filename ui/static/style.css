@@ -744,7 +744,7 @@ a:hover { color: var(--primary); text-decoration: underline; }
   0%, 100% { box-shadow: 0 0 4px currentColor; }
   50%      { box-shadow: 0 0 10px currentColor, 0 0 2px currentColor inset; }
 }
-#modeBadge { animation: badgeBorderPulse 3s ease infinite; }
+#modeBadge { animation: electricPulse 2.5s ease infinite, electricFlicker 4s step-end infinite; }
 
 /* ── OPERATIONAL badge: electric / alive ── */
 @keyframes electricPulse {
@@ -771,7 +771,7 @@ a:hover { color: var(--primary); text-decoration: underline; }
   color: #00ff44;
   border-color: #00ff44;
   background: rgba(0,255,68,0.12);
-  animation: electricPulse 2.5s ease infinite, electricFlicker 4s step-end infinite;
+  animation: badgeBorderPulse 3s ease infinite;
 }
 #statusBadge.badge--green:hover {
   background: rgba(0,255,68,0.25);

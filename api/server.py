@@ -1175,26 +1175,69 @@ async def set_trading_mode(payload: dict):
 @app.post("/api/broker/connect")
 async def broker_connect(payload: dict):
     import api.brokers as _brokers_mod
-    broker_name = payload.get("broker", "").lower()
+    broker_name = payload.get("broker", "").lower().strip()
+    if not broker_name:
+        raise HTTPException(400, "Missing 'broker' field. Send {\"broker\": \"binance\", \"api_key\": \"...\", \"api_secret\": \"...\"}")
     if broker_name not in BROKER_MAP:
-        raise HTTPException(400, f"broker must be one of: {', '.join(BROKER_MAP)}")
-    broker: BrokerBase = BROKER_MAP[broker_name]()
-    try:
-        kwargs = {k: v for k, v in payload.items() if k != "broker"}
-        if not kwargs:
+        raise HTTPException(400, f"Unknown broker '{broker_name}'. Available: {', '.join(sorted(BROKER_MAP))}")
+
+    # Collect credentials from payload or saved creds
+    kwargs = {k: v for k, v in payload.items() if k != "broker" and v}
+    if not kwargs:
+        try:
             creds = _load_broker_creds()
             if broker_name in creds:
                 kwargs = creds[broker_name]
-                logger.info(f"Auto-loaded saved credentials for {broker_name}: {list(kwargs.keys())}")
-        logger.info(f"Connecting to {broker_name} with kwargs: {list(kwargs.keys())}")
+                logger.info(f"Auto-loaded saved credentials for {broker_name}")
+        except Exception as e:
+            logger.warning(f"Failed to load saved credentials: {e}")
+
+    if not kwargs:
+        # Return helpful error with required fields per broker
+        required = _broker_required_fields(broker_name)
+        raise HTTPException(400, f"No credentials provided. {broker_name.upper()} requires: {', '.join(required)}")
+
+    # Attempt connection
+    broker: BrokerBase = BROKER_MAP[broker_name]()
+    try:
+        logger.info(f"Connecting to {broker_name} with fields: {list(kwargs.keys())}")
         await broker.connect(**kwargs)
     except ImportError as e:
-        raise HTTPException(422, str(e))
+        raise HTTPException(422, f"Missing dependency: {e}. Install with pip.")
+    except ValueError as e:
+        raise HTTPException(400, f"Invalid configuration: {e}")
+    except ConnectionError as e:
+        raise HTTPException(502, f"Cannot reach {broker_name.upper()} servers: {e}")
+    except RuntimeError as e:
+        raise HTTPException(401, f"Authentication failed: {e}")
     except Exception as e:
-        raise HTTPException(502, f"Broker connection failed: {e}")
+        error_msg = str(e)
+        # Detect common auth failures
+        if any(s in error_msg.lower() for s in ("invalid", "unauthorized", "forbidden", "api key", "signature")):
+            raise HTTPException(401, f"Authentication failed for {broker_name.upper()}: {error_msg}")
+        elif any(s in error_msg.lower() for s in ("timeout", "connect", "unreachable", "refused")):
+            raise HTTPException(502, f"Cannot reach {broker_name.upper()} servers: {error_msg}")
+        else:
+            raise HTTPException(500, f"Broker connection error: {error_msg}")
+
     _brokers_mod.ACTIVE_BROKER = broker
     STATE.add_alert("BROKER", f"{broker_name.upper()} connected", "INFO")
     return {"status": "connected", "broker": broker_name}
+
+
+def _broker_required_fields(broker_name: str) -> list[str]:
+    """Return required credential fields for a broker."""
+    FIELDS = {
+        "ibkr": ["host", "port", "client_id"],
+        "alpaca": ["api_key", "api_secret"],
+        "binance": ["api_key", "api_secret"],
+        "coinbase": ["api_key", "api_secret"],
+        "coinspot": ["api_key", "api_secret"],
+        "okx": ["api_key", "api_secret", "passphrase"],
+        "kucoin": ["api_key", "api_secret", "passphrase"],
+        "bitget": ["api_key", "api_secret", "passphrase"],
+    }
+    return FIELDS.get(broker_name, ["api_key", "api_secret"])
 
 
 @app.get("/api/broker/status")

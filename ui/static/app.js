@@ -2375,11 +2375,12 @@ function setTheme(name, btn) {
 
 function _applyStoredTheme() {
   const s = _loadSettings();
-  if (s.theme && s.theme !== 'cyber') {
-    const btn = document.querySelector(`[data-theme="${s.theme}"]`);
-    if (btn) setTheme(s.theme, btn);
+  const theme = s.theme || 'light';
+  if (theme !== 'cyber') {
+    const btn = document.querySelector(`[data-theme="${theme}"]`);
+    if (btn) setTheme(theme, btn);
   }
-  _updateThemeToggleBtn(s.theme || 'cyber');
+  _updateThemeToggleBtn(theme);
 }
 
 // ─── Restore signal filters + slider from localStorage ────
@@ -5918,7 +5919,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ═══════════════════════════════════════════════════════════
 
 function toggleLightDark() {
-  const current = _loadSettings().theme || 'cyber';
+  const current = _loadSettings().theme || 'light';
   const isLight = current === 'light';
   const prevDark = localStorage.getItem('dalios_prev_dark_theme') || 'cyber';
   const next = isLight ? prevDark : 'light';
