@@ -67,7 +67,7 @@ def _cache_set(key: str, val):
 
 
 # ── Basic credential obfuscation ────────────────────────
-_CRED_APP_KEY = b"DaLiOs_AlLwEaThEr_2024!"
+_CRED_APP_KEY = os.environ.get("DALIO_CRED_KEY", "DaLiOs_AlLwEaThEr_2024!").encode("utf-8")
 
 
 def _xor_bytes(data: bytes, key: bytes) -> bytes:
@@ -1985,7 +1985,7 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
             "rr_ratio":     rr,
             "fee_pct":      _get_fee_pct(tkr),
             "round_trip_fee_pct": round(_get_fee_pct(tkr) * 2, 2),
-            "net_profit_pct": round(tp_offset / price * 100 - _get_fee_pct(tkr) * 2, 2),
+            "net_profit_pct": round((tp - price) / price * 100 - _get_fee_pct(tkr) * 2, 2),
             "score":        composite,
             "asset_class":  ac,
             "quadrant_fit": q_fit,
