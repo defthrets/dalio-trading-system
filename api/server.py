@@ -156,6 +156,67 @@ def _calc_trend(closes: list) -> str:
 # yfinance/CoinGecko use -USD tickers for data. CoinSpot trades in -AUD.
 # These helpers bridge that gap.
 
+# Cached AUD/USD exchange rate (refreshed every 5 min with other caches)
+_AUD_USD_RATE: float = 0.0  # 0 = not fetched yet
+
+
+async def _get_aud_usd_rate() -> float:
+    """Get current AUD/USD rate. Cached 5 min."""
+    global _AUD_USD_RATE
+    cached = _cache_get("aud_usd_rate")
+    if cached is not None:
+        _AUD_USD_RATE = cached
+        return cached
+    # Try yfinance first
+    try:
+        loop = asyncio.get_event_loop()
+
+        def _fetch_fx():
+            import yfinance as _yf_fx
+            hist = _yf_fx.Ticker("AUDUSD=X").history(period="5d")
+            if hist is not None and not hist.empty and "Close" in hist.columns:
+                return float(hist["Close"].iloc[-1])
+            return None
+        rate = await asyncio.wait_for(
+            loop.run_in_executor(_EXECUTOR, _fetch_fx), timeout=8.0)
+        if rate and 0.3 < rate < 1.2:  # sanity check
+            _AUD_USD_RATE = rate
+            _cache_set("aud_usd_rate", rate)
+            return rate
+    except Exception:
+        pass
+    # Fallback: CoinGecko BTC price comparison
+    try:
+        import aiohttp as _aio_fx
+        async with _aio_fx.ClientSession(timeout=_aio_fx.ClientTimeout(total=5)) as s:
+            async with s.get(
+                "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,aud"
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    usd = data.get("bitcoin", {}).get("usd", 0)
+                    aud = data.get("bitcoin", {}).get("aud", 0)
+                    if usd and aud:
+                        rate = usd / aud  # AUD/USD = how many USD per AUD
+                        _AUD_USD_RATE = rate
+                        _cache_set("aud_usd_rate", rate)
+                        return rate
+    except Exception:
+        pass
+    # Last resort: hardcoded reasonable estimate
+    if _AUD_USD_RATE > 0:
+        return _AUD_USD_RATE
+    _AUD_USD_RATE = 0.65
+    return 0.65
+
+
+def _usd_to_aud(usd_price: float) -> float:
+    """Convert USD price to AUD using cached rate."""
+    if _AUD_USD_RATE > 0:
+        return round(usd_price / _AUD_USD_RATE, 4)
+    return round(usd_price / 0.65, 4)  # fallback
+
+
 def _to_data_ticker(ticker: str) -> str:
     """Convert any ticker format to the yfinance/CoinGecko -USD format for data fetching."""
     return ticker.replace("-AUD", "-USD")
@@ -278,6 +339,14 @@ async def _on_startup():
 
     _load_paper_state()
     REAL_EQUITY_CURVE = _load_real_equity()
+
+    # ── Fetch AUD/USD exchange rate for crypto price conversion ──
+    try:
+        rate = await _get_aud_usd_rate()
+        logger.info(f"AUD/USD rate: {rate:.4f}")
+    except Exception as exc:
+        logger.warning(f"AUD/USD rate fetch failed: {exc}")
+
     logger.info(f"Startup complete -- trading mode: {TRADING_MODE}")
 
 # ─────────────────────────────────────────────
@@ -1378,36 +1447,53 @@ async def _gen_signals(n: int = 12) -> list[dict]:
         if not closes or len(closes) < 10:
             continue
 
+        is_crypto_ticker = ticker in CRYPTO_TICKERS or _is_crypto(ticker)
         price  = round(closes[-1], 4 if "USD" in ticker else 2)
         rsi    = _calc_rsi(closes)
         trend  = _calc_trend(closes)
         atr    = _calc_atr(closes)
-        # Rule-based action from real RSI + trend
-        if rsi < 32 and trend != "downtrend":
-            action = "BUY"
-        elif rsi > 68 and trend != "uptrend":
-            action = "SELL"
-        elif trend == "uptrend" and rsi < 58:
-            action = "LONG"
-        elif trend == "downtrend" and rsi > 42:
-            action = "SHORT"
+
+        # Rule-based action — crypto gets wider RSI bands (more volatile)
+        if is_crypto_ticker:
+            # Crypto: wider bands to account for higher volatility
+            if rsi < 38 and trend != "downtrend":
+                action = "BUY"
+            elif rsi > 62 and trend != "uptrend":
+                action = "SELL"
+            elif trend == "uptrend" and rsi < 60:
+                action = "LONG"
+            elif trend == "downtrend" and rsi > 40:
+                action = "SHORT"
+            else:
+                action = "HOLD"
         else:
-            action = "HOLD"
+            # ASX / Commodities: standard thresholds
+            if rsi < 32 and trend != "downtrend":
+                action = "BUY"
+            elif rsi > 68 and trend != "uptrend":
+                action = "SELL"
+            elif trend == "uptrend" and rsi < 58:
+                action = "LONG"
+            elif trend == "downtrend" and rsi > 42:
+                action = "SHORT"
+            else:
+                action = "HOLD"
 
         price_history = [round(c, 4 if "USD" in ticker else 2) for c in closes[-30:]]
 
         sl_offset = max(atr * 1.5, price * 0.025)
         tp_offset = atr * 2.5
 
-        # Real confidence: RSI extremes = high confidence, middle = lower
+        # Confidence: crypto gets lower floor (40 instead of 50) due to volatility
+        conf_floor = 40.0 if is_crypto_ticker else 50.0
         if action == "BUY":
-            conf = round(min(95, max(50, 100 - rsi)), 1)   # oversold RSI → high confidence
+            conf = round(min(95, max(conf_floor, 100 - rsi)), 1)
         elif action == "SELL":
-            conf = round(min(95, max(50, rsi)), 1)           # overbought RSI → high confidence
+            conf = round(min(95, max(conf_floor, rsi)), 1)
         elif action in ("LONG", "SHORT"):
-            conf = round(min(85, max(50, abs(rsi - 50) + 50)), 1)
+            conf = round(min(85, max(conf_floor, abs(rsi - 50) + 50)), 1)
         else:
-            conf = 50.0
+            conf = conf_floor
 
         # quadrant_fit computed from ASSET_CLASS_MAP + current quadrant
         qdata = STATE.last_quadrant or {}
@@ -1426,17 +1512,18 @@ async def _gen_signals(n: int = 12) -> list[dict]:
         pos_size_pct = round(min(5.0, max(1.0, (conf - 50) / 9)), 1)
 
         # Determine market type for the signal
-        if ticker in CRYPTO_TICKERS or _is_crypto(ticker):
+        if is_crypto_ticker:
             sig_market = "crypto"
         elif ticker in COMMODITY_TICKERS:
             sig_market = "commodities"
         else:
             sig_market = "asx"
 
-        signals.append({
+        # Build signal dict
+        sig = {
             "ticker": ticker,
-            "trade_ticker": _to_trade_ticker(ticker) if _is_crypto(ticker) else ticker,
-            "currency": "AUD" if _is_crypto(ticker) else "USD",
+            "trade_ticker": _to_trade_ticker(ticker) if is_crypto_ticker else ticker,
+            "currency": "AUD" if is_crypto_ticker else "USD",
             "market": sig_market,
             "action": action,
             "confidence": conf,
@@ -1453,7 +1540,15 @@ async def _gen_signals(n: int = 12) -> list[dict]:
             "price_history": price_history,
             "predicted_days": predicted_days,
             "timestamp": datetime.utcnow().isoformat(),
-        })
+        }
+
+        # Add AUD price for crypto signals (for CoinSpot execution context)
+        if is_crypto_ticker:
+            sig["price_aud"] = _usd_to_aud(price)
+            sig["stop_loss_aud"] = _usd_to_aud(sig["stop_loss"])
+            sig["take_profit_aud"] = _usd_to_aud(sig["take_profit"])
+
+        signals.append(sig)
 
     # ── Ensure balanced market representation in final output ──
     # Take top signals per market to avoid ASX crowding out crypto/commodities
@@ -2689,8 +2784,12 @@ async def _fetch_binance_prices() -> dict:
 def _normalize_ticker(ticker: str) -> str:
     """Normalise user-entered tickers to yfinance format.
     BTC → BTC-USD, ETH → ETH-USD, bhp → BHP.AX (if known), etc.
+    Also converts -AUD pairs to -USD for data lookups (CoinSpot → yfinance).
     """
     t = ticker.upper().strip()
+    # -AUD pairs → convert to -USD for data fetching
+    if t.endswith("-AUD"):
+        return t.replace("-AUD", "-USD")
     # Already correct format — pass through
     if t.endswith("-USD") or t.endswith(".AX") or "-" in t or "." in t:
         return t
@@ -2750,10 +2849,15 @@ async def _prices_for_positions(tickers: list) -> dict:
 import re as _re
 
 ASSET_CLASS_MAP: dict = {
-    # Crypto
+    # Crypto (USD — used for yfinance data fetching)
     "BTC-USD":"crypto","ETH-USD":"crypto","BNB-USD":"crypto","SOL-USD":"crypto","XRP-USD":"crypto",
     "ADA-USD":"crypto","AVAX-USD":"crypto","DOT-USD":"crypto","LINK-USD":"crypto","MATIC-USD":"crypto",
     "DOGE-USD":"crypto","LTC-USD":"crypto","UNI-USD":"crypto","ATOM-USD":"crypto","NEAR-USD":"crypto",
+    # Crypto (AUD — used for CoinSpot positions and trading)
+    "BTC-AUD":"crypto","ETH-AUD":"crypto","BNB-AUD":"crypto","SOL-AUD":"crypto","XRP-AUD":"crypto",
+    "ADA-AUD":"crypto","AVAX-AUD":"crypto","DOT-AUD":"crypto","LINK-AUD":"crypto","MATIC-AUD":"crypto",
+    "DOGE-AUD":"crypto","LTC-AUD":"crypto","UNI-AUD":"crypto","ATOM-AUD":"crypto","NEAR-AUD":"crypto",
+    "SHIB-AUD":"crypto",
     # Gold / Precious metals
     "GLD":"gold","SLV":"gold","PALL":"gold","NCM.AX":"gold","EVN.AX":"gold","NST.AX":"gold",
     # Commodities
@@ -4312,6 +4416,13 @@ async def risk_reset():
     CIRCUIT_BREAKER._halt_reason = ""
     STATE.add_alert("RISK", "Circuit breaker manually reset", "WARNING")
     return {"status": "reset", "trading_halted": False}
+
+
+@app.get("/api/fx/audusd")
+async def fx_audusd():
+    """Return current AUD/USD exchange rate."""
+    rate = await _get_aud_usd_rate()
+    return {"rate": round(rate, 5), "pair": "AUD/USD", "source": "CoinGecko/yfinance"}
 
 
 # ─────────────────────────────────────────────
