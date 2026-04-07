@@ -1028,8 +1028,90 @@ a:hover { color: var(--primary); text-decoration: underline; }
   grid-template-rows: auto 280px auto auto auto;
   gap: 12px;
 }
-/* Row 1: stats bar */
+/* Row 1: stats bar — hero section */
 .panel--cc-statsbar   { grid-column: 1 / -1; grid-row: 1; }
+
+/* ─── Statsbar Hero Showpiece ─── */
+.statsbar-hero {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255,140,0,0.04) 0%, rgba(0,0,0,0) 40%, rgba(0,204,68,0.02) 100%),
+    var(--bg-panel) !important;
+  border: 1px solid rgba(255,140,0,0.15) !important;
+  box-shadow:
+    0 0 20px rgba(255,140,0,0.06),
+    0 0 60px rgba(0,204,68,0.03),
+    inset 0 1px 0 rgba(255,140,0,0.08);
+  overflow: hidden;
+}
+.statsbar-hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255,140,0,0.008) 2px,
+    rgba(255,140,0,0.008) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+.statsbar-header {
+  position: relative;
+  z-index: 2;
+  background: linear-gradient(90deg, rgba(255,140,0,0.06), transparent 50%, rgba(0,204,68,0.04)) !important;
+  border-bottom: 1px solid rgba(255,140,0,0.12) !important;
+}
+.statsbar-stats {
+  gap: 16px !important;
+  flex-wrap: wrap;
+}
+.statsbar-stat {
+  font-family: var(--font-hud) !important;
+  font-size: 10px !important;
+  letter-spacing: 1.5px;
+  color: var(--text-muted) !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 60px;
+}
+.statsbar-val {
+  font-size: 13px !important;
+  letter-spacing: 0.5px;
+  color: var(--green) !important;
+  text-shadow: 0 0 6px rgba(0,204,68,0.3);
+  transition: text-shadow 0.4s ease, color 0.3s ease;
+}
+.statsbar-val.flash-update {
+  animation: statsbarFlash 0.8s ease-out;
+}
+@keyframes statsbarFlash {
+  0%   { text-shadow: 0 0 12px rgba(0,204,68,0.8), 0 0 24px rgba(0,204,68,0.4); transform: scale(1.08); }
+  100% { text-shadow: 0 0 6px rgba(0,204,68,0.3); transform: scale(1); }
+}
+.statsbar-arrow {
+  display: inline-block;
+  font-size: 10px;
+  margin-left: 3px;
+  transition: color 0.3s;
+}
+.statsbar-arrow.up   { color: var(--green); }
+.statsbar-arrow.down { color: var(--red); }
+
+/* Chart container in statsbar */
+.statsbar-chart-container {
+  position: relative;
+  z-index: 2;
+  height: 200px !important;
+  padding: 8px 12px 4px !important;
+  transition: box-shadow 0.3s ease;
+}
+.statsbar-chart-container:hover {
+  box-shadow: inset 0 0 30px rgba(0,204,68,0.04), inset 0 0 60px rgba(255,140,0,0.02);
+}
 /* Row 2: ops | chart | intel overview | quadrant (compact) */
 .panel--cc-quicktrade { grid-column: 1;      grid-row: 2; overflow: hidden; }
 .panel--cc-chart      { grid-column: 2;      grid-row: 2; overflow: hidden; }

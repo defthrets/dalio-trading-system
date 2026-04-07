@@ -156,17 +156,21 @@
     <section id="tab-command-center" class="tab-panel active">      <div class="panel-grid panel-grid--cc-hub">
 
         <!-- ROW 1: Prediction Growth Chart (slim, full width) -->
-        <div class="panel panel--cc-statsbar">
-          <div class="panel-header" style="padding:8px 16px">
+        <div class="panel panel--cc-statsbar statsbar-hero">
+          <div class="panel-header statsbar-header" style="padding:8px 16px">
             <span class="panel-title">◈ PORTFOLIO GROWTH PREDICTION</span>
-            <div class="panel-stats">
-              <span class="stat-item">NAV: <strong id="ccTotalVal">$1,000.00</strong></span>
-              <span class="stat-item">PREDICTED: <strong id="ccPredictedVal" style="color:var(--green)">--</strong></span>
-              <span class="stat-item" id="ccReturn" style="font-size:11px">ROI: 0.00%</span>
+            <div class="panel-stats statsbar-stats">
+              <span class="stat-item statsbar-stat">NAV <strong id="ccTotalVal" class="statsbar-val">$1,000.00</strong></span>
+              <span class="stat-item statsbar-stat">PREDICTED <strong id="ccPredictedVal" class="statsbar-val" style="color:var(--green)">--</strong></span>
+              <span class="stat-item statsbar-stat">ROI <strong id="ccReturn" class="statsbar-val">0.00%</strong></span>
+              <span class="stat-item statsbar-stat">TODAY P&amp;L <strong id="ccStatsDailyPnl" class="statsbar-val">--</strong><span class="statsbar-arrow" id="ccStatsDailyArrow"></span></span>
+              <span class="stat-item statsbar-stat">WIN RATE <strong id="ccStatsWinRate" class="statsbar-val">--%</strong></span>
+              <span class="stat-item statsbar-stat">TRADES <strong id="ccStatsTotalTrades" class="statsbar-val">0</strong></span>
+              <span class="stat-item statsbar-stat">SHARPE <strong id="ccStatsSharpe" class="statsbar-val">--</strong></span>
             </div>
           </div>
           <div class="panel-hint">Statistical projection from actual equity history. Solid line = real equity, dashed line = mean-return projection. Green zone = 95% confidence interval (1.96&#963;&#8730;t).</div>
-          <div class="chart-container" style="height:160px">
+          <div class="chart-container statsbar-chart-container" style="height:200px">
             <canvas id="predictionChart"></canvas>
           </div>
           <!-- Hidden compat elements for stats that JS still writes to -->

@@ -339,6 +339,44 @@ function applyHealth(d) {
   if (d.positions) renderPositionTable(d.positions);
   // Weights chart
   if (d.risk_weights) updateWeightsChart(d.risk_weights);
+
+  // ── Statsbar hero stats ──
+  _updateStatsbarFromHealth(d);
+}
+
+function _updateStatsbarFromHealth(d) {
+  const dailyPct = d.daily_pnl_pct ?? 0;
+  const dSign = dailyPct >= 0 ? '+' : '';
+  _statsbarSet('ccStatsDailyPnl', `${dSign}${dailyPct.toFixed(3)}%`, dailyPct >= 0 ? 'var(--green)' : 'var(--red)');
+  const arrow = el('ccStatsDailyArrow');
+  if (arrow) {
+    arrow.textContent = dailyPct >= 0 ? '\u25B2' : '\u25BC';
+    arrow.className = 'statsbar-arrow ' + (dailyPct >= 0 ? 'up' : 'down');
+  }
+  const sh = d.sharpe_ratio ?? null;
+  _statsbarSet('ccStatsSharpe', sh != null ? sh.toFixed(2) : '--', sh != null && sh >= 1 ? 'var(--green)' : sh != null && sh >= 0 ? 'var(--amber)' : 'var(--red)');
+
+  // ROI update in statsbar
+  const ret = el('ccReturn');
+  if (ret) {
+    const roi = d.total_return_pct ?? 0;
+    const rSign = roi >= 0 ? '+' : '';
+    ret.textContent = `${rSign}${roi.toFixed(2)}%`;
+    ret.style.color = roi >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+}
+
+function _statsbarSet(id, val, color) {
+  const e = el(id);
+  if (!e) return;
+  const changed = e.textContent !== String(val);
+  e.textContent = val;
+  if (color) e.style.color = color;
+  if (changed) {
+    e.classList.remove('flash-update');
+    void e.offsetWidth; // reflow
+    e.classList.add('flash-update');
+  }
 }
 
 // ─── Quadrant ─────────────────────────────────────────────
@@ -1334,23 +1372,113 @@ function initCharts() {
     });
   }
 
-  // Prediction chart (slim, full width row 1)
+  // Prediction chart (slim, full width row 1) — SHOWPIECE
   const pctx = el('predictionChart')?.getContext('2d');
   if (pctx) {
-    // Gradient fills for actual equity and confidence band
-    const predGradActual = pctx.createLinearGradient(0, 0, 0, 160);
-    predGradActual.addColorStop(0, 'rgba(0,204,68,0.25)');
-    predGradActual.addColorStop(0.6, 'rgba(0,204,68,0.06)');
-    predGradActual.addColorStop(1, 'rgba(0,204,68,0)');
+    const chartH = 200;
 
-    const predGradBand = pctx.createLinearGradient(0, 0, 0, 160);
-    predGradBand.addColorStop(0, 'rgba(0,212,255,0.12)');
-    predGradBand.addColorStop(0.5, 'rgba(0,212,255,0.04)');
+    // Rich gradient for actual equity line — glowing green at top, dark at bottom
+    const predGradActual = pctx.createLinearGradient(0, 0, 0, chartH);
+    predGradActual.addColorStop(0, 'rgba(0,204,68,0.35)');
+    predGradActual.addColorStop(0.3, 'rgba(0,204,68,0.15)');
+    predGradActual.addColorStop(0.7, 'rgba(0,204,68,0.04)');
+    predGradActual.addColorStop(1, 'rgba(0,0,0,0)');
+
+    // Confidence band gradient — cyan tint
+    const predGradBand = pctx.createLinearGradient(0, 0, 0, chartH);
+    predGradBand.addColorStop(0, 'rgba(0,212,255,0.14)');
+    predGradBand.addColorStop(0.5, 'rgba(0,212,255,0.05)');
     predGradBand.addColorStop(1, 'rgba(0,212,255,0)');
 
-    const predGradPredLine = pctx.createLinearGradient(0, 0, 0, 160);
-    predGradPredLine.addColorStop(0, 'rgba(0,212,255,0.18)');
-    predGradPredLine.addColorStop(1, 'rgba(0,212,255,0)');
+    // Prediction line gradient — orange/amber glow
+    const predGradPredLine = pctx.createLinearGradient(0, 0, 0, chartH);
+    predGradPredLine.addColorStop(0, 'rgba(255,140,0,0.22)');
+    predGradPredLine.addColorStop(0.4, 'rgba(255,140,0,0.08)');
+    predGradPredLine.addColorStop(1, 'rgba(255,140,0,0)');
+
+    // Crosshair plugin for this chart
+    const crosshairPlugin = {
+      id: 'predictionCrosshair',
+      afterDraw(chart) {
+        if (!chart._crosshairX && !chart._crosshairY) return;
+        const ctx = chart.ctx;
+        const { left, right, top, bottom } = chart.chartArea;
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 0.8;
+        ctx.strokeStyle = 'rgba(255,140,0,0.35)';
+        if (chart._crosshairX != null) {
+          ctx.beginPath();
+          ctx.moveTo(chart._crosshairX, top);
+          ctx.lineTo(chart._crosshairX, bottom);
+          ctx.stroke();
+        }
+        if (chart._crosshairY != null) {
+          ctx.beginPath();
+          ctx.moveTo(left, chart._crosshairY);
+          ctx.lineTo(right, chart._crosshairY);
+          ctx.stroke();
+        }
+        ctx.restore();
+      },
+      afterEvent(chart, args) {
+        const evt = args.event;
+        if (evt.type === 'mousemove') {
+          const area = chart.chartArea;
+          if (evt.x >= area.left && evt.x <= area.right && evt.y >= area.top && evt.y <= area.bottom) {
+            chart._crosshairX = evt.x;
+            chart._crosshairY = evt.y;
+          } else {
+            chart._crosshairX = null;
+            chart._crosshairY = null;
+          }
+          chart.draw();
+        }
+        if (evt.type === 'mouseout') {
+          chart._crosshairX = null;
+          chart._crosshairY = null;
+          chart.draw();
+        }
+      },
+    };
+
+    // Glow point plugin — animated glow on hover points
+    const glowPointPlugin = {
+      id: 'predictionGlowPoints',
+      afterDatasetsDraw(chart) {
+        const meta0 = chart.getDatasetMeta(0);
+        const meta1 = chart.getDatasetMeta(1);
+        if (!chart._active?.length) return;
+        const ctx = chart.ctx;
+        chart._active.forEach(active => {
+          const ds = active.datasetIndex;
+          const meta = ds === 0 ? meta0 : ds === 1 ? meta1 : null;
+          if (!meta) return;
+          const pt = meta.data[active.index];
+          if (!pt || pt.y == null) return;
+          ctx.save();
+          // Outer glow ring
+          const color = ds === 0 ? 'rgba(0,204,68,' : 'rgba(255,140,0,';
+          const grad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, 14);
+          grad.addColorStop(0, color + '0.6)');
+          grad.addColorStop(0.5, color + '0.15)');
+          grad.addColorStop(1, color + '0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 14, 0, Math.PI * 2);
+          ctx.fill();
+          // Inner dot
+          ctx.fillStyle = ds === 0 ? '#00cc44' : '#ff8c00';
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+          ctx.restore();
+        });
+      },
+    };
 
     charts.prediction = new Chart(pctx, {
       type: 'line',
@@ -1360,46 +1488,82 @@ function initCharts() {
           {
             label: 'Actual', data: [], borderColor: '#00cc44', borderWidth: 2.5,
             fill: true, backgroundColor: predGradActual,
-            tension: 0.35, pointRadius: 0, pointHoverRadius: 4,
+            tension: 0.4, pointRadius: 0, pointHoverRadius: 0,
             pointHoverBackgroundColor: '#00cc44', pointHoverBorderColor: '#fff', order: 2,
+            borderShadowColor: 'rgba(0,204,68,0.5)', shadowBlur: 8,
           },
           {
-            label: 'Predicted', data: [], borderColor: '#00d4ff', borderWidth: 2,
+            label: 'Predicted', data: [], borderColor: '#ff8c00', borderWidth: 2,
             borderDash: [6,3], fill: true, backgroundColor: predGradPredLine,
-            tension: 0.4, pointRadius: 0, pointHoverRadius: 3,
-            pointHoverBackgroundColor: '#00d4ff', order: 1,
+            tension: 0.4, pointRadius: 0, pointHoverRadius: 0,
+            pointHoverBackgroundColor: '#ff8c00', order: 1,
           },
           {
-            label: 'Upper Band', data: [], borderColor: 'rgba(0,212,255,0.3)', borderWidth: 1,
+            label: 'Upper Band', data: [], borderColor: 'rgba(0,212,255,0.25)', borderWidth: 1,
             borderDash: [2,4], fill: '+1', backgroundColor: predGradBand,
             tension: 0.4, pointRadius: 0, order: 3,
           },
           {
-            label: 'Lower Band', data: [], borderColor: 'rgba(0,212,255,0.3)', borderWidth: 1,
+            label: 'Lower Band', data: [], borderColor: 'rgba(0,212,255,0.25)', borderWidth: 1,
             borderDash: [2,4], fill: false, backgroundColor: predGradBand,
             tension: 0.4, pointRadius: 0, order: 4,
           },
         ],
       },
+      plugins: [crosshairPlugin, glowPointPlugin],
       options: {
         ...CHART_DEFAULTS,
         maintainAspectRatio: false,
+        responsive: true,
         interaction: { mode: 'index', intersect: false },
+        animation: { duration: 800, easing: 'easeInOutQuart' },
         plugins: {
           ...CHART_DEFAULTS.plugins,
           legend: { display: false },
           tooltip: {
-            ...CHART_DEFAULTS.plugins?.tooltip,
-            backgroundColor: 'rgba(10,18,12,0.95)',
-            borderColor: 'rgba(255,140,0,0.3)',
+            enabled: true,
+            backgroundColor: 'rgba(8,12,10,0.96)',
+            borderColor: 'rgba(255,140,0,0.4)',
             borderWidth: 1,
-            titleFont: { family: 'JetBrains Mono', size: 10 },
-            bodyFont: { family: 'JetBrains Mono', size: 10 },
+            cornerRadius: 6,
+            padding: { top: 8, bottom: 8, left: 12, right: 12 },
+            titleFont: { family: 'Orbitron, monospace', size: 9, weight: '700' },
+            titleColor: '#ff8c00',
+            bodyFont: { family: 'JetBrains Mono, monospace', size: 10 },
+            bodyColor: '#b8dcf0',
+            displayColors: false,
+            caretSize: 6,
             callbacks: {
+              title: ctx => {
+                if (!ctx.length) return '';
+                return ctx[0].label || '';
+              },
               label: ctx => {
                 if (ctx.raw == null) return null;
                 const lbl = ctx.dataset.label;
-                return `${lbl}: $${ctx.raw.toLocaleString()}`;
+                const val = '$' + ctx.raw.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+                return `${lbl}: ${val}`;
+              },
+              afterBody: ctx => {
+                if (!ctx.length) return [];
+                const lines = [];
+                const ds0 = ctx.find(c => c.datasetIndex === 0);
+                if (ds0 && ds0.raw != null) {
+                  const idx = ds0.dataIndex;
+                  const data = ds0.dataset.data;
+                  if (idx > 0 && data[idx-1] != null && data[idx] != null) {
+                    const change = ((data[idx] - data[idx-1]) / data[idx-1] * 100);
+                    const sign = change >= 0 ? '+' : '';
+                    lines.push(`Daily: ${sign}${change.toFixed(3)}%`);
+                  }
+                  const first = data.find(v => v != null);
+                  if (first != null && ds0.raw != null) {
+                    const totalRet = ((ds0.raw - first) / first * 100);
+                    const tSign = totalRet >= 0 ? '+' : '';
+                    lines.push(`Total: ${tSign}${totalRet.toFixed(2)}%`);
+                  }
+                }
+                return lines;
               },
             },
           },
@@ -1407,18 +1571,18 @@ function initCharts() {
         scales: {
           x: {
             display: true,
-            ticks: { color: 'rgba(90,138,101,0.5)', font: { family: 'JetBrains Mono', size: 7 }, maxTicksLimit: 8, maxRotation: 0 },
-            grid: { color: 'rgba(255,140,0,0.04)', drawTicks: false },
+            ticks: { color: 'rgba(90,138,101,0.5)', font: { family: 'JetBrains Mono', size: 7 }, maxTicksLimit: 10, maxRotation: 0 },
+            grid: { color: 'rgba(255,140,0,0.03)', drawTicks: false },
           },
           y: {
             min: 0,
             ticks: {
-              color: '#5a8a65',
+              color: 'rgba(90,138,101,0.6)',
               font: { family: 'JetBrains Mono', size: 9 },
               callback: v => '$' + v.toLocaleString(),
               maxTicksLimit: 6,
             },
-            grid: { color: 'rgba(255,140,0,0.06)', drawTicks: false },
+            grid: { color: 'rgba(255,140,0,0.04)', drawTicks: false },
           },
         },
       },
@@ -4197,6 +4361,11 @@ function _applyCCHistory(d) {
     winEl.textContent = closed.length ? `${winRate}%` : '--%';
     winEl.style.color = closed.length ? (parseFloat(winRate) >= 50 ? 'var(--green)' : 'var(--red)') : '';
   }
+
+  // Statsbar hero stats — win rate & total trades
+  _statsbarSet('ccStatsWinRate', closed.length ? `${winRate}%` : '--%',
+    closed.length ? (parseFloat(winRate) >= 50 ? 'var(--green)' : 'var(--red)') : null);
+  _statsbarSet('ccStatsTotalTrades', total, 'var(--primary)');
 
   // Avg P&L, realised P&L, best, worst
   if (closed.length) {
