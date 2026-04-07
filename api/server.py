@@ -77,6 +77,10 @@ from api.agent import (
     _agent_last_cycle_time, _agent_next_cycle_time,
 )
 from api.websocket import WS_MANAGER, _run_cmd
+from api.auth import (
+    AUTH_ENABLED, auth_middleware,
+    register_user, login_user, get_current_user,
+)
 
 # ── Settings / DB init ─────────────────────────────────────
 if SETTINGS_AVAILABLE:
@@ -106,6 +110,12 @@ app.add_middleware(
 )
 
 _rate_limiter = RateLimiter()
+
+
+# ── JWT Auth middleware (disabled by default, enable via DALIOS_AUTH_ENABLED=true) ──
+@app.middleware("http")
+async def _auth_mw(request: Request, call_next):
+    return await auth_middleware(request, call_next)
 
 
 @app.middleware("http")
@@ -197,6 +207,53 @@ async def root():
     if html_path.exists():
         return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
     return HTMLResponse("<h1>UI not found. Run from project root.</h1>", status_code=404)
+
+
+# ─────────────────────────────────────────────
+# Routes -- Health Check (public, no auth)
+# ─────────────────────────────────────────────
+
+@app.get("/api/health")
+async def health_check():
+    """Lightweight health check for Docker/load balancers."""
+    return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+
+
+# ─────────────────────────────────────────────
+# Routes -- Authentication
+# ─────────────────────────────────────────────
+
+@app.post("/api/auth/register")
+async def auth_register(request: Request):
+    """Register a new user account (when auth is enabled)."""
+    body = await request.json()
+    username = body.get("username", "").strip()
+    password = body.get("password", "")
+    if not username or len(password) < 8:
+        raise HTTPException(400, "Username required, password must be 8+ characters")
+    result = register_user(username, password)
+    if "error" in result:
+        raise HTTPException(400, result["error"])
+    return result
+
+
+@app.post("/api/auth/login")
+async def auth_login(request: Request):
+    """Authenticate and receive a JWT token."""
+    body = await request.json()
+    result = login_user(body.get("username", ""), body.get("password", ""))
+    if "error" in result:
+        raise HTTPException(401, result["error"])
+    return result
+
+
+@app.get("/api/auth/me")
+async def auth_me(request: Request):
+    """Get current authenticated user info."""
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(401, "Not authenticated")
+    return {"username": user.get("username"), "admin": user.get("admin", False)}
 
 
 # ─────────────────────────────────────────────

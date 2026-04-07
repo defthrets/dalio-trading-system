@@ -1065,64 +1065,54 @@ def _gen_static_headlines() -> list[dict]:
     ]
 
 
-# FinBERT lazy loader
-_FINBERT_MODEL = None
-_FINBERT_TOKENIZER = None
-_FINBERT_LOADED = False
+# ── Keyword Sentiment Scorer (replaces FinBERT — zero dependencies) ──
+
+_POSITIVE_KW = {
+    "surge": 0.8, "soar": 0.9, "rally": 0.8, "boom": 0.85, "breakout": 0.7,
+    "record high": 0.9, "outperform": 0.7, "beat": 0.6, "strong": 0.5,
+    "growth": 0.5, "gain": 0.5, "rise": 0.4, "profit": 0.5, "positive": 0.4,
+    "bullish": 0.6, "upgrade": 0.7, "recovery": 0.6, "rebound": 0.6,
+    "optimism": 0.55, "confidence": 0.5, "expansion": 0.6, "stimulus": 0.5,
+}
+_NEGATIVE_KW = {
+    "crash": 0.9, "collapse": 0.85, "plunge": 0.8, "crisis": 0.8,
+    "recession": 0.85, "bankruptcy": 0.9, "default": 0.8, "bear market": 0.8,
+    "decline": 0.5, "drop": 0.4, "fall": 0.4, "loss": 0.5, "weak": 0.45,
+    "bearish": 0.6, "fear": 0.55, "uncertainty": 0.45, "slowdown": 0.5,
+    "layoffs": 0.6, "downgrade": 0.6, "warning": 0.5, "miss": 0.5,
+    "sanctions": 0.5, "tariff": 0.4, "inflation": 0.3,
+}
 
 
-def _try_finbert_sentiment(articles: list[dict]) -> list[dict]:
-    global _FINBERT_MODEL, _FINBERT_TOKENIZER, _FINBERT_LOADED
-    if not articles: return articles
-    if not _FINBERT_LOADED:
-        _FINBERT_LOADED = True
-        try:
-            import torch
-            from transformers import AutoTokenizer, AutoModelForSequenceClassification
-            model_name = "ProsusAI/finbert"
-            logger.info(f"Loading FinBERT model: {model_name}")
-            _FINBERT_TOKENIZER = AutoTokenizer.from_pretrained(model_name)
-            _FINBERT_MODEL = AutoModelForSequenceClassification.from_pretrained(model_name)
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            _FINBERT_MODEL.to(device)
-            _FINBERT_MODEL.eval()
-            logger.info(f"FinBERT loaded on {device}")
-        except Exception as e:
-            logger.info(f"FinBERT not available ({e}), using keyword sentiment")
-            _FINBERT_MODEL = None
-            _FINBERT_TOKENIZER = None
+def _keyword_sentiment_score(text: str) -> float:
+    """Score text from -1 (bearish) to +1 (bullish) using keyword matching."""
+    t = text.lower()
+    pos = sum(w for kw, w in _POSITIVE_KW.items() if kw in t)
+    neg = sum(w for kw, w in _NEGATIVE_KW.items() if kw in t)
+    total = pos + neg
+    if total == 0:
+        return 0.0
+    return max(-1.0, min(1.0, (pos - neg) / max(pos, neg)))
 
-    if _FINBERT_MODEL is None or _FINBERT_TOKENIZER is None:
+
+def _try_keyword_sentiment(articles: list[dict]) -> list[dict]:
+    """Score articles using lightweight keyword sentiment (replaces FinBERT)."""
+    if not articles:
         return articles
-
-    try:
-        import torch
-        device = next(_FINBERT_MODEL.parameters()).device
-        batch_size = 16
-        labels = ["positive", "negative", "neutral"]
-        for i in range(0, len(articles), batch_size):
-            batch = articles[i:i + batch_size]
-            texts = [a["title"][:512] for a in batch]
-            inputs = _FINBERT_TOKENIZER(texts, return_tensors="pt", truncation=True, max_length=512, padding=True).to(device)
-            with torch.no_grad():
-                outputs = _FINBERT_MODEL(**inputs)
-            probs = torch.softmax(outputs.logits, dim=1).cpu().numpy()
-            for j, a in enumerate(batch):
-                prob_dict = dict(zip(labels, probs[j].tolist()))
-                score = prob_dict["positive"] - prob_dict["negative"]
-                a["finbert_score"] = round(score, 4)
-                a["sentiment"] = labels[int(np.argmax(probs[j]))]
-                a["bull_score"] = round(prob_dict["positive"], 3)
-                a["bear_score"] = round(prob_dict["negative"], 3)
-        logger.info(f"FinBERT scored {len(articles)} articles")
-    except Exception as e:
-        logger.warning(f"FinBERT batch scoring failed ({e}), keeping keyword scores")
+    for a in articles:
+        text = a.get("title", "") + " " + a.get("summary", "")
+        score = _keyword_sentiment_score(text)
+        a["finbert_score"] = round(score, 4)  # Keep same key for API compat
+        a["sentiment"] = "positive" if score > 0.1 else "negative" if score < -0.1 else "neutral"
+        a["bull_score"] = round(max(0, score), 3)
+        a["bear_score"] = round(max(0, -score), 3)
+    logger.info(f"Keyword sentiment scored {len(articles)} articles")
     return articles
 
 
 async def _gen_sentiment_data() -> dict:
     articles = await _fetch_real_news()
-    articles = _try_finbert_sentiment(articles)
+    articles = _try_keyword_sentiment(articles)
     total = len(articles)
     conflict = sum(1 for a in articles if a["conflict_risk"])
 

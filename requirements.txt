@@ -1,45 +1,45 @@
-# ─── Dalios Trading System — Runtime Dependencies ───────────────────
+# ─── Dalios Trading System — Production Dependencies ─────────────────
+# Lean stack: ~200MB total (down from ~5.5GB)
+# No torch, no transformers, no riskfolio-lib
+
+# ─── Core Web Framework ─────────────────────────────────────────────
 fastapi>=0.110.0,<1.0.0
 uvicorn[standard]>=0.27.0,<1.0.0
 python-multipart>=0.0.9,<1.0.0
+
+# ─── Data & Analysis ────────────────────────────────────────────────
 numpy>=1.25.0,<3.0.0
 pandas>=1.5.0,<3.0.0
 yfinance>=0.2.40,<1.0.0
+ta>=0.11.0,<1.0.0
+
+# ─── Network / HTTP ─────────────────────────────────────────────────
 requests>=2.31.0,<3.0.0
 aiohttp>=3.9.0,<4.0.0
-loguru>=0.7.2,<1.0.0
-feedparser>=6.0.0,<7.0.0
 
-# ─── Configuration & Database ────────────────────────────────────────
+# ─── Configuration & Database ───────────────────────────────────────
 pydantic>=2.0.0,<3.0.0
 pydantic-settings>=2.0.0,<3.0.0
 sqlalchemy>=2.0.0,<3.0.0
+psycopg2-binary>=2.9.0,<3.0.0      # PostgreSQL driver (optional, for production)
 
-# ─── Technical Analysis & ML ─────────────────────────────────────────
-ta>=0.11.0,<1.0.0
-transformers>=4.30.0,<5.0.0
-torch>=2.0.0,<3.0.0
-riskfolio-lib>=6.0.0,<7.0.0
-
-# ─── Scheduling ─────────────────────────────────────────────────────
+# ─── Scheduling & Utilities ─────────────────────────────────────────
 apscheduler>=3.10.0,<4.0.0
 python-dateutil>=2.8.0,<3.0.0
+loguru>=0.7.2,<1.0.0
+feedparser>=6.0.0,<7.0.0
 
-# ─── Broker integrations (install whichever you use) ─────────────────
-# Binance — crypto spot/futures trading
-python-binance>=1.0.19
+# ─── Broker Integrations (install whichever you use) ────────────────
+python-binance>=1.0.19              # Binance crypto spot/futures
+# ib_insync>=0.9.86                 # Interactive Brokers (uncomment if using)
+# alpaca-trade-api>=3.0.0           # Alpaca US equities + crypto
+# coinbase-advanced-py>=1.4.0       # Coinbase Advanced Trade
 
-# Interactive Brokers — ASX, US, global equities via TWS/IB Gateway
-# ib_insync>=0.9.86   # uncomment if using IBKR
-
-# Alpaca — US equities and crypto (paper + live)
-# alpaca-trade-api>=3.0.0   # uncomment if using Alpaca
-
-# Coinbase Advanced Trade — crypto
-# coinbase-advanced-py>=1.4.0   # uncomment if using Coinbase
-
-# CoinSpot — AUD crypto (uses built-in requests/aiohttp, no extra package needed)
-
-# ─── Testing ───────────────────────────────────────────────────────
+# ─── Testing ────────────────────────────────────────────────────────
 pytest>=7.0.0
 httpx>=0.24.0
+
+# ─── Size comparison ────────────────────────────────────────────────
+# REMOVED: torch (~1.9GB), transformers (~1.2GB), riskfolio-lib (~50MB)
+# Sentiment: now uses keyword scoring engine (0 deps, same API)
+# Risk parity: now uses inverse-volatility (numpy only, ~5% accuracy vs ERC)

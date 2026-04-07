@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+.git
+.env
+.venv
+venv
+node_modules
+logs/
+data/storage/trading.db
+*.egg-info
+.pytest_cache

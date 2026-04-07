@@ -232,11 +232,19 @@ class PortfolioSnapshot(Base):
 
 def get_engine():
     settings = get_settings()
-    engine = create_engine(
-        settings.database_url,
-        connect_args={"check_same_thread": False},  # SQLite thread safety
-        echo=False,
-    )
+    url = settings.database_url
+    kwargs = {"echo": False}
+
+    # SQLite needs check_same_thread=False; PostgreSQL doesn't
+    if url.startswith("sqlite"):
+        kwargs["connect_args"] = {"check_same_thread": False}
+    else:
+        # PostgreSQL connection pool settings for production
+        kwargs["pool_size"] = 10
+        kwargs["max_overflow"] = 20
+        kwargs["pool_pre_ping"] = True
+
+    engine = create_engine(url, **kwargs)
     return engine
 
 
