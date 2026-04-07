@@ -6,92 +6,103 @@
 
 ## Quick Start (Windows)
 
-### Step 1 — Install
+### Step 1 — Configure
+Copy the environment template and add your API keys:
+```
+copy .env.template .env
+```
+Edit `.env` with your API keys (optional — system works without them using free data sources).
+
+### Step 2 — Install
 Double-click `setup.bat` or run in terminal:
 ```
 setup.bat
 ```
-This installs all Python packages automatically.
 
-### Step 2 — Start the server
+### Step 3 — Broker Credentials (if trading live)
+Copy the credential template:
+```
+copy data\broker_credentials.json.template data\broker_credentials.json
+```
+Edit with your CoinSpot/Binance API keys. **Never commit this file to git.**
+
+### Step 4 — Start the server
 Double-click `start.bat` or run:
 ```
 start.bat
 ```
 
-### Step 3 — Open the UI
+### Step 5 — Open the UI
 Navigate to: **http://localhost:8000**
 
 ---
 
-## Manual Install
+## Manual Install (Linux/Mac)
 
 ```bash
 pip install -r requirements.txt
+cp .env.template .env
+cp data/broker_credentials.json.template data/broker_credentials.json
+python main.py
 ```
 
-### Dependencies installed
+---
+
+## Security Notes
+
+**IMPORTANT:** Never commit secrets to git.
+
+- `.env` — Contains API keys. Gitignored by default.
+- `data/broker_credentials.json` — Contains broker API keys/secrets. Gitignored.
+- If you accidentally commit credentials, **revoke and rotate them immediately**.
+- The `.env.template` and `broker_credentials.json.template` files are safe to commit.
+
+---
+
+## Dependencies
+
 | Package | Purpose |
 |---------|---------|
 | fastapi | Web framework / API server |
 | uvicorn | ASGI server (runs FastAPI) |
-| python-multipart | Form data parsing |
-| numpy | Numerical calculations |
-| pandas | Data frames (required by yfinance) |
+| numpy / pandas | Numerical + data frame ops |
 | yfinance | Live ASX / commodities / crypto prices |
-| requests | HTTP client |
 | aiohttp | Async HTTP (CoinGecko API) |
 | loguru | Logging |
-| feedparser | Real financial news RSS feeds |
+| feedparser | Financial news RSS feeds |
+| pydantic-settings | Configuration management |
+| sqlalchemy | Database ORM (trade/signal logging) |
+| ta | Technical analysis indicators (RSI, MACD, BB) |
+| transformers + torch | FinBERT sentiment (optional, ~2GB) |
 
 ---
 
 ## Troubleshooting
 
 ### Scanners show no data
-1. Run `setup.bat` again to ensure all dependencies are installed
-2. Restart the server with `start.bat` (kills old process, starts fresh)
-3. Wait 10–30 seconds for first scan (yfinance fetches live data)
-4. If ASX shows empty: yfinance may be rate-limiting — wait 60s and refresh
+1. Re-run `setup.bat` to ensure dependencies are installed
+2. Restart server — wait 10–30s for first scan
+3. If ASX is empty: yfinance rate-limit — wait 60s and refresh
 
-### 404 errors on scanner tabs
-- **Always restart the server** after updating code via `start.bat`
-- The browser will cache old JS — hold Shift + click Refresh to hard-reload
+### FinBERT errors
+`transformers` + `torch` are large. System works without them — logs a warning and skips sentiment.
 
-### Port 8000 already in use
-`start.bat` automatically kills any process on port 8000 before starting.
-
-### Python not found
-Make sure Python is added to PATH during installation (check "Add to PATH" in installer).
-
----
-
-## Scanner Data Sources
-| Tab | Source | Refresh |
-|-----|--------|---------|
-| ASX Scanner | Yahoo Finance (yfinance) | 90s cache |
-| Crypto | CoinGecko free API → yfinance fallback | 90s cache |
-| Commodities | Yahoo Finance (yfinance) | 90s cache |
-| Signal Ops | yfinance 3-month price history | On demand |
-| Intel Center | Live RSS feeds (Reuters, Yahoo, CNBC, AFR, etc.) | 30 min cache |
-| Economic Quadrant | yfinance macro indicators | 5 min cache |
+### Port 8000 in use
+`start.bat` auto-kills existing processes on port 8000.
 
 ---
 
 ## Architecture
 ```
 dalio-trading-system/
-├── api/
-│   └── server.py          # FastAPI backend (~3000 lines)
-├── ui/
-│   ├── index.html         # Single-page app
-│   └── static/
-│       ├── app.js         # All frontend logic
-│       └── style.css      # Hacker/military UI theme
-├── data/
-│   ├── paper_portfolio.json   # Your paper trading state (auto-saved)
-│   └── paper_config.json      # Settings (starting cash etc.)
-├── requirements.txt
-├── setup.bat              # Install script
-└── start.bat              # Launch script
+├── api/server.py              # FastAPI backend
+├── config/                    # Settings + asset universe
+├── engines/                   # Quadrant, sentiment, correlation, risk parity
+├── trading/                   # Signal gen, circuit breaker, execution
+├── notifications/             # Discord/Telegram alerts
+├── backtesting/               # Walk-forward optimisation
+├── data/                      # Storage, ingestion, portfolios
+├── ui/                        # Single-page frontend
+├── .env.template              # Environment config template
+└── requirements.txt
 ```

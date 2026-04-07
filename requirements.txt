@@ -10,6 +10,16 @@ aiohttp>=3.9.0
 loguru>=0.7.2
 feedparser>=6.0.0
 
+# ─── Configuration & Database ────────────────────────────────────────
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+sqlalchemy>=2.0.0
+
+# ─── Technical Analysis & ML ─────────────────────────────────────────
+ta>=0.11.0
+transformers>=4.30.0
+torch>=2.0.0
+
 # ─── Broker integrations (install whichever you use) ─────────────────
 # Binance — crypto spot/futures trading
 python-binance>=1.0.19

@@ -152,6 +152,27 @@ def _calc_trend(closes: list) -> str:
     return "sideways"
 
 
+# ── Ticker conversion utilities ──────────────────────────
+# yfinance/CoinGecko use -USD tickers for data. CoinSpot trades in -AUD.
+# These helpers bridge that gap.
+
+def _to_data_ticker(ticker: str) -> str:
+    """Convert any ticker format to the yfinance/CoinGecko -USD format for data fetching."""
+    return ticker.replace("-AUD", "-USD")
+
+
+def _to_trade_ticker(ticker: str) -> str:
+    """Convert any ticker format to the CoinSpot -AUD format for trade execution."""
+    if "-USD" in ticker:
+        return ticker.replace("-USD", "-AUD")
+    return ticker
+
+
+def _is_crypto(ticker: str) -> bool:
+    """Check if a ticker is a crypto pair."""
+    return "-USD" in ticker or "-AUD" in ticker
+
+
 # ── CoinGecko coin-ID map ────────────────────────────────
 _COINGECKO_MAP = {
     "BTC-USD": "bitcoin",      "ETH-USD": "ethereum",       "BNB-USD": "binancecoin",
@@ -165,7 +186,8 @@ _COINGECKO_MAP = {
 
 
 async def _get_crypto_coingecko() -> Optional[dict]:
-    """Fetch real crypto prices from CoinGecko free API (no API key needed)."""
+    """Fetch real crypto prices from CoinGecko free API (no API key needed).
+    Returns both USD and AUD prices for CoinSpot trade execution."""
     key = "coingecko_prices"
     cached = _cache_get(key)
     if cached is not None:
@@ -173,7 +195,7 @@ async def _get_crypto_coingecko() -> Optional[dict]:
     ids = ",".join(_COINGECKO_MAP.values())
     url = (
         "https://api.coingecko.com/api/v3/simple/price"
-        f"?ids={ids}&vs_currencies=usd&include_24hr_change=true"
+        f"?ids={ids}&vs_currencies=usd,aud&include_24hr_change=true"
     )
     try:
         import aiohttp
@@ -186,14 +208,24 @@ async def _get_crypto_coingecko() -> Optional[dict]:
                     return None
                 data = await resp.json()
         rev = {v: k for k, v in _COINGECKO_MAP.items()}
-        result = {
-            rev[cid]: {
+        result = {}
+        for cid, vals in data.items():
+            if cid not in rev:
+                continue
+            usd_ticker = rev[cid]
+            result[usd_ticker] = {
                 "price":      vals.get("usd"),
+                "price_aud":  vals.get("aud"),
                 "change_pct": round(vals.get("usd_24h_change") or 0, 2),
                 "source":     "CoinGecko",
             }
-            for cid, vals in data.items() if cid in rev
-        }
+            # Also store under -AUD ticker for CoinSpot lookups
+            aud_ticker = _to_trade_ticker(usd_ticker)
+            result[aud_ticker] = {
+                "price":      vals.get("aud"),
+                "change_pct": round(vals.get("usd_24h_change") or 0, 2),
+                "source":     "CoinGecko",
+            }
         if result:
             _cache_set(key, result)
         return result or None
@@ -235,6 +267,15 @@ if STATIC_DIR.exists():
 @app.on_event("startup")
 async def _on_startup():
     global REAL_EQUITY_CURVE
+
+    # ── Initialise database (create tables if missing) ──
+    if SETTINGS_AVAILABLE:
+        try:
+            init_db()
+            logger.info("Database initialised successfully")
+        except Exception as exc:
+            logger.warning(f"Database init skipped: {exc}")
+
     _load_paper_state()
     REAL_EQUITY_CURVE = _load_real_equity()
     logger.info(f"Startup complete -- trading mode: {TRADING_MODE}")
@@ -290,6 +331,24 @@ class SystemState:
 
 STATE = SystemState()
 
+# ── Circuit Breaker — risk management safety rails ────────
+try:
+    from trading.circuit_breaker import CircuitBreaker
+    CIRCUIT_BREAKER = CircuitBreaker(starting_equity=STATE.initial_equity)
+    logger.info("CircuitBreaker initialised")
+except Exception as _cb_err:
+    CIRCUIT_BREAKER = None
+    logger.warning(f"CircuitBreaker not available: {_cb_err}")
+
+# ── Notification Manager — Discord/Telegram alerts ───────
+try:
+    from notifications.notifier import NotificationManager
+    NOTIFIER = NotificationManager()
+    logger.info("NotificationManager initialised")
+except Exception as _nm_err:
+    NOTIFIER = None
+    logger.warning(f"NotificationManager not available: {_nm_err}")
+
 
 # ─────────────────────────────────────────────
 # Persistence helpers
@@ -297,6 +356,7 @@ STATE = SystemState()
 
 DATA_DIR = ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
+(DATA_DIR / "storage").mkdir(exist_ok=True)  # SQLite DB lives here
 
 PAPER_STATE_FILE = DATA_DIR / "paper_portfolio.json"
 REAL_EQUITY_FILE   = DATA_DIR / "real_equity.json"
@@ -1215,24 +1275,26 @@ def _gen_price_history_demo(price: float, trend: str, n_points: int = 30) -> lis
 
 async def _gen_signals(n: int = 12) -> list[dict]:
     """
-    Generate trade signals from real yfinance price data.
-    Pulls from scanner cache first (free), then fetches fresh for uncached tickers.
+    Generate trade signals from real price data.
+    Fetches prices PER MARKET TYPE to avoid mixed-ticker yfinance failures.
+    Crypto: CoinGecko history → yfinance fallback.
+    ASX/Commodities: yfinance (separate calls so one doesn't block the other).
     Results cached 2 min so repeat loads are instant.
     """
     cache_key = f"signals_{n}"
     cached = _cache_get(cache_key)
     if cached is not None:
         return cached
+
     # ── Seed candidate pool — equal split across ASX / Crypto / Commodities ──
-    # Pull best movers from scanner cache first (already have prices)
     cached_by_market: dict = {"asx": [], "crypto": [], "commodities": []}
     for mkt in ("asx", "crypto", "commodities"):
-        cached = _scanner_cache.get(mkt)
-        if cached:
-            rows = sorted(cached["rows"], key=lambda r: abs(r.get("change_pct", 0)), reverse=True)
+        sc = _scanner_cache.get(mkt)
+        if sc:
+            rows = sorted(sc["rows"], key=lambda r: abs(r.get("change_pct", 0)), reverse=True)
             cached_by_market[mkt] = [r["ticker"] for r in rows if r.get("price", 0) > 0][:n]
 
-    # Sample fresh tickers per market to pad out any empty cache slots
+    # Sample fresh tickers per market to pad empty cache slots
     n_each = max(4, (n * 2) // 3)
     fresh = {
         "asx":         random.sample(ASX_TICKERS,        min(n_each, len(ASX_TICKERS))),
@@ -1240,30 +1302,79 @@ async def _gen_signals(n: int = 12) -> list[dict]:
         "commodities": random.sample(COMMODITY_TICKERS,  min(n_each, len(COMMODITY_TICKERS))),
     }
 
-    # Merge: cached first, then fresh, ensuring equal market representation
+    # Build per-market candidate lists (deduped, cached first)
+    market_candidates = {}
+    for mkt in ("asx", "crypto", "commodities"):
+        market_candidates[mkt] = list(dict.fromkeys(
+            cached_by_market[mkt] + fresh[mkt]
+        ))[:n_each]
+
+    # ── Fetch prices PER MARKET (prevents mixed-ticker yfinance failures) ──
+    prices_map: dict = {}
+
+    # ASX — yfinance (all .AX tickers in one call)
+    asx_cands = market_candidates["asx"][:10]
+    if asx_cands:
+        asx_prices = await _get_prices(asx_cands, "3mo")
+        if asx_prices:
+            prices_map.update(asx_prices)
+
+    # Commodities — yfinance (futures/ETFs in separate call)
+    comm_cands = market_candidates["commodities"][:10]
+    if comm_cands:
+        comm_prices = await _get_prices(comm_cands, "3mo")
+        if comm_prices:
+            prices_map.update(comm_prices)
+
+    # Crypto — yfinance -USD pairs (separate call, these often need individual fallback)
+    crypto_cands = market_candidates["crypto"][:10]
+    if crypto_cands:
+        crypto_prices = await _get_prices(crypto_cands, "3mo")
+        if crypto_prices:
+            prices_map.update(crypto_prices)
+
+    # Crypto fallback: if yfinance returned nothing for crypto, try individual fetches
+    crypto_missing = [t for t in crypto_cands if t not in prices_map]
+    if crypto_missing:
+        logger.info(f"Crypto signal fallback: fetching {len(crypto_missing)} tickers individually")
+        loop = asyncio.get_event_loop()
+        import yfinance as _yf_sig
+
+        def _fetch_single_crypto(tkr):
+            try:
+                hist = _yf_sig.Ticker(tkr).history(period="3mo", interval="1d", auto_adjust=True)
+                if hist is not None and not hist.empty and "Close" in hist.columns:
+                    closes = hist["Close"].dropna().tolist()
+                    if len(closes) >= 10:
+                        return (tkr, [float(c) for c in closes[-90:]])
+            except Exception:
+                pass
+            return None
+
+        tasks = [loop.run_in_executor(_EXECUTOR, _fetch_single_crypto, t) for t in crypto_missing[:8]]
+        results = await asyncio.gather(*tasks)
+        for res in results:
+            if res:
+                prices_map[res[0]] = res[1]
+
+    # All candidates across markets
     candidates = list(dict.fromkeys(
-        cached_by_market["asx"]         + fresh["asx"] +
-        cached_by_market["crypto"]       + fresh["crypto"] +
-        cached_by_market["commodities"]  + fresh["commodities"]
+        market_candidates["asx"] + market_candidates["crypto"] + market_candidates["commodities"]
     ))
-    candidates = candidates[:n * 3]
 
-    # ── Fetch 3-month price history (cap at 24 for speed) ──────────────
-    prices_map = await _get_prices(candidates[:24], "3mo") or {}
-
-    # Also pull single-day prices from scanner cache for RSI seed
+    # Also pull single-day prices from scanner cache
     cache_prices: dict = {}
     for mkt in ("asx", "crypto", "commodities"):
-        cached = _scanner_cache.get(mkt)
-        if cached:
-            for r in cached["rows"]:
+        sc = _scanner_cache.get(mkt)
+        if sc:
+            for r in sc["rows"]:
                 if r.get("price", 0) > 0:
                     cache_prices[r["ticker"]] = r["price"]
 
     signals = []
     for ticker in candidates:
         closes = prices_map.get(ticker)
-        # Require at least 10 data points (was 20 — was too strict)
+        # Require at least 10 data points
         if not closes or len(closes) < 10:
             continue
 
@@ -1314,8 +1425,19 @@ async def _gen_signals(n: int = 12) -> list[dict]:
         # Position size suggestion: 1–5% of portfolio based on confidence
         pos_size_pct = round(min(5.0, max(1.0, (conf - 50) / 9)), 1)
 
+        # Determine market type for the signal
+        if ticker in CRYPTO_TICKERS or _is_crypto(ticker):
+            sig_market = "crypto"
+        elif ticker in COMMODITY_TICKERS:
+            sig_market = "commodities"
+        else:
+            sig_market = "asx"
+
         signals.append({
             "ticker": ticker,
+            "trade_ticker": _to_trade_ticker(ticker) if _is_crypto(ticker) else ticker,
+            "currency": "AUD" if _is_crypto(ticker) else "USD",
+            "market": sig_market,
             "action": action,
             "confidence": conf,
             "price": price,
@@ -1333,14 +1455,36 @@ async def _gen_signals(n: int = 12) -> list[dict]:
             "timestamp": datetime.utcnow().isoformat(),
         })
 
-    # Return active signals only (no HOLDs — they're noise), sorted by confidence
+    # ── Ensure balanced market representation in final output ──
+    # Take top signals per market to avoid ASX crowding out crypto/commodities
     active = [s for s in signals if s["action"] != "HOLD"]
-    active.sort(key=lambda s: s["confidence"], reverse=True)
-    # If truly nothing actionable, fall back to showing highest-confidence HOLDs
     if not active:
         active = sorted(signals, key=lambda s: s["confidence"], reverse=True)
-    result = active[:n]
+
+    # Balanced selection: up to n/3 per market, fill remainder with best overall
+    per_market = max(2, n // 3)
+    balanced = []
+    for mkt in ("asx", "crypto", "commodities"):
+        mkt_sigs = sorted(
+            [s for s in active if s.get("market") == mkt],
+            key=lambda s: s["confidence"], reverse=True
+        )
+        balanced.extend(mkt_sigs[:per_market])
+
+    # Fill remaining slots with best overall signals not already included
+    seen = {s["ticker"] for s in balanced}
+    remaining = [s for s in active if s["ticker"] not in seen]
+    remaining.sort(key=lambda s: s["confidence"], reverse=True)
+    balanced.extend(remaining[:max(0, n - len(balanced))])
+
+    # Final sort by confidence
+    balanced.sort(key=lambda s: s["confidence"], reverse=True)
+    result = balanced[:n]
     _cache_set(cache_key, result)
+    logger.info(f"Signals generated: {len(result)} total — "
+                f"ASX:{sum(1 for s in result if s.get('market')=='asx')} "
+                f"Crypto:{sum(1 for s in result if s.get('market')=='crypto')} "
+                f"Commodities:{sum(1 for s in result if s.get('market')=='commodities')}")
     return result
 
 
@@ -1441,9 +1585,42 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
     all_rows.sort(key=_prescore, reverse=True)
     candidates = [r for r in all_rows if r["ticker"] not in PAPER.positions][:30]
 
-    # 3. Fetch 3-month price history for top candidates ───────────────────
-    tickers     = [r["ticker"] for r in candidates[:20]]
-    history_map = await _get_prices(tickers, "3mo") or {}
+    # 3. Fetch 3-month price history — SPLIT BY MARKET to avoid mixed-ticker failures
+    cand_by_mkt: dict = {"asx": [], "crypto": [], "commodities": []}
+    for r in candidates[:24]:
+        mkt = r.get("_market", "asx")
+        cand_by_mkt[mkt].append(r["ticker"])
+
+    history_map: dict = {}
+    for mkt, tkrs in cand_by_mkt.items():
+        if not tkrs:
+            continue
+        chunk = await _get_prices(tkrs[:10], "3mo")
+        if chunk:
+            history_map.update(chunk)
+
+    # Crypto individual fallback for any that bulk missed
+    crypto_missing = [t for t in cand_by_mkt.get("crypto", []) if t not in history_map]
+    if crypto_missing:
+        loop = asyncio.get_event_loop()
+        import yfinance as _yf_opp
+
+        def _fetch_one_opp(tkr):
+            try:
+                hist = _yf_opp.Ticker(tkr).history(period="3mo", interval="1d", auto_adjust=True)
+                if hist is not None and not hist.empty and "Close" in hist.columns:
+                    closes = hist["Close"].dropna().tolist()
+                    if len(closes) >= 10:
+                        return (tkr, [float(c) for c in closes[-90:]])
+            except Exception:
+                pass
+            return None
+
+        tasks = [loop.run_in_executor(_EXECUTOR, _fetch_one_opp, t) for t in crypto_missing[:8]]
+        results = await asyncio.gather(*tasks)
+        for res in results:
+            if res:
+                history_map[res[0]] = res[1]
 
     # 4. Full scoring with technicals ─────────────────────────────────────
     opportunities: list[dict] = []
@@ -2058,6 +2235,9 @@ def _gen_portfolio_health() -> dict:
 
 
 def _gen_backtest_results() -> dict:
+    """Generate simulated backtest results.
+    NOTE: This returns SIMULATED data — real walk-forward backtesting
+    requires the backtesting module to be integrated with historical data."""
     periods = []
     cumulative = STATE.initial_equity
     for i in range(8):
@@ -2073,7 +2253,8 @@ def _gen_backtest_results() -> dict:
             "trades": random.randint(28, 85),
         })
     return {
-        "status": "COMPLETE",
+        "status": "SIMULATED",
+        "data_source": "simulated",
         "training_months": 12,
         "test_months": 3,
         "periods": len(periods),
@@ -3168,6 +3349,10 @@ async def get_paper_live_pnl():
 @app.post("/api/paper/order")
 async def place_paper_order(payload: dict):
     """Place a paper trade. payload: {ticker, side, qty, price (optional)}."""
+    # ── Circuit breaker gate ──
+    if CIRCUIT_BREAKER is not None and CIRCUIT_BREAKER._trading_halted:
+        raise HTTPException(403, f"Trading halted by circuit breaker: {CIRCUIT_BREAKER._halt_reason}")
+
     ticker = _normalize_ticker(payload.get("ticker", "").strip())
     side   = payload.get("side", "BUY").upper()
     try:
@@ -3197,9 +3382,24 @@ async def place_paper_order(payload: dict):
     # Equity snapshot + persist
     _tickers = list(PAPER.positions.keys())
     _prices  = await _prices_for_positions(_tickers) if _tickers else {}
-    PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": PAPER.total_value(_prices)})
+    current_equity = PAPER.total_value(_prices)
+    PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
     PAPER.equity_history = PAPER.equity_history[-2000:]
     _save_paper_state()
+
+    # ── Update circuit breaker with new equity ──
+    if CIRCUIT_BREAKER is not None:
+        CIRCUIT_BREAKER.state.current_equity = current_equity
+        if current_equity > CIRCUIT_BREAKER.state.peak_equity:
+            CIRCUIT_BREAKER.state.peak_equity = current_equity
+
+    # ── Send notification if configured ──
+    if NOTIFIER is not None:
+        try:
+            NOTIFIER.send({"type": "TRADE", "ticker": ticker, "side": side,
+                           "qty": qty, "price": price, "mode": "paper"})
+        except Exception:
+            pass  # don't block trades on notification failure
 
     await WS_MANAGER.broadcast({"type": "PAPER_ORDER", "data": result})
     return result
@@ -3958,6 +4158,11 @@ async def get_real_portfolio():
 @app.post("/api/real/order")
 async def place_real_order(payload: dict):
     _require_live()
+
+    # ── Circuit breaker gate ──
+    if CIRCUIT_BREAKER is not None and CIRCUIT_BREAKER._trading_halted:
+        raise HTTPException(403, f"Trading halted by circuit breaker: {CIRCUIT_BREAKER._halt_reason}")
+
     ticker = payload.get("ticker", "").upper().strip()
     side   = payload.get("side", "BUY").upper()
     try:
@@ -3979,11 +4184,26 @@ async def place_real_order(payload: dict):
         raise HTTPException(502, f"Broker order failed: {e}")
     try:
         acct = await ACTIVE_BROKER.get_account()
-        REAL_EQUITY_CURVE.append({"t": datetime.utcnow().isoformat(), "v": acct.get("account_value", 0)})
+        current_equity = acct.get("account_value", 0)
+        REAL_EQUITY_CURVE.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
         _save_real_equity(REAL_EQUITY_CURVE[-2000:])
+        # ── Update circuit breaker ──
+        if CIRCUIT_BREAKER is not None:
+            CIRCUIT_BREAKER.state.current_equity = current_equity
+            if current_equity > CIRCUIT_BREAKER.state.peak_equity:
+                CIRCUIT_BREAKER.state.peak_equity = current_equity
     except Exception:
         pass
-    STATE.add_alert("LIVE", f"{side} {qty}�-- {ticker}", "INFO")
+
+    # ── Send notification ──
+    if NOTIFIER is not None:
+        try:
+            NOTIFIER.send({"type": "TRADE", "ticker": ticker, "side": side,
+                           "qty": qty, "price": price, "mode": "live"})
+        except Exception:
+            pass
+
+    STATE.add_alert("LIVE", f"{side} {qty} -- {ticker}", "INFO")
     await WS_MANAGER.broadcast({"type": "REAL_ORDER", "data": result})
     return result
 
@@ -4058,6 +4278,40 @@ async def boot_agent():
 async def test_notification(payload: dict):
     STATE.add_alert("TEST", f"Test notification sent to {payload.get('channel', 'unknown')}", "INFO")
     return {"status": "sent", "channel": payload.get("channel")}
+
+
+# ─────────────────────────────────────────────
+# Circuit Breaker & Risk Management
+# ─────────────────────────────────────────────
+
+@app.get("/api/risk/status")
+async def risk_status():
+    """Return circuit breaker and risk management status."""
+    if CIRCUIT_BREAKER is None:
+        return {"available": False, "reason": "CircuitBreaker not initialised"}
+    s = CIRCUIT_BREAKER.state
+    return {
+        "available": True,
+        "trading_halted": CIRCUIT_BREAKER._trading_halted,
+        "halt_reason": CIRCUIT_BREAKER._halt_reason or None,
+        "current_equity": round(s.current_equity, 2),
+        "peak_equity": round(s.peak_equity, 2),
+        "daily_pnl_pct": round(s.daily_pnl_pct, 2),
+        "drawdown_pct": round(s.drawdown_pct, 2),
+        "max_daily_loss_pct": CIRCUIT_BREAKER.settings.max_daily_loss_pct if SETTINGS_AVAILABLE else 2.0,
+        "max_drawdown_pct": CIRCUIT_BREAKER.settings.max_drawdown_pct if SETTINGS_AVAILABLE else 10.0,
+    }
+
+
+@app.post("/api/risk/reset")
+async def risk_reset():
+    """Reset circuit breaker halt (manual override)."""
+    if CIRCUIT_BREAKER is None:
+        raise HTTPException(503, "CircuitBreaker not available")
+    CIRCUIT_BREAKER._trading_halted = False
+    CIRCUIT_BREAKER._halt_reason = ""
+    STATE.add_alert("RISK", "Circuit breaker manually reset", "WARNING")
+    return {"status": "reset", "trading_halted": False}
 
 
 # ─────────────────────────────────────────────
