@@ -545,6 +545,11 @@ async def _on_startup():
     asyncio.get_event_loop().create_task(_sl_tp_monitor_loop())
     logger.info("SL/TP monitor started (30s interval)")
 
+    # ── Launch autonomous agent loop background task ──
+    asyncio.get_event_loop().create_task(_autonomous_agent_loop())
+    auto_status = "ENABLED" if AGENT_CONFIG.get("enabled", False) else "DISABLED"
+    logger.info(f"Autonomous agent loop started ({auto_status}, interval {AGENT_CONFIG.get('interval_seconds', 300)}s)")
+
     logger.info(f"Startup complete -- trading mode: {TRADING_MODE}")
 
 # ─────────────────────────────────────────────
@@ -625,10 +630,46 @@ DATA_DIR = ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
 (DATA_DIR / "storage").mkdir(exist_ok=True)  # SQLite DB lives here
 
-PAPER_STATE_FILE = DATA_DIR / "paper_portfolio.json"
+PAPER_STATE_FILE   = DATA_DIR / "paper_portfolio.json"
 REAL_EQUITY_FILE   = DATA_DIR / "real_equity.json"
 WATCHLIST_FILE     = DATA_DIR / "watchlist.json"
 PAPER_CONFIG_FILE  = DATA_DIR / "paper_config.json"
+AGENT_CONFIG_FILE  = DATA_DIR / "agent_config.json"
+
+
+# ── Agent auto-trading config persistence ──────────────────────────
+
+_AGENT_CONFIG_DEFAULTS = {
+    "enabled": False,
+    "interval_seconds": 300,
+    "min_confidence": 60,
+}
+
+
+def _load_agent_config() -> dict:
+    """Load agent auto-trading config from disk, or return defaults."""
+    try:
+        if AGENT_CONFIG_FILE.exists():
+            with open(AGENT_CONFIG_FILE) as f:
+                cfg = json.load(f)
+            # Merge with defaults so new keys are always present
+            merged = {**_AGENT_CONFIG_DEFAULTS, **cfg}
+            return merged
+    except Exception as exc:
+        logger.warning(f"Failed to load agent config: {exc}")
+    return dict(_AGENT_CONFIG_DEFAULTS)
+
+
+def _save_agent_config(cfg: dict) -> None:
+    """Persist agent auto-trading config to disk."""
+    try:
+        with open(AGENT_CONFIG_FILE, "w") as f:
+            json.dump(cfg, f, indent=2)
+    except Exception as exc:
+        logger.warning(f"Failed to save agent config: {exc}")
+
+
+AGENT_CONFIG = _load_agent_config()
 
 
 def _save_paper_state() -> None:
@@ -1154,6 +1195,279 @@ async def _sl_tp_monitor_loop():
         except Exception as exc:
             logger.warning(f"SL/TP monitor error: {exc}")
         await asyncio.sleep(30)
+
+
+# ── Autonomous Agent Loop ──────────────────────────────────────────
+
+_agent_last_cycle_time: Optional[str] = None
+_agent_next_cycle_time: Optional[str] = None
+
+
+async def _autonomous_agent_loop():
+    """Background loop: scan markets, generate signals, auto-execute paper trades.
+
+    Runs every AGENT_CONFIG['interval_seconds'] (default 300s / 5 min).
+    Auto-trading is disabled by default — user must enable via POST /api/agent/toggle.
+    Only executes trades automatically in paper mode. In live mode, signals are
+    logged but require manual execution.
+    """
+    global _agent_last_cycle_time, _agent_next_cycle_time
+
+    # Brief initial delay to let startup finish
+    await asyncio.sleep(10)
+    logger.info("Autonomous agent loop started (waiting for enable)")
+
+    while True:
+        interval = AGENT_CONFIG.get("interval_seconds", 300)
+        if not AGENT_CONFIG.get("enabled", False):
+            _agent_next_cycle_time = None
+            await asyncio.sleep(5)  # Check enable flag every 5s
+            continue
+
+        _agent_next_cycle_time = (
+            datetime.utcnow().__class__.utcnow()
+            .replace(microsecond=0)
+            .isoformat()
+        )
+
+        try:
+            await _run_autonomous_cycle()
+        except Exception as exc:
+            logger.error(f"Autonomous cycle error: {exc}")
+            STATE.add_alert("AGENT", f"Autonomous cycle failed: {exc}", "ERROR")
+
+        # Calculate next cycle time
+        await asyncio.sleep(interval)
+
+
+async def _run_autonomous_cycle():
+    """Execute one autonomous scan/signal/trade cycle."""
+    global _agent_last_cycle_time, _agent_next_cycle_time
+
+    cycle_start = datetime.utcnow()
+    STATE.cycle_count += 1
+    cycle_num = STATE.cycle_count
+
+    logger.info(f"Autonomous cycle #{cycle_num} starting...")
+
+    # 1. Refresh scanner data for all markets
+    markets_refreshed = 0
+    for market in ("asx", "crypto", "commodities"):
+        try:
+            await market_scanner(market)
+            markets_refreshed += 1
+        except Exception as exc:
+            logger.warning(f"Scanner refresh failed for {market}: {exc}")
+
+    # 2. Generate signals
+    signals = await _gen_signals(12)
+    min_confidence = AGENT_CONFIG.get("min_confidence", 60)
+
+    # 3. Filter signals by minimum confidence
+    strong_signals = [s for s in signals if s.get("confidence", 0) >= min_confidence]
+    buy_signals = [s for s in strong_signals if s.get("action") == "BUY"]
+    sell_signals = [s for s in strong_signals if s.get("action") == "SELL"]
+
+    trades_executed = 0
+    trade_details = []
+
+    # 4. Determine trading mode
+    is_paper = TRADING_MODE.upper() != "LIVE"
+
+    # 5. Process SELL signals — close held positions
+    for sig in sell_signals:
+        ticker = sig["ticker"]
+        if ticker not in PAPER.positions:
+            continue  # No position to close
+
+        if not is_paper:
+            logger.info(
+                f"[LIVE MODE] SELL signal for {ticker} (conf {sig['confidence']}%) "
+                f"— requires manual execution"
+            )
+            STATE.add_alert(
+                "AGENT",
+                f"SELL signal: {ticker} @ ${sig['price']:.4f} "
+                f"(conf {sig['confidence']}%) — manual execution required (live mode)",
+                "WARNING",
+            )
+            continue
+
+        # Auto-close in paper mode
+        try:
+            pos = PAPER.positions[ticker]
+            qty = pos["qty"]
+            price = await _live_price(ticker)
+            if price is None:
+                price = sig["price"]
+            price = float(price)
+
+            async with _PAPER_LOCK:
+                if ticker not in PAPER.positions:
+                    continue
+                result = PAPER.place_order(ticker, "SELL", qty, price)
+                _tickers = list(PAPER.positions.keys())
+                _prices = await _prices_for_positions(_tickers) if _tickers else {}
+                current_equity = PAPER.total_value(_prices)
+                PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
+                PAPER.equity_history = PAPER.equity_history[-2000:]
+                _save_paper_state()
+                if PAPER.history:
+                    _db_save_trade(PAPER.history[0])
+                _db_save_equity_snapshot(current_equity)
+
+            pnl = result.get("pnl", PAPER.history[0]["pnl"] if PAPER.history else 0)
+            trades_executed += 1
+            trade_details.append(f"SELL {ticker} x{qty:.4g} @ ${price:.4f}")
+            STATE.add_alert(
+                "AGENT",
+                f"Auto-closed {ticker} x{qty:.4g} @ ${price:.4f} (PnL ${pnl:+,.2f})",
+                "INFO",
+            )
+            await WS_MANAGER.broadcast({"type": "PAPER_ORDER", "data": result})
+            logger.info(f"Cycle #{cycle_num}: auto-closed {ticker} @ ${price:.4f}")
+
+        except Exception as exc:
+            logger.warning(f"Cycle #{cycle_num}: failed to close {ticker}: {exc}")
+
+    # 6. Process BUY signals — open new positions (paper mode only)
+    for sig in buy_signals:
+        ticker = sig["ticker"]
+        # Skip if already holding this ticker
+        if ticker in PAPER.positions:
+            continue
+
+        if not is_paper:
+            logger.info(
+                f"[LIVE MODE] BUY signal for {ticker} (conf {sig['confidence']}%) "
+                f"— requires manual execution"
+            )
+            STATE.add_alert(
+                "AGENT",
+                f"BUY signal: {ticker} @ ${sig['price']:.4f} "
+                f"(conf {sig['confidence']}%) — manual execution required (live mode)",
+                "WARNING",
+            )
+            continue
+
+        # Auto-execute in paper mode with position sizing
+        try:
+            price = await _live_price(ticker)
+            if price is None:
+                price = sig["price"]
+            price = float(price)
+
+            async with _PAPER_LOCK:
+                # Position sizing check
+                _tickers_pre = list(set(list(PAPER.positions.keys()) + [ticker]))
+                _prices_pre = await _prices_for_positions(_tickers_pre) if _tickers_pre else {}
+                _prices_pre[ticker] = price
+
+                try:
+                    sizing = _calculate_position_size(ticker, price, "BUY", PAPER, _prices_pre)
+                except ValueError as e:
+                    logger.info(f"Cycle #{cycle_num}: position sizing blocked {ticker}: {e}")
+                    continue
+
+                max_qty = sizing["max_allowed_qty"]
+                if max_qty <= 0:
+                    continue
+
+                # Use signal's suggested position size (1-5% of portfolio)
+                pos_size_pct = sig.get("position_size_pct", 2.0)
+                total_value = PAPER.total_value(_prices_pre)
+                target_value = total_value * (pos_size_pct / 100.0)
+                target_qty = target_value / price if price > 0 else 0
+
+                # Cap to max allowed
+                qty = min(target_qty, max_qty)
+                if qty <= 0:
+                    continue
+
+                # Round qty sensibly
+                if price > 100:
+                    qty = round(qty, 2)
+                elif price > 1:
+                    qty = round(qty, 4)
+                else:
+                    qty = round(qty, 6)
+
+                if qty <= 0:
+                    continue
+
+                # Use signal's SL/TP
+                sl = sig.get("stop_loss")
+                tp = sig.get("take_profit")
+
+                result = PAPER.place_order(ticker, "BUY", qty, price,
+                                           stop_loss=sl, take_profit=tp)
+
+                # Equity snapshot + persist
+                _tickers_post = list(PAPER.positions.keys())
+                _prices_post = await _prices_for_positions(_tickers_post) if _tickers_post else {}
+                current_equity = PAPER.total_value(_prices_post)
+                PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
+                PAPER.equity_history = PAPER.equity_history[-2000:]
+                _save_paper_state()
+                _db_save_equity_snapshot(current_equity)
+
+            trades_executed += 1
+            trade_details.append(f"BUY {ticker} x{qty:.4g} @ ${price:.4f}")
+            STATE.add_alert(
+                "AGENT",
+                f"Auto-bought {ticker} x{qty:.4g} @ ${price:.4f} "
+                f"(conf {sig['confidence']}%, SL ${sl}, TP ${tp})",
+                "INFO",
+            )
+            await WS_MANAGER.broadcast({"type": "PAPER_ORDER", "data": result})
+            logger.info(f"Cycle #{cycle_num}: auto-bought {ticker} x{qty:.4g} @ ${price:.4f}")
+
+        except Exception as exc:
+            logger.warning(f"Cycle #{cycle_num}: failed to buy {ticker}: {exc}")
+
+    # 7. Generate opportunities
+    opportunities = await _gen_opportunities(8)
+
+    # 8. Build cycle result
+    health = _gen_portfolio_health()
+    quadrant = _gen_quadrant_data()
+    _agent_last_cycle_time = datetime.utcnow().isoformat()
+    interval = AGENT_CONFIG.get("interval_seconds", 300)
+    _agent_next_cycle_time = (
+        datetime.utcnow().__class__.utcnow()
+        .replace(microsecond=0)
+        .isoformat()
+    )
+
+    result = {
+        "type": "CYCLE_COMPLETE",
+        "cycle": cycle_num,
+        "autonomous": True,
+        "quadrant": quadrant.get("quadrant", "unknown"),
+        "signals_found": len(signals),
+        "strong_signals": len(strong_signals),
+        "trades_executed": trades_executed,
+        "trade_details": trade_details,
+        "top_signals": signals[:5],
+        "opportunities": len(opportunities),
+        "portfolio_health": health,
+        "markets_refreshed": markets_refreshed,
+        "timestamp": _agent_last_cycle_time,
+    }
+    STATE.last_cycle = result
+
+    # 9. Summary log + alert
+    elapsed = (datetime.utcnow() - cycle_start).total_seconds()
+    summary = (
+        f"Cycle #{cycle_num} complete -- "
+        f"{len(signals)} signals, {len(strong_signals)} above {min_confidence}% conf, "
+        f"{trades_executed} trades executed ({elapsed:.1f}s)"
+    )
+    logger.info(summary)
+    STATE.add_alert("CYCLE", summary, "INFO")
+
+    # 10. Broadcast via WebSocket
+    await WS_MANAGER.broadcast({"type": "CYCLE_UPDATE", "data": result})
 
 
 # ─────────────────────────────────────────────
@@ -5552,6 +5866,83 @@ async def boot_agent():
     STATE.add_alert("BOOT", "Dalio Agent initialised -- FinBERT loaded, correlations computed", "INFO")
     await WS_MANAGER.broadcast({"type": "AGENT_BOOT", "message": "DALIO AGENT ONLINE"})
     return {"status": "booted", "timestamp": datetime.utcnow().isoformat()}
+
+
+@app.get("/api/agent/status")
+async def agent_status():
+    """Return autonomous agent status: enabled, interval, last/next cycle times."""
+    interval = AGENT_CONFIG.get("interval_seconds", 300)
+    return {
+        "enabled": AGENT_CONFIG.get("enabled", False),
+        "interval_seconds": interval,
+        "min_confidence": AGENT_CONFIG.get("min_confidence", 60),
+        "last_cycle_time": _agent_last_cycle_time,
+        "next_cycle_time": _agent_next_cycle_time,
+        "cycle_count": STATE.cycle_count,
+        "trading_mode": TRADING_MODE,
+        "auto_execute": TRADING_MODE.upper() != "LIVE",
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+@app.post("/api/agent/toggle")
+async def agent_toggle(payload: dict = None):
+    """Enable or disable autonomous auto-trading. Persisted to data/agent_config.json.
+
+    Body (optional): {"enabled": true/false}
+    If no body, toggles current state.
+    """
+    if payload and "enabled" in payload:
+        new_state = bool(payload["enabled"])
+    else:
+        new_state = not AGENT_CONFIG.get("enabled", False)
+
+    AGENT_CONFIG["enabled"] = new_state
+    _save_agent_config(AGENT_CONFIG)
+
+    status_str = "ENABLED" if new_state else "DISABLED"
+    logger.info(f"Autonomous agent {status_str} by user")
+    STATE.add_alert("AGENT", f"Autonomous trading {status_str}", "WARNING" if new_state else "INFO")
+    await WS_MANAGER.broadcast({
+        "type": "AGENT_CONFIG",
+        "data": {"enabled": new_state, "interval_seconds": AGENT_CONFIG.get("interval_seconds", 300)},
+    })
+
+    return {
+        "enabled": new_state,
+        "interval_seconds": AGENT_CONFIG.get("interval_seconds", 300),
+        "message": f"Autonomous trading {status_str}",
+    }
+
+
+@app.post("/api/agent/interval")
+async def agent_interval(payload: dict):
+    """Change the autonomous cycle interval.
+
+    Body: {"interval_seconds": 300}
+    Min 60s, max 3600s.
+    """
+    try:
+        new_interval = int(payload.get("interval_seconds", 300))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "interval_seconds must be an integer")
+
+    if new_interval < 60:
+        raise HTTPException(400, "Minimum interval is 60 seconds")
+    if new_interval > 3600:
+        raise HTTPException(400, "Maximum interval is 3600 seconds (1 hour)")
+
+    AGENT_CONFIG["interval_seconds"] = new_interval
+    _save_agent_config(AGENT_CONFIG)
+
+    logger.info(f"Autonomous agent interval changed to {new_interval}s")
+    STATE.add_alert("AGENT", f"Cycle interval changed to {new_interval}s ({new_interval // 60}m {new_interval % 60}s)", "INFO")
+
+    return {
+        "interval_seconds": new_interval,
+        "enabled": AGENT_CONFIG.get("enabled", False),
+        "message": f"Interval set to {new_interval}s",
+    }
 
 
 @app.post("/api/notifications/test")

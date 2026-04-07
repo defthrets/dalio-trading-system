@@ -24,6 +24,7 @@ data/paper_portfolio.json
 data/real_equity.json
 data/paper_config.json
 data/trading_mode.json
+data/agent_config.json
 
 # Environment files with secrets
 .env
