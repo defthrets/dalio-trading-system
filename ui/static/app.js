@@ -1316,6 +1316,14 @@ function initCharts() {
   Chart.defaults.color = '#5a8a65';
   Chart.defaults.font.family = 'JetBrains Mono, Share Tech Mono, monospace';
 
+  // [MEMORY-FIX] Destroy any existing chart instances before creating new ones
+  for (const key of Object.keys(charts)) {
+    if (charts[key] && typeof charts[key].destroy === 'function') {
+      charts[key].destroy();
+      charts[key] = null;
+    }
+  }
+
   // Equity chart
   const ectx = el('equityChart')?.getContext('2d');
   if (ectx) {
@@ -3833,6 +3841,8 @@ function cliPrint(text, cls = '', isHtml = false) {
   div.className = 'cli-msg' + (cls ? ' cli-msg--' + cls : '');
   if (isHtml) { div.innerHTML = text; } else { div.textContent = text; }
   out.appendChild(div);
+  // [MEMORY-FIX] Cap CLI output DOM nodes to prevent unbounded growth
+  while (out.children.length > 200) out.removeChild(out.firstChild);
   scrollCliOutput();
 }
 
@@ -3844,6 +3854,8 @@ async function sendCliCommand() {
   input.value = '';
   _cliHistIdx = -1;
   _cliHistory.push(cmd);
+  // [MEMORY-FIX] Cap CLI history to prevent unbounded growth
+  if (_cliHistory.length > 100) _cliHistory.splice(0, _cliHistory.length - 100);
 
   cliPrint(`<span class="cli-prompt-echo">DALIOS&gt;</span> ${escHtml(cmd)}`, 'user', true);
 
@@ -4161,6 +4173,12 @@ function _updatePaperTableInPlace(positions) {
     _setCell('pnl',     sign + fmt$(p.pnl) + arrow, pnlCls);
     _setCell('pnl_pct', sign + p.pnl_pct.toFixed(2) + '%', pnlCls);
   });
+
+  // [MEMORY-FIX] Prune _prevPnl for tickers no longer in positions to prevent unbounded growth
+  const activeTickers = new Set(positions.map(p => p.ticker));
+  for (const key of Object.keys(_prevPnl)) {
+    if (!activeTickers.has(key)) delete _prevPnl[key];
+  }
 }
 
 function _applyCCHistory(d) {
@@ -5578,7 +5596,9 @@ function checkPriceAlerts() {
 // Check price alerts every 30s
 document.addEventListener('DOMContentLoaded', () => {
   _loadPriceAlerts();
-  setInterval(checkPriceAlerts, 30000);
+  // [MEMORY-FIX] Track interval so it can be cleaned up
+  if (window._intervals) window._intervals.push(setInterval(checkPriceAlerts, 30000));
+  else setInterval(checkPriceAlerts, 30000);
 });
 
 
