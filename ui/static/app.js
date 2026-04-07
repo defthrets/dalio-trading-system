@@ -2309,10 +2309,22 @@ function toggleSoundSetting(btn) {
 }
 
 function requestNotificationPermission() {
+  if (Notification.permission === 'denied') {
+    pushAlert('SETTINGS', 'Notifications blocked by browser. Reset in browser settings: click the lock icon in the address bar → Site settings → Notifications → Allow.', 'warn');
+    return;
+  }
   initNotifications();
   setTimeout(() => {
     const btn = el('settNotifBtn');
-    if (btn) { btn.textContent = Notification.permission === 'granted' ? 'ENABLED' : 'BLOCKED'; btn.classList.toggle('on', Notification.permission === 'granted'); }
+    if (!btn) return;
+    if (Notification.permission === 'granted') {
+      btn.textContent = 'ENABLED'; btn.classList.add('on');
+    } else if (Notification.permission === 'denied') {
+      btn.textContent = 'BLOCKED'; btn.classList.remove('on');
+      pushAlert('SETTINGS', 'Notifications blocked. Reset via browser address bar lock icon → Site settings → Notifications → Allow.', 'warn');
+    } else {
+      btn.textContent = 'ENABLE'; btn.classList.remove('on');
+    }
   }, 1500);
 }
 
@@ -2376,10 +2388,8 @@ function setTheme(name, btn) {
 function _applyStoredTheme() {
   const s = _loadSettings();
   const theme = s.theme || 'light';
-  if (theme !== 'cyber') {
-    const btn = document.querySelector(`[data-theme="${theme}"]`);
-    if (btn) setTheme(theme, btn);
-  }
+  const btn = document.querySelector(`[data-theme="${theme}"]`);
+  setTheme(theme, btn);
   _updateThemeToggleBtn(theme);
 }
 

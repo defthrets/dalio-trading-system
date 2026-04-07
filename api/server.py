@@ -521,7 +521,7 @@ async def get_recommendations(n: int = 6):
 
     recs = []
     for opp in opps:
-        if opp["score"] < 65:
+        if opp["score"] < 25:
             continue
         ticker = opp["ticker"]
         analysis = dalio_analyse_trade(
