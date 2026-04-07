@@ -33,7 +33,7 @@ from engines.quadrant_engine import QuadrantEngine
 from trading.signal_generator import SignalGenerator, TradeSignal
 from trading.execution import ExecutionEngine
 from trading.circuit_breaker import CircuitBreaker
-from config.assets import get_all_assets
+from config.assets import get_core_assets
 from config.settings import get_settings
 
 
@@ -81,23 +81,41 @@ class DalioAgent:
     # ------------------------------------------------------------------
 
     def boot(self):
-        """Initialise all engines. Call once at startup."""
+        """Initialise all engines. Each step is isolated so one failure
+        doesn't prevent the rest of the system from starting."""
         logger.info("=" * 60)
         logger.info("  DALIO AUTONOMOUS TRADING SYSTEM — BOOTING")
         logger.info("=" * 60)
 
+        # Step 1: FinBERT (optional — keyword fallback exists)
         logger.info("Step 1/4: Loading FinBERT sentiment model...")
-        self.sentiment_engine.load_model()
+        try:
+            self.sentiment_engine.load_model()
+        except Exception as e:
+            logger.error(f"FinBERT load failed, using keyword fallback: {e}")
 
+        # Step 2: Quadrant classification
         logger.info("Step 2/4: Classifying economic quadrant...")
-        self._current_quadrant_context = self.quadrant_engine.classify()
-        logger.info(self.quadrant_engine.get_narrative())
+        try:
+            self._current_quadrant_context = self.quadrant_engine.classify()
+            logger.info(self.quadrant_engine.get_narrative())
+        except Exception as e:
+            logger.error(f"Quadrant classification failed, defaulting to unknown: {e}")
+            self._current_quadrant_context = {"quadrant": "unknown", "description": "Boot failed — neutral positioning"}
 
+        # Step 3: Correlation matrix
         logger.info("Step 3/4: Building correlation matrix...")
-        self._refresh_correlations()
+        try:
+            self._refresh_correlations()
+        except Exception as e:
+            logger.error(f"Correlation matrix build failed: {e}")
 
+        # Step 4: Risk-parity weights
         logger.info("Step 4/4: Computing risk-parity weights...")
-        self._refresh_weights()
+        try:
+            self._refresh_weights()
+        except Exception as e:
+            logger.error(f"Risk-parity weight computation failed: {e}")
 
         self._booted = True
         logger.info("DALIO AGENT READY. Entering autonomous mode.")
@@ -248,7 +266,7 @@ class DalioAgent:
     # ------------------------------------------------------------------
 
     def _refresh_correlations(self):
-        tickers = list(get_all_assets().keys())
+        tickers = list(get_core_assets().keys())
         self.correlation_engine.refresh(tickers)
         self._last_correlation_update = datetime.utcnow()
 

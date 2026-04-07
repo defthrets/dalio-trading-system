@@ -54,6 +54,7 @@ class SentimentEngine:
         self.news_fetcher = NewsDataFetcher()
         self._model = None
         self._tokenizer = None
+        self._load_failed = False
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # ------------------------------------------------------------------
@@ -61,9 +62,11 @@ class SentimentEngine:
     # ------------------------------------------------------------------
 
     def load_model(self):
-        """Lazy-load FinBERT (downloads once, ~400 MB)."""
+        """Lazy-load FinBERT (downloads once, ~400 MB). Won't retry on failure."""
         if self._model is not None:
             return
+        if self._load_failed:
+            return  # Already failed — use keyword fallback instead of retrying
 
         model_name = self.settings.finbert_model_name
         logger.info(f"Loading FinBERT model: {model_name} on {self._device}")
@@ -74,8 +77,9 @@ class SentimentEngine:
             self._model.eval()
             logger.info("FinBERT loaded successfully.")
         except Exception as e:
-            logger.error(f"FinBERT load failed: {e}")
+            logger.error(f"FinBERT load failed (will use keyword fallback): {e}")
             self._model = None
+            self._load_failed = True
 
     def analyze_article(self, title: str, summary: str = "") -> dict:
         """

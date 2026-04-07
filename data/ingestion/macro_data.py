@@ -6,6 +6,7 @@ Used to classify the current economic quadrant.
 
 import pandas as pd
 import requests
+import yfinance as yf
 from datetime import datetime
 from loguru import logger
 
@@ -40,6 +41,7 @@ class MacroDataFetcher:
         """
         Get a current snapshot of all macro indicators for quadrant classification.
         Returns latest values and their trends (rising/falling).
+        Tries EODHD first, falls back to yfinance market proxies.
         """
         gdp = self.get_gdp_data(country)
         cpi = self.get_cpi_data(country)
@@ -63,6 +65,103 @@ class MacroDataFetcher:
                 "date": str(df.index[-1].date()),
             }
 
+        # If EODHD returned all unknowns, use yfinance market proxies
+        all_unknown = all(
+            snapshot.get(k, {}).get("trend") == "unknown"
+            for k in ["gdp", "cpi", "interest_rate", "unemployment"]
+        )
+        if all_unknown:
+            logger.info("EODHD data unavailable — using yfinance market proxy fallback")
+            snapshot = self._yfinance_macro_fallback()
+
+        return snapshot
+
+    def _yfinance_macro_fallback(self) -> dict:
+        """
+        Estimate macro trends from freely available market data:
+          - Growth proxy: ASX200 (^AXJO) 3-month trend
+          - Inflation proxy: Gold (GC=F) vs Bond yield (^TNX) spread trend
+          - Interest rate proxy: AU 10Y bond yield (^GSPC stand-in via ^TNX)
+          - Unemployment proxy: consumer discretionary vs staples ratio
+        """
+        snapshot = {
+            "gdp": {"value": None, "trend": "unknown"},
+            "cpi": {"value": None, "trend": "unknown"},
+            "interest_rate": {"value": None, "trend": "unknown"},
+            "unemployment": {"value": None, "trend": "unknown"},
+        }
+
+        try:
+            # Growth proxy: ASX200 3-month trend
+            asx = yf.download("^AXJO", period="6mo", interval="1wk", progress=False)
+            if len(asx) >= 12:
+                recent = asx["Close"].iloc[-1]
+                past = asx["Close"].iloc[-12]
+                pct = float((recent - past) / past * 100)
+                snapshot["gdp"] = {
+                    "value": round(pct, 2),
+                    "previous": 0,
+                    "trend": "rising" if pct > 0 else "falling",
+                    "date": str(asx.index[-1].date()),
+                    "source": "yfinance_proxy (ASX200 3mo return)",
+                }
+        except Exception as e:
+            logger.debug(f"Growth proxy failed: {e}")
+
+        try:
+            # Inflation proxy: Gold price trend (rising gold = rising inflation expectations)
+            gold = yf.download("GC=F", period="6mo", interval="1wk", progress=False)
+            if len(gold) >= 12:
+                recent = gold["Close"].iloc[-1]
+                past = gold["Close"].iloc[-12]
+                pct = float((recent - past) / past * 100)
+                snapshot["cpi"] = {
+                    "value": round(pct, 2),
+                    "previous": 0,
+                    "trend": "rising" if pct > 2 else "falling",
+                    "date": str(gold.index[-1].date()),
+                    "source": "yfinance_proxy (Gold 3mo change)",
+                }
+        except Exception as e:
+            logger.debug(f"Inflation proxy failed: {e}")
+
+        try:
+            # Interest rate proxy: US 10Y Treasury yield trend
+            tnx = yf.download("^TNX", period="6mo", interval="1wk", progress=False)
+            if len(tnx) >= 12:
+                recent = float(tnx["Close"].iloc[-1])
+                past = float(tnx["Close"].iloc[-12])
+                snapshot["interest_rate"] = {
+                    "value": round(recent, 2),
+                    "previous": round(past, 2),
+                    "trend": "rising" if recent > past else "falling",
+                    "date": str(tnx.index[-1].date()),
+                    "source": "yfinance_proxy (US 10Y yield)",
+                }
+        except Exception as e:
+            logger.debug(f"Rate proxy failed: {e}")
+
+        try:
+            # Unemployment proxy: consumer discretionary (XLY) vs staples (XLP)
+            # Rising ratio = confidence/low unemployment, falling = rising unemployment
+            xly = yf.download("XLY", period="6mo", interval="1wk", progress=False)
+            xlp = yf.download("XLP", period="6mo", interval="1wk", progress=False)
+            if len(xly) >= 12 and len(xlp) >= 12:
+                ratio_now = float(xly["Close"].iloc[-1] / xlp["Close"].iloc[-1])
+                ratio_past = float(xly["Close"].iloc[-12] / xlp["Close"].iloc[-12])
+                # Falling ratio = rising unemployment
+                snapshot["unemployment"] = {
+                    "value": round(ratio_now, 4),
+                    "previous": round(ratio_past, 4),
+                    "trend": "falling" if ratio_now > ratio_past else "rising",
+                    "date": str(xly.index[-1].date()),
+                    "source": "yfinance_proxy (XLY/XLP ratio)",
+                }
+        except Exception as e:
+            logger.debug(f"Unemployment proxy failed: {e}")
+
+        proxied = sum(1 for v in snapshot.values() if v.get("trend") != "unknown")
+        logger.info(f"yfinance macro fallback: {proxied}/4 indicators estimated")
         return snapshot
 
     def classify_quadrant(self, snapshot: dict) -> str:

@@ -14,7 +14,7 @@ from loguru import logger
 from typing import Optional
 
 from config.settings import get_settings
-from config.assets import get_all_assets
+from config.assets import get_core_assets
 from data.ingestion.market_data import MarketDataFetcher
 
 
@@ -36,17 +36,28 @@ class CorrelationEngine:
         """
         Rebuild the correlation matrix from fresh market data.
         Called once every 24 hours by the scheduler.
+        Preserves the last good matrix if the refresh fails.
         """
         if tickers is None:
-            tickers = list(get_all_assets().keys())
+            tickers = list(get_core_assets().keys())
 
         logger.info(f"Refreshing correlation matrix for {len(tickers)} assets...")
-        self.returns_df = self._build_returns_matrix(tickers)
 
-        if self.returns_df.empty:
-            logger.error("No return data available — correlation matrix not updated.")
+        try:
+            new_returns = self._build_returns_matrix(tickers)
+        except Exception as e:
+            logger.error(f"Correlation refresh crashed: {e}")
+            if self.corr_matrix is not None:
+                logger.info("Keeping previous correlation matrix.")
+            return self.corr_matrix if self.corr_matrix is not None else pd.DataFrame()
+
+        if new_returns.empty:
+            logger.warning("No return data available — keeping previous correlation matrix.")
+            if self.corr_matrix is not None:
+                return self.corr_matrix
             return pd.DataFrame()
 
+        self.returns_df = new_returns
         lookback = self.settings.correlation_lookback_days
         recent = self.returns_df.tail(lookback)
         self.corr_matrix = recent.corr(method="pearson")

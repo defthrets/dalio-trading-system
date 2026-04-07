@@ -76,13 +76,33 @@ CRYPTO = {
 }
 
 def get_all_assets() -> dict:
-    """Return the full asset universe."""
+    """Return the full asset universe (56 assets)."""
     all_assets = {}
     all_assets.update(ASX_EQUITIES)
     all_assets.update(COMMODITIES)
     all_assets.update(DEFENSIVE_ETFS)
     all_assets.update(CRYPTO)
     return all_assets
+
+
+# Core subset (~20 assets) for low-memory systems (< 8GB RAM).
+# Covers all quadrants with the most liquid instruments.
+CORE_TICKERS = [
+    # ASX blue chips (5)
+    "BHP.AX", "CBA.AX", "CSL.AX", "FMG.AX", "WDS.AX",
+    # Commodities (5)
+    "GC=F", "CL=F", "SI=F", "HG=F", "NG=F",
+    # Defensive ETFs (3)
+    "TLT", "GLD", "TIP",
+    # Crypto (5)
+    "BTC-AUD", "ETH-AUD", "SOL-AUD", "XRP-AUD", "BNB-AUD",
+]
+
+
+def get_core_assets() -> dict:
+    """Return a reduced ~20 asset universe for memory-constrained systems."""
+    full = get_all_assets()
+    return {t: full[t] for t in CORE_TICKERS if t in full}
 
 
 def get_assets_by_quadrant(quadrant: str) -> dict:
