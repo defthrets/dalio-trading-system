@@ -3463,7 +3463,7 @@ function initEquityChart(canvasId, chartRef, multiAsset = false) {
     type: 'line',
     data: { labels: [], datasets },
     options: {
-      responsive: !isPaper, maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       animation: { duration: 300 },
       interaction: { mode: 'index', intersect: false },
       plugins: {

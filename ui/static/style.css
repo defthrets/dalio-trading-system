@@ -1150,8 +1150,10 @@ a:hover { color: var(--primary); text-decoration: underline; }
 .chart-ctrl-select:focus { outline: 1px solid var(--primary-dim); }
 
 /* Live equity panel in live trading tab */
-.panel--live-equity { grid-column: 1 / -1; }
-.panel--live-equity .chart-container { height: 140px !important; }
+.panel--live-equity { grid-column: 1 / -1; overflow: hidden; }
+.panel--live-equity .chart-container { height: 140px !important; max-height: 140px; }
+.panel--live-equity .paper-equity-chart-wrap { height: 140px; max-height: 140px; overflow: hidden; }
+.panel--live-equity canvas { max-height: 120px; }
 /* Row 3: AI recommendations (wide) | live positions */
 .panel--cc-recs       { grid-column: 1 / 4;  grid-row: 3; overflow: hidden; max-height: 500px; }
 .panel--cc-livepos    { grid-column: 4;      grid-row: 3; overflow: hidden; max-height: 500px; }
@@ -3621,6 +3623,10 @@ canvas { display: block; max-width: 100%; }
 .paper-equity-chart-wrap {
   padding: 10px 12px 4px;
   border-bottom: 1px solid var(--border);
+  position: relative;
+  height: 140px;
+  max-height: 140px;
+  overflow: hidden;
 }
 .pec-header {
   display: flex;
