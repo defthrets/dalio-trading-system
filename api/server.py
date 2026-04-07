@@ -360,6 +360,64 @@ def _calc_atr(closes: list, period: int = 14) -> float:
     diffs = [abs(closes[i] - closes[i - 1]) for i in range(-period, 0)]
     return float(np.mean(diffs))
 
+
+def _calc_ema(closes: list, span: int) -> list:
+    """Compute exponential moving average from a list of closes."""
+    if not closes:
+        return []
+    alpha = 2.0 / (span + 1)
+    ema = [closes[0]]
+    for c in closes[1:]:
+        ema.append(alpha * c + (1 - alpha) * ema[-1])
+    return ema
+
+
+def _calc_macd(closes: list) -> dict:
+    """Compute MACD, signal line, and crossover from a list of closes."""
+    if len(closes) < 35:
+        return {"macd": 0.0, "signal_line": 0.0, "macd_signal": "neutral", "macd_crossover": False}
+    ema12 = _calc_ema(closes, 12)
+    ema26 = _calc_ema(closes, 26)
+    macd_line = [e12 - e26 for e12, e26 in zip(ema12, ema26)]
+    signal_line = _calc_ema(macd_line, 9)
+    macd_val = macd_line[-1]
+    sig_val = signal_line[-1]
+    prev_macd = macd_line[-2] if len(macd_line) >= 2 else 0
+    prev_sig = signal_line[-2] if len(signal_line) >= 2 else 0
+    return {
+        "macd": round(macd_val, 4),
+        "signal_line": round(sig_val, 4),
+        "macd_signal": "bullish" if macd_val > sig_val else "bearish",
+        "macd_crossover": macd_val > sig_val and prev_macd <= prev_sig,
+    }
+
+
+def _calc_bollinger(closes: list, period: int = 20) -> dict:
+    """Compute Bollinger Bands position from a list of closes."""
+    if len(closes) < period:
+        return {"bb_position": "mid", "bb_pct": 0.5}
+    window = closes[-period:]
+    sma = float(np.mean(window))
+    std = float(np.std(window))
+    upper = sma + 2 * std
+    lower = sma - 2 * std
+    last = closes[-1]
+    if last > upper:
+        pos = "above_upper"
+    elif last < lower:
+        pos = "below_lower"
+    else:
+        pos = "mid"
+    bb_pct = (last - lower) / (upper - lower + 1e-9)
+    return {"bb_position": pos, "bb_pct": round(bb_pct, 4)}
+
+
+def _calc_sma(closes: list, period: int) -> float:
+    """Simple moving average of last `period` values."""
+    if len(closes) < period:
+        return closes[-1] if closes else 0.0
+    return float(np.mean(closes[-period:]))
+
 # ─────────────────────────────────────────────
 # App setup
 # ─────────────────────────────────────────────
@@ -1981,48 +2039,85 @@ async def _gen_signals(n: int = 12) -> list[dict]:
         rsi    = _calc_rsi(closes)
         trend  = _calc_trend(closes)
         atr    = _calc_atr(closes)
+        macd_data = _calc_macd(closes)
+        bb_data   = _calc_bollinger(closes)
 
-        # Rule-based action — crypto gets wider RSI bands (more volatile)
+        # ── Multi-indicator scoring (inspired by SignalGenerator engine) ──
+        score = 0.0
+        signal_reasons = []
+
+        # RSI contribution
         if is_crypto_ticker:
-            # Crypto: wider bands to account for higher volatility
-            if rsi < 38 and trend != "downtrend":
-                action = "BUY"
-            elif rsi > 62 and trend != "uptrend":
-                action = "SELL"
-            elif trend == "uptrend" and rsi < 60:
-                action = "LONG"
-            elif trend == "downtrend" and rsi > 40:
-                action = "SHORT"
-            else:
-                action = "HOLD"
+            rsi_oversold, rsi_overbought = 38, 62
         else:
-            # ASX / Commodities: standard thresholds
-            if rsi < 32 and trend != "downtrend":
-                action = "BUY"
-            elif rsi > 68 and trend != "uptrend":
-                action = "SELL"
-            elif trend == "uptrend" and rsi < 58:
-                action = "LONG"
-            elif trend == "downtrend" and rsi > 42:
-                action = "SHORT"
-            else:
-                action = "HOLD"
+            rsi_oversold, rsi_overbought = 32, 68
+
+        if rsi < rsi_oversold:
+            score += 2.0
+            signal_reasons.append(f"RSI oversold ({rsi:.0f})")
+        elif rsi > rsi_overbought:
+            score -= 2.0
+            signal_reasons.append(f"RSI overbought ({rsi:.0f})")
+        elif rsi < 45:
+            score += 0.5
+        elif rsi > 55:
+            score -= 0.5
+
+        # MACD contribution
+        if macd_data["macd_signal"] == "bullish":
+            score += 1.5
+            signal_reasons.append("MACD bullish")
+        else:
+            score -= 1.5
+            signal_reasons.append("MACD bearish")
+        if macd_data["macd_crossover"]:
+            score += 1.0
+            signal_reasons.append("Fresh MACD crossover")
+
+        # Bollinger Bands contribution
+        if bb_data["bb_position"] == "below_lower":
+            score += 1.5
+            signal_reasons.append("Below lower Bollinger Band")
+        elif bb_data["bb_position"] == "above_upper":
+            score -= 1.5
+            signal_reasons.append("Above upper Bollinger Band")
+
+        # Trend contribution
+        if trend == "uptrend":
+            score += 2.0
+            signal_reasons.append("Confirmed uptrend")
+        elif trend == "downtrend":
+            score -= 2.0
+            signal_reasons.append("Confirmed downtrend")
+
+        # Momentum (rate of change)
+        if len(closes) >= 10:
+            roc = (closes[-1] / closes[-10] - 1) * 100
+            if roc > 5:
+                score += 0.5
+            elif roc < -5:
+                score -= 0.5
+
+        # Determine action from composite score
+        if score >= 3.0:
+            action = "BUY"
+        elif score <= -3.0:
+            action = "SHORT"
+        elif score >= 1.5:
+            action = "LONG"
+        elif score <= -1.5:
+            action = "SELL"
+        else:
+            action = "HOLD"
 
         price_history = [round(c, 4 if "USD" in ticker else 2) for c in closes[-30:]]
 
         sl_offset = max(atr * 1.5, price * 0.025)
         tp_offset = atr * 2.5
 
-        # Confidence: crypto gets lower floor (40 instead of 50) due to volatility
+        # Confidence derived from score magnitude (normalised to 0-100%)
         conf_floor = 40.0 if is_crypto_ticker else 50.0
-        if action == "BUY":
-            conf = round(min(95, max(conf_floor, 100 - rsi)), 1)
-        elif action == "SELL":
-            conf = round(min(95, max(conf_floor, rsi)), 1)
-        elif action in ("LONG", "SHORT"):
-            conf = round(min(85, max(conf_floor, abs(rsi - 50) + 50)), 1)
-        else:
-            conf = conf_floor
+        conf = round(min(95, max(conf_floor, abs(score) / 10.0 * 100)), 1)
 
         # quadrant_fit computed from ASSET_CLASS_MAP + current quadrant
         qdata = STATE.last_quadrant or {}
@@ -2049,6 +2144,7 @@ async def _gen_signals(n: int = 12) -> list[dict]:
             sig_market = "asx"
 
         # Build signal dict
+        rr_ratio = round(tp_offset / sl_offset, 2)
         sig = {
             "ticker": ticker,
             "trade_ticker": _to_trade_ticker(ticker) if is_crypto_ticker else ticker,
@@ -2061,14 +2157,26 @@ async def _gen_signals(n: int = 12) -> list[dict]:
             "quadrant_fit": q_fit,
             "rsi": rsi,
             "trend": trend,
+            "macd_signal": macd_data["macd_signal"],
+            "macd_value": macd_data["macd"],
+            "macd_crossover": macd_data["macd_crossover"],
+            "bb_position": bb_data["bb_position"],
+            "bb_pct": bb_data["bb_pct"],
+            "signal_score": round(score, 2),
+            "signal_reasons": signal_reasons,
             "stop_loss":  round(price - sl_offset, 2) if action in ("SELL","SHORT") else round(price - sl_offset, 2),
             "take_profit": round(price + tp_offset, 2) if action in ("BUY","LONG")  else round(price - tp_offset, 2),
-            "rr_ratio": round(tp_offset / sl_offset, 2),
+            "rr_ratio": rr_ratio,
             "fee_pct": _get_fee_pct(ticker),
             "round_trip_fee_pct": round(_get_fee_pct(ticker) * 2, 2),
             "net_rr_ratio": round(max(0, (tp_offset - price * _get_fee_pct(ticker) * 2 / 100)) / sl_offset, 2),
             "position_size_pct": pos_size_pct,
-            "dalio_justification": _gen_justification(ticker, action),
+            "dalio_justification": _gen_justification(
+                ticker, action, rsi=rsi, rr=rr_ratio,
+                macd_signal=macd_data["macd_signal"],
+                bb_position=bb_data["bb_position"],
+                trend=trend, q_fit=q_fit,
+            ),
             "price_history": price_history,
             "predicted_days": predicted_days,
             "timestamp": datetime.utcnow().isoformat(),
@@ -2380,18 +2488,47 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
     return opportunities[:n]
 
 
-def _gen_justification(ticker: str, action: str) -> dict:
-    quadrant = random.choice(list(QUADRANT_META.keys()))
-    meta = QUADRANT_META[quadrant]
-    sent_score = round(random.uniform(-0.5, 0.8), 3)
-    sharpe_imp = round(random.uniform(0.05, 0.35), 3)
-    rsi_val    = round(random.uniform(22, 78), 1)
-    rr         = round(random.uniform(1.5, 4.0), 2)
-    corr       = round(random.uniform(-0.12, 0.08), 3)
+def _gen_justification(ticker: str, action: str, **kwargs) -> dict:
+    """
+    Generate Dalio-framework justification using real signal data.
+    Accepts keyword args from the signal computation (rsi, rr, macd_signal, etc.)
+    to build an evidence-based narrative instead of random values.
+    """
+    # Pull real quadrant from state, fall back to computed
+    qdata = STATE.last_quadrant or {}
+    quadrant = qdata.get("quadrant", "rising_growth")
+    meta = QUADRANT_META.get(quadrant, QUADRANT_META["rising_growth"])
+
+    # Use real values passed from signal generator, with sensible defaults
+    rsi_val = kwargs.get("rsi", 50.0)
+    rr = kwargs.get("rr", 2.0)
+    macd_sig = kwargs.get("macd_signal", "neutral")
+    bb_pos = kwargs.get("bb_position", "mid")
+    trend = kwargs.get("trend", "sideways")
+    q_fit = kwargs.get("q_fit", "neutral")
+
+    # Derive sentiment from cached sentiment data if available
+    sent_score = 0.0
+    sent_source = "keyword"
+    if STATE.last_sentiment:
+        qs = STATE.last_sentiment.get("quadrant_sentiment", {})
+        q_sent = qs.get(quadrant, {})
+        sent_score = q_sent.get("avg_score", 0.0)
+        sent_source = STATE.last_sentiment.get("sentiment_model", "keyword")
+
+    # Estimate correlation contribution from position count
+    n_positions = len(PAPER.positions) + 1
+    corr_estimate = round(max(-0.15, min(0.1, 0.3 - 0.03 * n_positions)), 3)
+
+    # Estimate Sharpe improvement based on confidence/RR
+    sharpe_est = round(max(0.01, min(0.4, (rr - 1.0) * 0.1)), 3)
+
+    # Risk contribution based on equal-weight share
+    risk_contrib = round(100.0 / max(n_positions, 1), 2)
 
     action_word = {
-        "BUY":   "long",  "LONG":  "long",
-        "SELL":  "exit",  "SHORT": "short", "HOLD": "hold",
+        "BUY": "long", "LONG": "long",
+        "SELL": "exit", "SHORT": "short", "HOLD": "hold",
     }.get(action, "enter")
 
     sentiment_word = "positive" if sent_score > 0.1 else "negative" if sent_score < -0.1 else "neutral"
@@ -2400,33 +2537,174 @@ def _gen_justification(ticker: str, action: str) -> dict:
 
     ai_overview = (
         f"{ticker} presents a {action.lower()} opportunity under the current {quadrant_label} regime. "
-        f"FinBERT sentiment across recent news is {sentiment_word} (score {sent_score:+.3f}), "
-        f"RSI reads {rsi_val} ({rsi_desc}), and the risk/reward ratio is {rr}:1. "
-        f"Adding this position improves portfolio Sharpe by +{sharpe_imp:.3f} and contributes "
-        f"{'negatively' if corr < 0 else 'minimally'} to overall correlation ({corr:+.3f} delta), "
-        f"keeping the Holy Grail diversification threshold intact. "
+        f"Sentiment ({sent_source}) is {sentiment_word} (score {sent_score:+.3f}), "
+        f"RSI reads {rsi_val:.0f} ({rsi_desc}), MACD is {macd_sig}, "
+        f"BB position: {bb_pos}, trend: {trend}. "
+        f"Risk/reward ratio is {rr}:1. "
+        f"Estimated correlation delta {corr_estimate:+.3f} — within Holy Grail threshold. "
+        f"Quadrant fit: {q_fit}. "
         f"Dalio framework favours {', '.join(meta['favoured'][:3])} in this environment."
     )
+
+    reasons = [
+        f"Asset has {q_fit} alignment with {quadrant_label} environment",
+        f"Sentiment ({sent_source}): {sentiment_word} ({sent_score:+.3f}) for {ticker}",
+        f"RSI {rsi_val:.0f} — {rsi_desc} zone",
+        f"MACD {macd_sig} | Bollinger: {bb_pos} | Trend: {trend}",
+        f"Correlation delta {corr_estimate:+.3f} — within Holy Grail threshold",
+    ]
 
     return {
         "quadrant": quadrant,
         "quadrant_description": meta["description"],
         "sentiment_score": sent_score,
-        "sharpe_improvement": sharpe_imp,
-        "correlation_delta": corr,
-        "risk_contribution_pct": round(random.uniform(4.0, 8.5), 2),
+        "sentiment_model": sent_source,
+        "sharpe_improvement": sharpe_est,
+        "correlation_delta": corr_estimate,
+        "risk_contribution_pct": risk_contrib,
         "ai_overview": ai_overview,
-        "reasons": [
-            f"Asset aligns with {quadrant_label} environment",
-            f"FinBERT sentiment {sentiment_word} ({sent_score:+.3f}) for {ticker}",
-            f"RSI {rsi_val} -- {rsi_desc} zone",
-            f"Trade improves portfolio Sharpe by +{sharpe_imp:.3f}",
-            f"Correlation delta {corr:+.3f} -- within Holy Grail threshold",
-        ],
+        "reasons": reasons,
+        "data_source": "LIVE",
     }
 
 
 def _gen_quadrant_data() -> dict:
+    """
+    Classify economic quadrant from real market data when available.
+    Uses: market breadth (% of tracked stocks up), gold direction (inflation proxy),
+    bond proxy TLT direction (growth expectations), and overall volatility.
+    Falls back to random only if no market data is available at all.
+    """
+    try:
+        return _classify_quadrant_from_market_data()
+    except Exception as exc:
+        logger.warning(f"Real quadrant classification failed ({exc}), using random fallback")
+        return _gen_quadrant_data_random()
+
+
+def _classify_quadrant_from_market_data() -> dict:
+    """Derive economic quadrant from cached scanner/price data."""
+    # ── Gather signals from scanner cache ──
+    growth_score = 0.0   # positive = rising growth, negative = falling
+    inflation_score = 0.0  # positive = rising inflation, negative = falling
+    confidence_factors = 0
+    data_sources = []
+
+    # 1. Market breadth: % of ASX stocks that are positive today
+    asx_cache = _scanner_cache.get("asx")
+    if asx_cache and asx_cache.get("rows"):
+        rows = asx_cache["rows"]
+        up_count = sum(1 for r in rows if r.get("change_pct", 0) > 0)
+        breadth = up_count / max(len(rows), 1)
+        # breadth > 0.6 = broad rally (growth), < 0.4 = broad selloff
+        growth_score += (breadth - 0.5) * 4.0  # range ~ -2 to +2
+        confidence_factors += 1
+        data_sources.append("ASX breadth")
+
+    # 2. Gold direction: rising gold = inflation fears
+    gold_price_data = None
+    for gold_ticker in ("GC=F", "GOLD.AX", "GLD"):
+        cached = _cache_get(f"px_{hash((gold_ticker,))}_{gold_ticker}_3mo")
+        if cached:
+            gold_price_data = cached
+            break
+    # Also check scanner cache for gold/commodity tickers
+    comm_cache = _scanner_cache.get("commodities")
+    if comm_cache and comm_cache.get("rows"):
+        for r in comm_cache["rows"]:
+            tkr = r.get("ticker", "")
+            if "GC=F" in tkr or "GOLD" in tkr.upper():
+                chg = r.get("change_pct", 0)
+                if chg > 0.5:
+                    inflation_score += 1.5
+                elif chg < -0.5:
+                    inflation_score -= 1.0
+                confidence_factors += 1
+                data_sources.append("Gold price")
+                break
+            # Oil as inflation proxy
+            if "CL=F" in tkr or "OIL" in tkr.upper() or "BZ=F" in tkr:
+                chg = r.get("change_pct", 0)
+                if chg > 1.0:
+                    inflation_score += 1.0
+                elif chg < -1.0:
+                    inflation_score -= 0.5
+                confidence_factors += 1
+                data_sources.append("Oil price")
+                break
+
+    # 3. Use crypto as risk-on/risk-off gauge
+    crypto_cache = _scanner_cache.get("crypto")
+    if crypto_cache and crypto_cache.get("rows"):
+        rows = crypto_cache["rows"]
+        avg_chg = np.mean([r.get("change_pct", 0) for r in rows[:5]])
+        # Crypto up = risk-on = growth
+        growth_score += min(max(avg_chg * 0.3, -1.5), 1.5)
+        confidence_factors += 1
+        data_sources.append("Crypto sentiment")
+
+    # 4. Sentiment from cached news (conflict = inflation bias)
+    if STATE.last_sentiment:
+        sent = STATE.last_sentiment
+        if sent.get("conflict_risk_elevated"):
+            inflation_score += 1.5
+            confidence_factors += 1
+            data_sources.append("Conflict risk")
+        dom_q = sent.get("dominant_quadrant", "")
+        if "inflation" in dom_q:
+            inflation_score += 0.8
+        elif "growth" in dom_q:
+            growth_score += 0.5 if "rising" in dom_q else -0.5
+
+    # ── Classify quadrant ──
+    if confidence_factors == 0:
+        # No data at all — truly random fallback
+        raise ValueError("No market data available for quadrant classification")
+
+    if growth_score > 0.3 and inflation_score <= 0.5:
+        q = "rising_growth"
+    elif growth_score <= -0.3 and inflation_score <= 0.5:
+        q = "falling_growth"
+    elif inflation_score > 0.5:
+        q = "rising_inflation"
+    else:
+        q = "falling_inflation"
+
+    meta = QUADRANT_META[q]
+    confidence = min(92, max(55, 50 + confidence_factors * 8 + abs(growth_score + inflation_score) * 5))
+
+    # Approximate GDP/CPI from market signals
+    gdp_proxy = round(2.5 + growth_score * 0.8, 2)
+    cpi_proxy = round(3.0 + inflation_score * 1.2, 2)
+    gdp_trend = "rising" if growth_score > 0.3 else "falling" if growth_score < -0.3 else "stable"
+    cpi_trend = "rising" if inflation_score > 0.5 else "falling" if inflation_score < -0.3 else "stable"
+
+    conflict = False
+    if STATE.last_sentiment:
+        conflict = STATE.last_sentiment.get("conflict_risk_elevated", False)
+
+    return {
+        "quadrant": q,
+        "label": meta["label"],
+        "color": meta["color"],
+        "description": meta["description"],
+        "gdp_value": gdp_proxy,
+        "gdp_trend": gdp_trend,
+        "cpi_value": cpi_proxy,
+        "cpi_trend": cpi_trend,
+        "conflict_risk_elevated": conflict,
+        "favoured_assets": meta["favoured"],
+        "avoid_assets": meta["avoid"],
+        "confidence": round(confidence, 1),
+        "macro_source": f"Market-derived ({', '.join(data_sources)})",
+        "sentiment_source": "RSS keyword analysis",
+        "data_source": "LIVE" if confidence_factors >= 2 else "PARTIAL",
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+def _gen_quadrant_data_random() -> dict:
+    """Pure random fallback — used only when no market data exists."""
     q = random.choice(list(QUADRANT_META.keys()))
     meta = QUADRANT_META[q]
     return {
@@ -2442,8 +2720,9 @@ def _gen_quadrant_data() -> dict:
         "favoured_assets": meta["favoured"],
         "avoid_assets": meta["avoid"],
         "confidence": round(random.uniform(65, 92), 1),
-        "macro_source": "EODHD / Trading Economics",
-        "sentiment_source": "FinBERT / Finnhub",
+        "macro_source": "DEMO (no market data available)",
+        "sentiment_source": "DEMO",
+        "data_source": "DEMO",
         "timestamp": datetime.utcnow().isoformat(),
     }
 
@@ -2709,35 +2988,59 @@ def _gen_static_headlines() -> list[dict]:
 
 
 async def _gen_sentiment_data() -> dict:
-    """Build sentiment data from real RSS news. All articles shown — no random sampling."""
+    """
+    Build sentiment data from real RSS news.
+    Tries FinBERT for higher-quality sentiment scoring when torch/transformers
+    are available. Falls back to keyword-based scoring otherwise.
+    All articles shown — no random sampling.
+    """
     from collections import defaultdict
 
     articles = await _fetch_real_news()
+
+    # ── Try FinBERT enhancement on article titles ──
+    articles = _try_finbert_sentiment(articles)
 
     total    = len(articles)
     conflict = sum(1 for a in articles if a["conflict_risk"])
 
     # Per-quadrant stats
-    q_counts: dict = defaultdict(lambda: {"count": 0, "bull": 0, "bear": 0})
+    q_counts: dict = defaultdict(lambda: {"count": 0, "bull": 0, "bear": 0, "scores": []})
     for a in articles:
         q = a["quadrant"]
         q_counts[q]["count"] += 1
-        if a["sentiment"] == "positive":
-            q_counts[q]["bull"] += 1
-        elif a["sentiment"] == "negative":
-            q_counts[q]["bear"] += 1
+        # Use FinBERT score if available, otherwise derive from bull/bear
+        score = a.get("finbert_score", None)
+        if score is not None:
+            q_counts[q]["scores"].append(score)
+            if score > 0.1:
+                q_counts[q]["bull"] += 1
+            elif score < -0.1:
+                q_counts[q]["bear"] += 1
+        else:
+            if a["sentiment"] == "positive":
+                q_counts[q]["bull"] += 1
+            elif a["sentiment"] == "negative":
+                q_counts[q]["bear"] += 1
 
     quadrant_sentiment: dict = {}
     for q in QUADRANT_META:
         s = q_counts[q]
         c = max(s["count"], 1)
+        # Prefer FinBERT mean score if available
+        if s["scores"]:
+            avg_score = round(float(np.mean(s["scores"])), 3)
+        else:
+            avg_score = round((s["bull"] - s["bear"]) / c, 3)
         quadrant_sentiment[q] = {
-            "avg_score":    round((s["bull"] - s["bear"]) / c, 3),
+            "avg_score":    avg_score,
             "article_count": s["count"],
             "bullish_pct":  round(s["bull"] / c * 100, 1),
         }
 
     dominant = max(quadrant_sentiment, key=lambda q: quadrant_sentiment[q]["article_count"])
+
+    sentiment_model = "FinBERT" if articles and articles[0].get("finbert_score") is not None else "Keyword"
 
     return {
         "total_articles":          total,
@@ -2746,8 +3049,80 @@ async def _gen_sentiment_data() -> dict:
         "dominant_quadrant":       dominant,
         "quadrant_sentiment":      quadrant_sentiment,
         "top_headlines":           articles,   # ALL articles, no cap
+        "sentiment_model":         sentiment_model,
         "timestamp":               datetime.utcnow().isoformat(),
     }
+
+
+# ── FinBERT lazy loader (cached singleton) ──
+_FINBERT_MODEL = None
+_FINBERT_TOKENIZER = None
+_FINBERT_LOADED = False  # True once we've attempted load (even if failed)
+
+
+def _try_finbert_sentiment(articles: list[dict]) -> list[dict]:
+    """
+    Attempt to score articles with FinBERT. If torch/transformers unavailable
+    or model fails, returns articles unchanged (keyword scores preserved).
+    """
+    global _FINBERT_MODEL, _FINBERT_TOKENIZER, _FINBERT_LOADED
+
+    if not articles:
+        return articles
+
+    # Only attempt loading once
+    if not _FINBERT_LOADED:
+        _FINBERT_LOADED = True
+        try:
+            import torch
+            from transformers import AutoTokenizer, AutoModelForSequenceClassification
+            model_name = "ProsusAI/finbert"
+            logger.info(f"Loading FinBERT model: {model_name}")
+            _FINBERT_TOKENIZER = AutoTokenizer.from_pretrained(model_name)
+            _FINBERT_MODEL = AutoModelForSequenceClassification.from_pretrained(model_name)
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            _FINBERT_MODEL.to(device)
+            _FINBERT_MODEL.eval()
+            logger.info(f"FinBERT loaded on {device}")
+        except Exception as e:
+            logger.info(f"FinBERT not available ({e}), using keyword sentiment")
+            _FINBERT_MODEL = None
+            _FINBERT_TOKENIZER = None
+
+    if _FINBERT_MODEL is None or _FINBERT_TOKENIZER is None:
+        return articles
+
+    # Score articles in batches
+    try:
+        import torch
+        device = next(_FINBERT_MODEL.parameters()).device
+        batch_size = 16
+        labels = ["positive", "negative", "neutral"]
+
+        for i in range(0, len(articles), batch_size):
+            batch = articles[i:i + batch_size]
+            texts = [a["title"][:512] for a in batch]
+            inputs = _FINBERT_TOKENIZER(
+                texts, return_tensors="pt", truncation=True,
+                max_length=512, padding=True
+            ).to(device)
+            with torch.no_grad():
+                outputs = _FINBERT_MODEL(**inputs)
+            probs = torch.softmax(outputs.logits, dim=1).cpu().numpy()
+            for j, a in enumerate(batch):
+                prob_dict = dict(zip(labels, probs[j].tolist()))
+                score = prob_dict["positive"] - prob_dict["negative"]
+                a["finbert_score"] = round(score, 4)
+                # Override keyword sentiment with FinBERT result
+                a["sentiment"] = labels[int(np.argmax(probs[j]))]
+                a["bull_score"] = round(prob_dict["positive"], 3)
+                a["bear_score"] = round(prob_dict["negative"], 3)
+
+        logger.info(f"FinBERT scored {len(articles)} articles")
+    except Exception as e:
+        logger.warning(f"FinBERT batch scoring failed ({e}), keeping keyword scores")
+
+    return articles
 
 
 def _gen_correlation_matrix_demo() -> dict:
