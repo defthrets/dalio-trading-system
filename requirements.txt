@@ -39,3 +39,7 @@ python-binance>=1.0.19
 # coinbase-advanced-py>=1.4.0   # uncomment if using Coinbase
 
 # CoinSpot — AUD crypto (uses built-in requests/aiohttp, no extra package needed)
+
+# ─── Testing ───────────────────────────────────────────────────────
+pytest>=7.0.0
+httpx>=0.24.0
