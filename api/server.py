@@ -483,6 +483,10 @@ async def _on_startup():
     except Exception as exc:
         logger.warning(f"AUD/USD rate fetch failed: {exc}")
 
+    # ── Launch SL/TP monitoring background task ──
+    asyncio.get_event_loop().create_task(_sl_tp_monitor_loop())
+    logger.info("SL/TP monitor started (30s interval)")
+
     logger.info(f"Startup complete -- trading mode: {TRADING_MODE}")
 
 # ─────────────────────────────────────────────
@@ -717,7 +721,8 @@ class PaperPortfolio:
                 total += (pos["entry_price"] - cur) * pos["qty"]
         return round(total, 2)
 
-    def place_order(self, ticker: str, side: str, qty: float, price: float) -> dict:
+    def place_order(self, ticker: str, side: str, qty: float, price: float,
+                    stop_loss: float = None, take_profit: float = None) -> dict:
         cost = qty * price
         fee  = _calc_fee(ticker, qty, price)
         oid  = self._next_id()
@@ -735,10 +740,16 @@ class PaperPortfolio:
                 total_cost  = pos["entry_price"] * pos["qty"] + price * qty
                 pos["entry_price"] = round(total_cost / total_qty, 4)
                 pos["qty"]         = total_qty
+                # Update SL/TP if provided (new values take precedence)
+                if stop_loss is not None:
+                    pos["stop_loss"] = stop_loss
+                if take_profit is not None:
+                    pos["take_profit"] = take_profit
             else:
                 self.positions[ticker] = {
                     "qty": qty, "entry_price": round(price, 4),
                     "entry_time": ts, "side": "LONG", "cost_basis": round(cost, 2),
+                    "stop_loss": stop_loss, "take_profit": take_profit,
                 }
         else:  # SELL / close
             if ticker not in self.positions:
@@ -784,6 +795,74 @@ PAPER = PaperPortfolio()
 _PAPER_LOCK     = asyncio.Lock()
 _MODE_LOCK      = asyncio.Lock()
 _WATCHLIST_LOCK  = asyncio.Lock()
+
+
+# ── Stop-Loss / Take-Profit monitoring ────────────────────────────
+
+async def _check_stop_loss_take_profit():
+    """Iterate open paper positions and auto-close any that hit SL or TP."""
+    if not PAPER.positions:
+        return
+    # Snapshot tickers to avoid dict-changed-during-iteration
+    tickers = list(PAPER.positions.keys())
+    for ticker in tickers:
+        pos = PAPER.positions.get(ticker)
+        if pos is None:
+            continue
+        sl = pos.get("stop_loss")
+        tp = pos.get("take_profit")
+        if sl is None and tp is None:
+            continue
+        price = await _live_price(ticker)
+        if price is None:
+            continue
+        price = float(price)
+        triggered = None
+        if sl is not None and price <= sl:
+            triggered = "STOP-LOSS"
+        elif tp is not None and price >= tp:
+            triggered = "TAKE-PROFIT"
+        if triggered is None:
+            continue
+        # Auto-close the position
+        async with _PAPER_LOCK:
+            # Re-check after acquiring lock (may have been closed already)
+            if ticker not in PAPER.positions:
+                continue
+            qty = PAPER.positions[ticker]["qty"]
+            try:
+                result = PAPER.place_order(ticker, "SELL", qty, price)
+            except ValueError as exc:
+                logger.warning(f"SL/TP auto-close failed for {ticker}: {exc}")
+                continue
+            # Equity snapshot + persist
+            _tickers = list(PAPER.positions.keys())
+            _prices  = await _prices_for_positions(_tickers) if _tickers else {}
+            current_equity = PAPER.total_value(_prices)
+            PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
+            PAPER.equity_history = PAPER.equity_history[-2000:]
+            _save_paper_state()
+        # Alert + broadcast
+        pnl = PAPER.history[0]["pnl"] if PAPER.history else 0
+        level_str = f"{triggered} hit"
+        STATE.add_alert("SL/TP",
+            f"{level_str}: auto-closed {ticker} {qty:.4g} @ ${price:.4f} "
+            f"(PnL ${pnl:+,.2f})", "WARNING")
+        await WS_MANAGER.broadcast({
+            "type": "PAPER_SL_TP",
+            "data": {**result, "trigger": triggered, "pnl": pnl},
+        })
+        logger.info(f"{triggered} triggered for {ticker} @ ${price:.4f} -- position auto-closed")
+
+
+async def _sl_tp_monitor_loop():
+    """Background loop: check SL/TP every 30 seconds."""
+    while True:
+        try:
+            await _check_stop_loss_take_profit()
+        except Exception as exc:
+            logger.warning(f"SL/TP monitor error: {exc}")
+        await asyncio.sleep(30)
 
 
 # ─────────────────────────────────────────────
@@ -3573,8 +3652,17 @@ async def _run_cmd(message: str) -> dict:
         try:
             price = await _live_price(tkr)
             if price is None: raise ValueError(f"Cannot determine price for {tkr}")
+            # Auto-compute SL/TP for BUY orders (ATR-based defaults)
+            _sl_val = None
+            _tp_val = None
+            if side == "BUY":
+                _sl_offset = float(price) * 0.025  # 2.5% default stop
+                _tp_offset = float(price) * 0.05   # 5% default target
+                _sl_val = round(float(price) - _sl_offset, 4)
+                _tp_val = round(float(price) + _tp_offset, 4)
             async with _PAPER_LOCK:
-                result = PAPER.place_order(tkr, side, qty, float(price))
+                result = PAPER.place_order(tkr, side, qty, float(price),
+                                           stop_loss=_sl_val, take_profit=_tp_val)
                 _tks = list(PAPER.positions.keys())
                 _prc = await _prices_for_positions(_tks) if _tks else {}
                 PAPER.equity_history.append({"t":datetime.utcnow().isoformat(),"v":PAPER.total_value(_prc)})
@@ -3765,9 +3853,18 @@ async def place_paper_order(payload: dict):
         raise HTTPException(400, f"Cannot determine price for {ticker}")
     price = float(price)
 
+    # Extract optional SL/TP from payload
+    sl = payload.get("stop_loss")
+    tp = payload.get("take_profit")
+    if sl is not None:
+        sl = float(sl)
+    if tp is not None:
+        tp = float(tp)
+
     async with _PAPER_LOCK:
         try:
-            result = PAPER.place_order(ticker, side, qty, price)
+            result = PAPER.place_order(ticker, side, qty, price,
+                                       stop_loss=sl, take_profit=tp)
         except ValueError as e:
             raise HTTPException(400, str(e))
 
