@@ -466,7 +466,7 @@ async function loadSignals() {
     renderSignalGrid(STATE.signals);
     renderOpportunities(d.new_opportunities || []);
   } catch (e) {
-    grid.innerHTML = `<div class="signal-loading"><span>⚠ SCAN ERROR — ${e.message || 'server unreachable'}</span></div>`;
+    grid.innerHTML = `<div class="signal-loading"><span>⚠ SCAN ERROR — ${escHtml(e.message || 'server unreachable')}</span></div>`;
     setEl('signalCount', '0 SIGNALS');
   }
 }
@@ -499,7 +499,7 @@ function renderSignalGrid(signals) {
     return;
   }
 
-  el('signalGrid').innerHTML = filtered.map(s => { try { return signalCardHTML(s); } catch(e) { return `<div class="signal-card" style="padding:14px;color:var(--red)">Error rendering ${s.ticker}: ${e.message}</div>`; } }).join('');
+  el('signalGrid').innerHTML = filtered.map(s => { try { return signalCardHTML(s); } catch(e) { return `<div class="signal-card" style="padding:14px;color:var(--red)">Error rendering ${s.ticker}: ${escHtml(e.message)}</div>`; } }).join('');
 
   // Check for strong signals (fires fixed banner + in-page bar)
   checkStrongSignals(filtered);
@@ -770,7 +770,7 @@ async function loadSuggestOpportunities(n = 8) {
     const d = await fetchJSON(`/api/suggest?n=${n}`);
     renderOpportunities(d.opportunities || [], d);
   } catch(e) {
-    list.innerHTML = `<div style="padding:14px;color:var(--red);font-size:10px">SCAN FAILED: ${e.message}</div>`;
+    list.innerHTML = `<div style="padding:14px;color:var(--red);font-size:10px">SCAN FAILED: ${escHtml(e.message)}</div>`;
   }
 }
 
@@ -2152,7 +2152,7 @@ async function triggerCycle() {
     pushAlert('CYCLE', 'Manual cycle triggered', 'info');
     pushActivityItem('▶', 'Cycle triggered from Signal Ops', 'info');
   } catch (e) {
-    pushAlert('ERROR', `Cycle failed: ${e.message || 'server unreachable'}`, 'warning');
+    pushAlert('ERROR', `Cycle failed: ${escHtml(e.message || 'server unreachable')}`, 'warning');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '▶ RUN CYCLE'; }
   }
@@ -2423,7 +2423,7 @@ async function saveGeneralSettings() {
         pushAlert('SETTINGS', `Starting cash updated to $${cash.toLocaleString()} — click RESET to apply`, 'warning');
       }
     } catch (e) {
-      pushAlert('SETTINGS', `Failed to save starting cash: ${e.message}`, 'warning');
+      pushAlert('SETTINGS', `Failed to save starting cash: ${escHtml(e.message)}`, 'warning');
     }
   }
   _saveSetting('trade_size',    parseFloat(el('settTradeSize')?.value) || 100);
@@ -2531,7 +2531,7 @@ function renderSearchResults(q) {
   }
 
   if (!results.length) {
-    list.innerHTML = `<div class="sr-empty">No assets matching "${q}"</div>`;
+    list.innerHTML = `<div class="sr-empty">No assets matching "${escHtml(q)}"</div>`;
     return;
   }
 
@@ -2676,7 +2676,7 @@ async function closePaperPosition(ticker) {
     pushAlert('PAPER', `Closed position: ${ticker}`, 'info');
     pushActivityItem('✕', `Closed position: ${ticker.replace('-USD','')}`, 'sell');
   } catch (e) {
-    pushAlert('PAPER', `Close failed: ${e.message}`, 'warning');
+    pushAlert('PAPER', `Close failed: ${escHtml(e.message)}`, 'warning');
   }
 }
 
@@ -2763,7 +2763,7 @@ async function submitPaperOrder() {
     pushActivityItem(d.side === 'BUY' ? '▲' : '▼', `ORDER #${d.order_id} — ${d.side} ${qty}× ${d.ticker} @ ${fmt$(d.price)}`, d.side === 'BUY' ? 'buy' : 'sell');
   } catch (e) {
     const msg = e.message || 'Order failed';
-    if (res) res.innerHTML = `<span style="color:var(--red)">✗ ${msg}</span>`;
+    if (res) res.innerHTML = `<span style="color:var(--red)">✗ ${escHtml(msg)}</span>`;
   } finally {
     if (btn) { btn.classList.remove('loading'); btn.textContent = '▶ EXECUTE TRADE'; }
   }
@@ -3061,7 +3061,7 @@ async function submitOrderModal() {
     if (_omMode === 'live') { loadRealPortfolio(); loadRealHistory(); }
     else { loadPaperPortfolio(); loadPaperHistory(); }
   } catch (e) {
-    if (res) res.innerHTML = `<span style="color:var(--red)">✗ ${e.message || 'Failed'}</span>`;
+    if (res) res.innerHTML = `<span style="color:var(--red)">✗ ${escHtml(e.message || 'Failed')}</span>`;
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -3117,7 +3117,7 @@ async function loadScanner(market) {
     if (statsEl) statsEl.dataset.cacheNote = cacheNote;
     renderScanner(market);
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="${ids.cols}" class="scanner-loading" style="color:var(--red)">⚠ Failed to load — ${e.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${ids.cols}" class="scanner-loading" style="color:var(--red)">⚠ Failed to load — ${escHtml(e.message)}</td></tr>`;
   }
 }
 
@@ -3785,7 +3785,7 @@ async function connectBrokerFromSettings(broker) {
     await loadBrokerStatus();
     await loadRealPortfolio();
   } catch (e) {
-    if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ ${e.message || 'Connection failed'}</span>`;
+    if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ ${escHtml(e.message || 'Connection failed')}</span>`;
   }
 }
 
@@ -3827,7 +3827,7 @@ async function saveBrokerCreds(broker) {
     if (resultEl) resultEl.innerHTML = '<span style="color:var(--green)">💾 Credentials saved</span>';
     pushAlert('BROKER', `${broker.toUpperCase()} credentials saved`, 'info');
   } catch (e) {
-    if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">Save failed: ${e.message}</span>`;
+    if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">Save failed: ${escHtml(e.message)}</span>`;
   }
 }
 
@@ -3907,7 +3907,7 @@ async function connectBroker() {
     await loadBrokerStatus();
     await loadRealPortfolio();
   } catch (e) {
-    if (res) res.innerHTML = `<span style="color:var(--red)">✗ ${e.message || 'Connection failed'}</span>`;
+    if (res) res.innerHTML = `<span style="color:var(--red)">✗ ${escHtml(e.message || 'Connection failed')}</span>`;
     pushAlert('BROKER', e.message || 'Connection failed', 'warning');
   } finally {
     if (btn) { btn.textContent = '▶ CONNECT BROKER'; btn.classList.remove('loading'); }
@@ -4038,7 +4038,7 @@ async function submitLiveOrder() {
     loadRealHistory();
     loadRealEquityCurve();
   } catch (e) {
-    if (res) res.innerHTML = `<span style="color:var(--red)">✗ ${e.message || 'Order failed'}</span>`;
+    if (res) res.innerHTML = `<span style="color:var(--red)">✗ ${escHtml(e.message || 'Order failed')}</span>`;
     pushAlert('LIVE', e.message || 'Order failed', 'warning');
   } finally {
     if (btn) { btn.textContent = '🔴 PLACE LIVE ORDER'; btn.classList.remove('loading'); }
@@ -4341,7 +4341,7 @@ async function quickClosePosition(ticker) {
     loadPaperPortfolio();
     loadPaperHistory();
   } catch (e) {
-    pushAlert('PAPER', `Close failed: ${e.message}`, 'warning');
+    pushAlert('PAPER', `Close failed: ${escHtml(e.message)}`, 'warning');
   }
 }
 
@@ -4591,7 +4591,7 @@ async function loadCcRecommendations() {
     const rb = el('ccRegimeBadge');
     if (rb && d.regime_label) rb.textContent = d.regime_label.toUpperCase();
   } catch(e) {
-    list.innerHTML = `<div style="padding:14px;color:var(--red);font-size:10px">ANALYSIS FAILED: ${e.message}</div>`;
+    list.innerHTML = `<div style="padding:14px;color:var(--red);font-size:10px">ANALYSIS FAILED: ${escHtml(e.message)}</div>`;
   }
 }
 
@@ -4694,7 +4694,7 @@ async function loadCcOpportunities(n = 8) {
     const regimeBadge = el('ccRegimeBadge');
     if (regimeBadge && regime) regimeBadge.textContent = regime;
   } catch(e) {
-    list.innerHTML = `<div style="padding:14px;color:var(--red);font-size:10px">SCAN FAILED: ${e.message}</div>`;
+    list.innerHTML = `<div style="padding:14px;color:var(--red);font-size:10px">SCAN FAILED: ${escHtml(e.message)}</div>`;
   }
 }
 
@@ -4741,7 +4741,7 @@ async function ccQtSubmit() {
     loadPaperPortfolio();
     loadPaperHistory();
   } catch(e) {
-    if (res) res.innerHTML = `<span style="color:var(--red)">✗ ${e.message}</span>`;
+    if (res) res.innerHTML = `<span style="color:var(--red)">✗ ${escHtml(e.message)}</span>`;
   }
 }
 
@@ -5546,7 +5546,7 @@ function pushOpsLine(cmd, msg, type) {
   const line = document.createElement('div');
   line.className = 'ops-line';
   const cls = type === 'warning' ? ' warn' : type === 'error' ? ' err' : '';
-  line.innerHTML = `<span class="ops-ts">${ts}</span> <span class="ops-cmd">${cmd}</span> <span class="ops-msg${cls}">${msg}</span>`;
+  line.innerHTML = `<span class="ops-ts">${ts}</span> <span class="ops-cmd">${escHtml(cmd)}</span> <span class="ops-msg${cls}">${escHtml(msg)}</span>`;
   term.appendChild(line);
   while (term.children.length > 40) term.removeChild(term.firstChild);
   term.scrollTop = term.scrollHeight;
@@ -5721,7 +5721,7 @@ async function testBrokerConnection(broker) {
         if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ Network error — ${e2.message}</span>`;
       }
     } else {
-      if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ ${e.message || 'Test failed'}</span>`;
+      if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ ${escHtml(e.message || 'Test failed')}</span>`;
     }
   }
 }
@@ -5767,7 +5767,7 @@ async function _exportTradesCSV(endpoint, filename, mode) {
     pushAlert('EXPORT', `${trades.length} trades exported to ${filename}`, 'info');
     playBeep(660, 0.08);
   } catch (e) {
-    pushAlert('EXPORT', `Export failed: ${e.message}`, 'warning');
+    pushAlert('EXPORT', `Export failed: ${escHtml(e.message)}`, 'warning');
   }
 }
 
