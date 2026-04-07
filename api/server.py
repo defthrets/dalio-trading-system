@@ -599,6 +599,33 @@ def _save_watchlist(wl: list) -> None:
 
 WATCHLIST: list = _load_watchlist()
 
+# ── Trading Fee Schedule (percentage of trade value) ─────────────────
+# Covers brokerage, spread, exchange fees. Conservative estimates.
+TRADING_FEES = {
+    "asx":         0.10,   # 0.10% — typical ASX online broker (CommSec, SelfWealth)
+    "us_equity":   0.05,   # 0.05% — typical US broker (incl. SEC/FINRA micro-fees)
+    "crypto":      0.20,   # 0.20% — crypto exchange (Binance 0.1%, CoinSpot 0.1-1%)
+    "commodities": 0.10,   # 0.10% — commodity ETF brokerage
+    "forex":       0.03,   # 0.03% — forex spread cost estimate
+    "default":     0.10,   # 0.10% — fallback for unknown asset types
+}
+
+def _get_fee_pct(ticker: str) -> float:
+    """Return the estimated round-trip fee percentage for a ticker."""
+    if ticker in CRYPTO_TICKERS or ticker.endswith("-USD"):
+        return TRADING_FEES["crypto"]
+    elif ticker.endswith(".AX"):
+        return TRADING_FEES["asx"]
+    elif ticker in COMMODITY_TICKERS:
+        return TRADING_FEES["commodities"]
+    else:
+        return TRADING_FEES["default"]
+
+def _calc_fee(ticker: str, qty: float, price: float) -> float:
+    """Calculate fee in dollars for a single leg of a trade."""
+    return round(qty * price * _get_fee_pct(ticker) / 100, 4)
+
+
 class PaperPortfolio:
     def __init__(self):
         self.cash            = PAPER_STARTING_CASH
@@ -631,13 +658,15 @@ class PaperPortfolio:
 
     def place_order(self, ticker: str, side: str, qty: float, price: float) -> dict:
         cost = qty * price
+        fee  = _calc_fee(ticker, qty, price)
         oid  = self._next_id()
         ts   = datetime.utcnow().isoformat()
 
         if side == "BUY":
-            if cost > self.cash:
-                raise ValueError(f"Insufficient cash -- need ${cost:,.2f}, have ${self.cash:,.2f}")
-            self.cash -= cost
+            total_cost = cost + fee
+            if total_cost > self.cash:
+                raise ValueError(f"Insufficient cash -- need ${total_cost:,.2f} (incl ${fee:.2f} fee), have ${self.cash:,.2f}")
+            self.cash -= total_cost
             if ticker in self.positions and self.positions[ticker]["side"] == "LONG":
                 # Add to existing long
                 pos = self.positions[ticker]
@@ -655,24 +684,28 @@ class PaperPortfolio:
                 raise ValueError(f"No open position in {ticker}")
             pos   = self.positions[ticker]
             close_qty = min(qty, pos["qty"])
-            proceeds  = close_qty * price
+            sell_fee  = _calc_fee(ticker, close_qty, price)
+            proceeds  = close_qty * price - sell_fee
+            # Also account for the buy-side fee already embedded in cost_basis
+            buy_fee   = _calc_fee(ticker, close_qty, pos["entry_price"])
             if pos["side"] == "LONG":
-                pnl = (price - pos["entry_price"]) * close_qty
+                pnl = (price - pos["entry_price"]) * close_qty - buy_fee - sell_fee
             else:
-                pnl = (pos["entry_price"] - price) * close_qty
+                pnl = (pos["entry_price"] - price) * close_qty - buy_fee - sell_fee
             self.cash += proceeds
             self.history.insert(0, {
                 "id": oid, "ticker": ticker, "side": "SELL",
                 "qty": close_qty, "entry_price": pos["entry_price"],
                 "exit_price": round(price, 4), "pnl": round(pnl, 2),
                 "pnl_pct": round(pnl / (pos["entry_price"] * close_qty) * 100, 2),
+                "fees": round(buy_fee + sell_fee, 2),
                 "timestamp": ts,
             })
             pos["qty"] -= close_qty
             if pos["qty"] <= 0:
                 del self.positions[ticker]
-        STATE.add_alert("PAPER", f"Order #{oid}: {side} {qty:.4g}�-- {ticker} @ ${price:.4f}", "INFO")
-        return {"order_id": oid, "ticker": ticker, "side": side, "qty": qty, "price": price, "timestamp": ts}
+        STATE.add_alert("PAPER", f"Order #{oid}: {side} {qty:.4g} {ticker} @ ${price:.4f} (fee ${fee:.2f})", "INFO")
+        return {"order_id": oid, "ticker": ticker, "side": side, "qty": qty, "price": price, "fee": fee, "timestamp": ts}
 
     def reset(self):
         self.cash            = PAPER_STARTING_CASH
@@ -1629,6 +1662,9 @@ async def _gen_signals(n: int = 12) -> list[dict]:
             "stop_loss":  round(price - sl_offset, 2) if action in ("SELL","SHORT") else round(price - sl_offset, 2),
             "take_profit": round(price + tp_offset, 2) if action in ("BUY","LONG")  else round(price - tp_offset, 2),
             "rr_ratio": round(tp_offset / sl_offset, 2),
+            "fee_pct": _get_fee_pct(ticker),
+            "round_trip_fee_pct": round(_get_fee_pct(ticker) * 2, 2),
+            "net_rr_ratio": round(max(0, (tp_offset - price * _get_fee_pct(ticker) * 2 / 100)) / sl_offset, 2),
             "position_size_pct": pos_size_pct,
             "dalio_justification": _gen_justification(ticker, action),
             "price_history": price_history,
@@ -1924,6 +1960,9 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
             "stop_loss":    sl,
             "take_profit":  tp,
             "rr_ratio":     rr,
+            "fee_pct":      _get_fee_pct(tkr),
+            "round_trip_fee_pct": round(_get_fee_pct(tkr) * 2, 2),
+            "net_profit_pct": round(tp_offset / price * 100 - _get_fee_pct(tkr) * 2, 2),
             "score":        composite,
             "asset_class":  ac,
             "quadrant_fit": q_fit,
