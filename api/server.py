@@ -4294,12 +4294,14 @@ async def set_trading_mode(payload: dict):
     new_mode = payload.get("mode", "").lower()
     if new_mode not in ("paper", "live"):
         raise HTTPException(400, "mode must be 'paper' or 'live'")
-    if new_mode == "live" and (ACTIVE_BROKER is None or not ACTIVE_BROKER.is_connected()):
-        raise HTTPException(400, "Connect a broker before switching to live mode")
+    broker_connected = ACTIVE_BROKER is not None and ACTIVE_BROKER.is_connected()
     TRADING_MODE = new_mode
-    STATE.add_alert("SYSTEM", f"Trading mode → {new_mode.upper()}", "INFO")
-    await WS_MANAGER.broadcast({"type": "MODE_CHANGE", "data": {"mode": new_mode}})
-    return {"mode": TRADING_MODE}
+    if new_mode == "live" and not broker_connected:
+        STATE.add_alert("SYSTEM", "⚠ LIVE MODE — No broker configured. Trading halted until broker connected.", "WARNING")
+    else:
+        STATE.add_alert("SYSTEM", f"Trading mode → {new_mode.upper()}", "INFO")
+    await WS_MANAGER.broadcast({"type": "MODE_CHANGE", "data": {"mode": new_mode, "broker_connected": broker_connected}})
+    return {"mode": TRADING_MODE, "broker_connected": broker_connected}
 
 
 @app.post("/api/broker/connect")

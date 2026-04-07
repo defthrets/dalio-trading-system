@@ -3141,21 +3141,22 @@ document.addEventListener('click', e => {
 // Called by the new mode switcher pill buttons
 async function setTradingMode(newMode) {
   if (newMode === _tradingMode) return;
+  let brokerWarning = false;
   if (newMode === 'live') {
     const status = await fetchJSON('/api/broker/status').catch(() => null);
-    if (!status?.connected) {
-      pushAlert('MODE', 'Connect a broker first on the LIVE TRADING tab', 'warning');
-      document.querySelector('[data-tab="live-trading"]')?.click();
-      return;
-    }
+    if (!status?.connected) brokerWarning = true;
   }
   try {
     const d = await postJSON('/api/mode', { mode: newMode });
     updateModeUI(d.mode, true);
     refreshCcForMode();
     playBeep(newMode === 'live' ? 880 : 440, 0.1);
-    pushAlert('MODE', `Switched to ${d.mode.toUpperCase()} trading mode`, 'info');
-    if (newMode === 'live') sendNotification('LIVE MODE ACTIVE', 'Real money trading is now active. Orders will be placed with your broker.');
+    if (brokerWarning) {
+      pushAlert('MODE', '⚠ LIVE MODE — No broker configured. Trading is halted until a broker is connected.', 'warning');
+    } else {
+      pushAlert('MODE', `Switched to ${d.mode.toUpperCase()} trading mode`, 'info');
+    }
+    if (newMode === 'live' && !brokerWarning) sendNotification('LIVE MODE ACTIVE', 'Real money trading is now active. Orders will be placed with your broker.');
   } catch (e) {
     // Revert buttons if failed
     updateModeUI(_tradingMode);
