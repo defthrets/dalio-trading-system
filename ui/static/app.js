@@ -4928,33 +4928,66 @@ function updatePredictionFromEquity(equityHistory) {
     returns.push((vals[i] - vals[i - 1]) / vals[i - 1]);
   }
 
-  // Mean daily return and standard deviation from actual data
   const n = returns.length;
-  const meanReturn = n > 0 ? returns.reduce((s, r) => s + r, 0) / n : 0;
-  const variance = n > 1
-    ? returns.reduce((s, r) => s + (r - meanReturn) ** 2, 0) / (n - 1)
-    : 0;
-  const stdDev = Math.sqrt(variance);
-
   const lastEquity = vals[vals.length - 1] || 1000;
-  let pred = lastEquity;
 
-  // Bridge point
-  predicted[predicted.length - 1] = lastEquity;
-  upper[upper.length - 1] = lastEquity;
-  lower[lower.length - 1] = lastEquity;
+  // Need at least 5 data points for any meaningful projection
+  if (n < 5) {
+    // Not enough data — show flat projection with wide uncertainty
+    predicted[predicted.length - 1] = lastEquity;
+    upper[upper.length - 1] = lastEquity;
+    lower[lower.length - 1] = lastEquity;
+    for (let i = 1; i <= 30; i++) {
+      labels.push(`+${i}d`);
+      actual.push(null);
+      predicted.push(+lastEquity.toFixed(2));
+      // Assume ~1% daily vol as placeholder
+      const spread = lastEquity * 0.01 * 1.96 * Math.sqrt(i);
+      upper.push(+(lastEquity + spread).toFixed(2));
+      lower.push(+(lastEquity - spread).toFixed(2));
+    }
+  } else {
+    // Use trimmed mean — discard top/bottom 10% of returns to reduce outlier impact
+    const sorted = [...returns].sort((a, b) => a - b);
+    const trimPct = Math.max(1, Math.floor(n * 0.1));
+    const trimmed = sorted.slice(trimPct, -trimPct);
+    const tN = trimmed.length || 1;
+    let meanReturn = trimmed.reduce((s, r) => s + r, 0) / tN;
 
-  // 30-day forward projection using historical mean return
-  // Confidence bands use actual volatility scaled by sqrt(t)
-  for (let i = 1; i <= 30; i++) {
-    labels.push(`+${i}d`);
-    actual.push(null);
-    pred *= (1 + meanReturn);
-    predicted.push(+pred.toFixed(2));
-    // 1.96σ√t gives ~95% confidence interval
-    const spread = lastEquity * stdDev * 1.96 * Math.sqrt(i);
-    upper.push(+(pred + spread).toFixed(2));
-    lower.push(+(pred - spread).toFixed(2));
+    // Cap daily return to realistic bounds: -2% to +2% (≈500% annualised max)
+    meanReturn = Math.max(-0.02, Math.min(0.02, meanReturn));
+
+    // Standard deviation from full returns
+    const variance = n > 1
+      ? returns.reduce((s, r) => s + (r - meanReturn) ** 2, 0) / (n - 1)
+      : 0;
+    let stdDev = Math.sqrt(variance);
+
+    // Floor volatility at 0.3% and cap at 5% daily
+    stdDev = Math.max(0.003, Math.min(0.05, stdDev));
+
+    // Decay confidence: fewer data points → wider bands (scale factor > 1 when n < 30)
+    const dataConfidence = Math.min(1, n / 30);
+    const uncertaintyMult = 1 + (1 - dataConfidence) * 0.5; // up to 1.5x wider bands with little data
+
+    let pred = lastEquity;
+
+    // Bridge point
+    predicted[predicted.length - 1] = lastEquity;
+    upper[upper.length - 1] = lastEquity;
+    lower[lower.length - 1] = lastEquity;
+
+    // 30-day forward projection
+    for (let i = 1; i <= 30; i++) {
+      labels.push(`+${i}d`);
+      actual.push(null);
+      pred *= (1 + meanReturn);
+      predicted.push(+pred.toFixed(2));
+      // 1.96σ√t gives ~95% confidence interval, scaled by data quality
+      const spread = lastEquity * stdDev * 1.96 * Math.sqrt(i) * uncertaintyMult;
+      upper.push(+(pred + spread).toFixed(2));
+      lower.push(+Math.max(0, pred - spread).toFixed(2)); // never go negative
+    }
   }
 
   charts.prediction.data.labels = labels;
