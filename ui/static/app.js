@@ -62,16 +62,24 @@ document.addEventListener('DOMContentLoaded', () => {
   initTradingMode();
   loadWatchlist();
   _applyStoredTheme();
+  _restoreSound();
+  _restoreFilters();
   loadAll();
   loadMarketSummary();
   setTimeout(initWelcomeTutorial, 1500);  // Show welcome popup after initial load
+
+  // Use saved intervals or defaults
+  const _s = _loadSettings();
+  const refreshMs  = (_s.refresh_interval  || 30) * 1000;
+  const tickerMs   = (_s.ticker_interval   || 60) * 1000;
+
   window._intervals = [];
-  window._intervals.push(setInterval(loadAll, 30_000));           // Refresh all data every 30s
+  window._intervals.push(setInterval(loadAll, refreshMs));            // Refresh all data
   window._intervals.push(setInterval(updateClock, 1000));
-  window._intervals.push(setInterval(loadHealth, 10_000));        // Health every 10s
-  window._intervals.push(setInterval(loadMarketSummary, 60_000)); // Ticker strip every 60s
-  window._intervals.push(setInterval(pollLivePnl, 15_000));       // Live P&L every 15s (global)
-  window._intervals.push(setInterval(autoRefreshNews, 300_000));  // Live news refresh every 5 min
+  window._intervals.push(setInterval(loadHealth, 10_000));            // Health every 10s
+  window._intervals.push(setInterval(loadMarketSummary, tickerMs));   // Ticker strip
+  window._intervals.push(setInterval(pollLivePnl, 15_000));           // Live P&L every 15s (global)
+  window._intervals.push(setInterval(autoRefreshNews, 300_000));      // Live news refresh every 5 min
 });
 
 // ─── Tab Navigation ───────────────────────────────────────
@@ -79,30 +87,41 @@ function initTabs() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.tab;
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById(`tab-${id}`).classList.add('active');
-      // Lazy-load tab data
-      if (id === 'signal-ops')           initSignalOps();
-      if (id === 'intel-center')         loadSentiment();
-      if (id === 'holy-grail')           loadCorrelation();
-      if (id === 'risk-matrix')          loadHealth();
-      if (id === 'backtest-lab')         loadBacktest();
-      if (id === 'paper-trading')        initPaperTrading();
-      if (id === 'live-trading')         initLiveTrading();
-      if (id === 'asx-scanner')         loadScanner('asx');
-      if (id === 'crypto-scanner')      loadScanner('crypto');
-      if (id === 'commodities-scanner') loadScanner('commodities');
-      if (id === 'command-center')      initCommandCentre();
-      if (id === 'comms-config')        initSettingsTab();
-      // Show tutorial on first visit
-      showTutorial(id);
+      _switchTab(id, btn);
     });
   });
 
+  // Restore last active tab or default to command-center
+  const savedTab = _loadSettings().active_tab;
+  if (savedTab) {
+    const btn = document.querySelector(`.tab-btn[data-tab="${savedTab}"]`);
+    if (btn) { _switchTab(savedTab, btn); return; }
+  }
   // Show speech bubbles for Command Center on first ever load
   setTimeout(() => showTutorial('command-center'), 1000);
+}
+
+function _switchTab(id, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(`tab-${id}`).classList.add('active');
+  _saveSetting('active_tab', id);
+  // Lazy-load tab data
+  if (id === 'signal-ops')           initSignalOps();
+  if (id === 'intel-center')         loadSentiment();
+  if (id === 'holy-grail')           loadCorrelation();
+  if (id === 'risk-matrix')          loadHealth();
+  if (id === 'backtest-lab')         loadBacktest();
+  if (id === 'paper-trading')        initPaperTrading();
+  if (id === 'live-trading')         initLiveTrading();
+  if (id === 'asx-scanner')         loadScanner('asx');
+  if (id === 'crypto-scanner')      loadScanner('crypto');
+  if (id === 'commodities-scanner') loadScanner('commodities');
+  if (id === 'command-center')      initCommandCentre();
+  if (id === 'comms-config')        initSettingsTab();
+  // Show tutorial on first visit
+  showTutorial(id);
 }
 
 // ─── Clock ────────────────────────────────────────────────
@@ -2183,6 +2202,19 @@ function initSettingsTab() {
   // Notification btn
   const nBtn = el('settNotifBtn');
   if (nBtn) { nBtn.textContent = Notification.permission === 'granted' ? 'ENABLED' : 'ENABLE'; nBtn.classList.toggle('on', Notification.permission === 'granted'); }
+
+  // Restore saved general settings into form fields
+  if (s.trade_size != null)   { const e = el('settTradeSize'); if (e) e.value = s.trade_size; }
+  if (s.daily_sl != null)     { const e = el('settDailySL');   if (e) e.value = s.daily_sl; }
+  if (s.max_dd != null)       { const e = el('settMaxDD');     if (e) e.value = s.max_dd; }
+  if (s.max_pos_size != null) { const e = el('settMaxPos');    if (e) e.value = s.max_pos_size; }
+  if (s.max_open != null)     { const e = el('settMaxOpen');   if (e) e.value = s.max_open; }
+  if (s.min_conf != null)     { const e = el('settMinConf');   if (e) e.value = s.min_conf; }
+  if (s.min_dalio != null)    { const e = el('settMinDalio');  if (e) e.value = s.min_dalio; }
+  // Restore UI settings
+  if (s.refresh_interval != null) { const e = el('settRefreshInterval'); if (e) e.value = s.refresh_interval; }
+  if (s.ticker_interval != null)  { const e = el('settTickerInterval');  if (e) e.value = s.ticker_interval; }
+
   // Populate cash from server
   fetchJSON('/api/paper/config').then(d => {
     const inp = el('settStartCash'); if (inp) inp.value = d.starting_cash;
@@ -2269,11 +2301,11 @@ window.showTutorial = function(tabId, force = false) {
 };
 
 function toggleSoundSetting(btn) {
-  toggleSound();
+  toggleSound();  // already saves to localStorage
   btn.textContent = _soundOn ? 'ON' : 'OFF';
   btn.classList.toggle('on', _soundOn);
   const mainBtn = el('soundToggleBtn');
-  if (mainBtn) mainBtn.textContent = _soundOn ? '🔊 SOUND' : '🔇 SOUND';
+  if (mainBtn) { mainBtn.textContent = _soundOn ? '🔊 SOUND' : '🔇 SOUND'; mainBtn.classList.toggle('on', _soundOn); }
 }
 
 function requestNotificationPermission() {
@@ -2315,6 +2347,29 @@ function _applyStoredTheme() {
     if (btn) setTheme(s.theme, btn);
   }
   _updateThemeToggleBtn(s.theme || 'cyber');
+}
+
+// ─── Restore signal filters + slider from localStorage ────
+function _restoreFilters() {
+  const s = _loadSettings();
+  // Confidence slider
+  const slider = el('minConfidence');
+  const valLabel = el('minConfVal');
+  if (slider && s.filter_min_conf != null) {
+    slider.value = s.filter_min_conf;
+    if (valLabel) valLabel.textContent = s.filter_min_conf + '%';
+  }
+  // Signal type filter
+  const sf = el('signalFilter');
+  if (sf && s.filter_signal_type) sf.value = s.filter_signal_type;
+  // Market filter
+  const mf = el('marketFilter');
+  if (mf && s.filter_market) mf.value = s.filter_market;
+
+  // Attach change listeners to persist on change
+  if (slider) slider.addEventListener('input', () => _saveSetting('filter_min_conf', parseInt(slider.value)));
+  if (sf) sf.addEventListener('change', () => _saveSetting('filter_signal_type', sf.value));
+  if (mf) mf.addEventListener('change', () => _saveSetting('filter_market', mf.value));
 }
 
 // ─── Save general settings ─────────────────────────────────
@@ -3207,6 +3262,16 @@ async function toggleWatchlist(ticker, btn) {
 let _soundOn = false;
 let _audioCtx = null;
 
+function _restoreSound() {
+  const s = _loadSettings();
+  if (s.sound_on === true) {
+    _soundOn = true;
+    const btn = el('soundToggleBtn');
+    if (btn) { btn.textContent = '🔊 SOUND'; btn.classList.add('on'); }
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+
 function toggleSound() {
   _soundOn = !_soundOn;
   const btn = el('soundToggleBtn');
@@ -3217,6 +3282,7 @@ function toggleSound() {
   if (_soundOn && !_audioCtx) {
     _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
+  _saveSetting('sound_on', _soundOn);
   if (_soundOn) playBeep(660, 0.08, 'sine');
 }
 
