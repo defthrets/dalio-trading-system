@@ -19,6 +19,11 @@ sqlalchemy>=2.0.0
 ta>=0.11.0
 transformers>=4.30.0
 torch>=2.0.0
+riskfolio-lib>=6.0.0
+
+# ─── Scheduling ─────────────────────────────────────────────────────
+apscheduler>=3.10.0
+python-dateutil>=2.8.0
 
 # ─── Broker integrations (install whichever you use) ─────────────────
 # Binance — crypto spot/futures trading

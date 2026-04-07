@@ -313,7 +313,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000", "http://localhost:3000", "http://127.0.0.1:3000"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -2122,9 +2122,14 @@ async def _fetch_real_news() -> list[dict]:
         loop.run_in_executor(None, _parse_one_feed, name, url)
         for name, url in _NEWS_RSS_FEEDS
     ]
-    results = await asyncio.gather(*futures)
+    try:
+        results = await asyncio.wait_for(asyncio.gather(*futures, return_exceptions=True), timeout=30)
+    except asyncio.TimeoutError:
+        logger.warning("RSS aggregate fetch timed out after 30s")
+        results = []
     for batch in results:
-        articles.extend(batch)
+        if isinstance(batch, list):
+            articles.extend(batch)
 
     if not articles:
         logger.warning("All RSS feeds failed — using static headline pool")
@@ -2993,7 +2998,7 @@ def dalio_analyse_trade(ticker: str, side: str, quadrant: str,
         f"Portfolio has {n_pos} positions across {len(set(existing_classes))} asset class(es) -- {'diversified' if len(set(existing_classes))>=4 else 'needs more diversification'}.",
     ]
     if sig:
-        reasoning.append(f"Signal engine: {sig.get('action','HOLD')} {ticker} with {sig.get('confidence',0):.0%} confidence, RSI {sig.get('rsi',50)}.")
+        reasoning.append(f"Signal engine: {sig.get('action','HOLD')} {ticker} with {sig.get('confidence',0):.0f}% confidence, RSI {sig.get('rsi',50)}.")
     reasoning.append(f"Avoid list for {quadrant_label}: {', '.join(playbook['avoid']).replace('_',' ')}. {'This trade is on the avoid list.' if asset_class in playbook['avoid'] else 'This trade is not on the avoid list.'}")
 
     # All Weather score
@@ -3098,7 +3103,7 @@ async def _run_cmd(message: str) -> dict:
         rows = []
         for t,p in PAPER.positions.items():
             cur = prices.get(t, p["entry_price"])
-            pnl = (cur - p["entry_price"]) * p["qty"] * (1 if p["side"]=="BUY" else -1)
+            pnl = (cur - p["entry_price"]) * p["qty"] * (1 if p["side"] in ("BUY","LONG") else -1)
             rows.append({"ticker":t,"side":p["side"],"qty":p["qty"],
                          "entry_price":p["entry_price"],"current_price":cur,"pnl":round(pnl,2)})
         lines = [f"  {r['ticker']}: {r['side']} {r['qty']} entry ${r['entry_price']:.4f} cur ${r['current_price']:.4f} P&L ${r['pnl']:+,.2f}" for r in rows]
@@ -3111,7 +3116,7 @@ async def _run_cmd(message: str) -> dict:
         recent = PAPER.history[-n:][::-1]
         if not recent:
             return {"type":"history","message":"No trade history yet.","data":{"trades":[]}}
-        lines = [f"  #{t['order_id']} {t['side']} {t['qty']} {t['ticker']} @ ${t['price']:.4f}" for t in recent]
+        lines = [f"  #{t.get('id','?')} {t['side']} {t['qty']} {t['ticker']} @ ${t.get('entry_price', t.get('exit_price',0)):.4f}" for t in recent]
         return {"type":"history","message":f"Last {len(recent)} trades:\n"+"\n".join(lines),"data":{"trades":recent}}
 
     # ── quote <ticker> ────────────────────────────────────────────────────
@@ -3152,7 +3157,7 @@ async def _run_cmd(message: str) -> dict:
         tkr = wl_add_m.group(1).upper()
         if tkr not in WATCHLIST:
             WATCHLIST.append(tkr)
-            _save_watchlist()
+            _save_watchlist(WATCHLIST)
         return {"type":"watchlist","message":f"Added {tkr} to watchlist.","data":{"tickers":list(WATCHLIST)}}
 
     wl_rem_m = _re.match(r"^watchlist remove\s+(\S+)$", msg_lower)
@@ -3160,7 +3165,7 @@ async def _run_cmd(message: str) -> dict:
         tkr = wl_rem_m.group(1).upper()
         if tkr in WATCHLIST:
             WATCHLIST.remove(tkr)
-            _save_watchlist()
+            _save_watchlist(WATCHLIST)
             return {"type":"watchlist","message":f"Removed {tkr} from watchlist.","data":{"tickers":list(WATCHLIST)}}
         return {"type":"watchlist","message":f"{tkr} not in watchlist.","data":{"tickers":list(WATCHLIST)}}
 
@@ -3258,7 +3263,7 @@ async def _run_cmd(message: str) -> dict:
     if msg_lower in ("signals","top signals","best signals"):
         sigs = await _gen_signals(12)
         top5 = sigs[:5]
-        lines = [f"  {s['ticker']}: {s['action']} | conf {s['confidence']:.0%} | RSI {s['rsi']}" for s in top5]
+        lines = [f"  {s['ticker']}: {s['action']} | conf {s['confidence']:.0f}% | RSI {s['rsi']}" for s in top5]
         return {"type":"signals","message":"Top 5 Signals:\n"+"\n".join(lines),"data":top5}
 
     # ── risk ──────────────────────────────────────────────────────────────

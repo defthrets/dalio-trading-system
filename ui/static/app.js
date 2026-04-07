@@ -269,9 +269,11 @@ function applyHealth(d) {
   const dailyPct = d.daily_pnl_pct ?? 0;
   const ddPct    = d.drawdown_pct ?? 0;
   setEl('dailyPnl', (dailyPct >= 0 ? '+' : '') + dailyPct.toFixed(3) + '%');
-  el('dailyPnl').style.color = dailyPct >= 0 ? 'var(--green)' : 'var(--red)';
+  const dpEl = el('dailyPnl');
+  if (dpEl) dpEl.style.color = dailyPct >= 0 ? 'var(--green)' : 'var(--red)';
   setWidth('dailyPnlBar', Math.min(Math.abs(dailyPct) / 2 * 100, 100));
-  if (dailyPct < 0) el('dailyPnlBar').style.background = 'var(--red)';
+  const dpBar = el('dailyPnlBar');
+  if (dailyPct < 0 && dpBar) dpBar.style.background = 'var(--red)';
 
   setEl('drawdownVal', `-${ddPct.toFixed(2)}%`);
   setWidth('drawdownBar', Math.min(ddPct / 10 * 100, 100));
@@ -2408,11 +2410,15 @@ async function closePaperPosition(ticker) {
 async function resetPaperPortfolio() {
   const cfgCash = parseFloat(el('startingCashInput')?.value) || 1000;
   if (!confirm(`Reset portfolio to $${cfgCash.toLocaleString()} starting cash? All positions and history will be cleared.`)) return;
-  await postJSON('/api/paper/reset', {});
-  loadPaperPortfolio();
-  loadPaperHistory();
-  loadPaperEquityCurve();
-  pushAlert('PAPER', `Portfolio reset to $${cfgCash.toLocaleString()}`, 'info');
+  try {
+    await postJSON('/api/paper/reset', {});
+    loadPaperPortfolio();
+    loadPaperHistory();
+    loadPaperEquityCurve();
+    pushAlert('PAPER', `Portfolio reset to $${cfgCash.toLocaleString()}`, 'info');
+  } catch (e) {
+    pushAlert('PAPER', `Reset failed: ${e.message || 'server error'}`, 'error');
+  }
 }
 
 // ─── Order Entry ──────────────────────────────────────────

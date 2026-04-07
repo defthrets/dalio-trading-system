@@ -19,6 +19,11 @@ data/broker_credentials.json.backup
 *.credentials
 *.secrets
 
+# User portfolio/equity data — per-user, should not be tracked
+data/paper_portfolio.json
+data/real_equity.json
+data/paper_config.json
+
 # Environment files with secrets
 .env
 # Note: .env is gitignored but .env.template is tracked
