@@ -2038,6 +2038,7 @@ function skipWelcomeTutorial() {
   const overlay = el('welcomeOverlay');
   if (overlay) overlay.classList.add('hidden');
   localStorage.setItem('dalios_welcome_done', '1');
+  _saveSetting('tutorials_off', true);
 
   const neverCb = el('welcomeNeverAgain');
   if (neverCb && neverCb.checked) {

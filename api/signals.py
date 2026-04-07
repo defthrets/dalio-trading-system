@@ -318,7 +318,7 @@ async def _gen_signals(n: int = 12) -> list[dict]:
         tp_offset = atr * 2.5
 
         conf_floor = 40.0 if is_crypto_ticker else 50.0
-        conf = round(min(95, max(conf_floor, abs(score) / 10.0 * 100)), 1)
+        conf = round(min(95, max(conf_floor, 50 + abs(score) * 6)), 1)
 
         qdata = STATE.last_quadrant or {}
         quadrant = qdata.get("quadrant", "rising_growth")
