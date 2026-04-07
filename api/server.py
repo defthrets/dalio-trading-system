@@ -377,6 +377,67 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ── In-memory rate limiter ────────────────────────────────
+class RateLimiter:
+    """Simple sliding-window rate limiter. Tracks request timestamps per IP."""
+
+    # Endpoints with stricter limits (10 req/min)
+    TRADING_PATHS = {"/api/paper/order", "/api/real/order", "/api/broker/connect"}
+
+    def __init__(self, general_limit: int = 60, trading_limit: int = 10, window: int = 60):
+        self.general_limit = general_limit
+        self.trading_limit = trading_limit
+        self.window = window          # seconds
+        self._hits: dict[str, list[float]] = {}   # key -> list of timestamps
+        self._lock = threading.Lock()
+
+    def _key(self, ip: str, path: str) -> tuple[str, int]:
+        """Return (bucket_key, max_allowed) for this request."""
+        for tp in self.TRADING_PATHS:
+            if path == tp:
+                return f"trade:{ip}", self.trading_limit
+        return f"general:{ip}", self.general_limit
+
+    def is_allowed(self, ip: str, path: str) -> bool:
+        bucket, limit = self._key(ip, path)
+        now = time.time()
+        with self._lock:
+            timestamps = self._hits.get(bucket, [])
+            # Drop timestamps outside the window
+            cutoff = now - self.window
+            timestamps = [t for t in timestamps if t > cutoff]
+            if len(timestamps) >= limit:
+                self._hits[bucket] = timestamps
+                return False
+            timestamps.append(now)
+            self._hits[bucket] = timestamps
+            return True
+
+
+_rate_limiter = RateLimiter()
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Enforce per-IP rate limits. Static files and WebSocket upgrades are exempt."""
+    path = request.url.path
+
+    # Exempt static files and websocket upgrades
+    if path.startswith("/static") or path.startswith("/ws"):
+        return await call_next(request)
+
+    ip = request.client.host if request.client else "unknown"
+
+    if not _rate_limiter.is_allowed(ip, path):
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded. Please try again later."},
+        )
+
+    return await call_next(request)
+
+
 # ── Optional API key authentication ─────────────────────
 _DALIOS_API_KEY = os.environ.get("DALIOS_API_KEY")
 
