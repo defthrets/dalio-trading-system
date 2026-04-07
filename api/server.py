@@ -1,24 +1,28 @@
 """
 Dalios -- Automated Trading Framework
-FastAPI Backend Server
+FastAPI Backend Server (Thin Orchestrator)
+
+Imports all engines from submodules:
+  api.utils       -- caching, encryption, indicators, yfinance helpers
+  api.state       -- global state, persistence, DB helpers, circuit breaker
+  api.scanners    -- ticker universes, market scanning, live prices
+  api.portfolio   -- paper portfolio, position sizing, fees
+  api.signals     -- signal engine, opportunities, sentiment, correlation, analysis
+  api.brokers     -- broker classes, credentials
+  api.agent       -- autonomous agent loop, SL/TP monitoring
+  api.websocket   -- WebSocket manager, CLI command parser
 
 Exposes all trading system engines via REST + WebSocket endpoints.
 Serves the military/hacker UI from /ui/index.html.
 """
 
-import json
 import asyncio
-import base64
+import json
 import os
 import random
-import sys
-import threading
 import time
-import aiohttp
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional
-from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks
@@ -27,396 +31,62 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-# Add project root to path
-ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(ROOT))
+# ── Module imports ─────────────────────────────────────────
+from api.utils import (
+    _cache_get, _cache_set, _get_prices, _EXECUTOR, _fmt_vol,
+    YF_AVAILABLE, _normalize_ticker, _get_aud_usd_rate,
+    RateLimiter,
+)
+from api.state import (
+    ROOT, STATE, SETTINGS_AVAILABLE,
+    CIRCUIT_BREAKER, NOTIFIER,
+    WATCHLIST, _save_watchlist, _WATCHLIST_LOCK,
+    TRADING_MODE, _save_trading_mode, _MODE_LOCK,
+    REAL_EQUITY_CURVE, _load_real_equity, _save_real_equity,
+    _db_save_trade, _db_save_equity_snapshot, _db_get_trades, _db_get_equity_curve,
+    _PAPER_LOCK,
+)
+from api.scanners import (
+    ASX_TICKERS, CRYPTO_TICKERS, COMMODITY_TICKERS, ALL_TICKERS, CORR_TICKERS,
+    _ASSET_META, _scanner_cache, _CACHE_TTL,
+    _get_crypto_coingecko, _live_price, _prices_for_positions,
+    _scan_yfinance, _scan_coingecko, _MARKET_DEMO,
+)
+from api.portfolio import (
+    PAPER, PAPER_STARTING_CASH, _save_paper_state, _load_paper_state,
+    _save_paper_config, _calculate_position_size, _RISK_MAX_POS_SIZE_PCT,
+)
+from api.signals import (
+    QUADRANT_META, ASSET_CLASS_MAP, QUADRANT_PLAYBOOK,
+    _gen_signals, _gen_opportunities, _gen_quadrant_data,
+    _gen_sentiment_data, _gen_correlation_matrix_demo, _real_correlation_matrix,
+    _gen_portfolio_health, _gen_backtest_results, dalio_analyse_trade,
+)
+from api.brokers import (
+    BrokerBase, IBKRBroker, AlpacaBroker, BinanceBroker,
+    CoinbaseBroker, CoinSpotBroker, GenericCryptoBroker,
+    KrakenBroker, BybitBroker, OKXBroker, KuCoinBroker, BitgetBroker,
+    IndependentReserveBroker, SelfWealthBroker, IGBroker, CMCBroker,
+    SchwabBroker, StakeBroker, CommsecBroker, MomooBroker,
+    SuperheroBroker, NabtradeBroker, RobinhoodBroker, WebullBroker,
+    ACTIVE_BROKER, _load_broker_creds, _save_broker_creds, BROKER_MAP,
+)
+from api.agent import (
+    AGENT_CONFIG, _save_agent_config,
+    _autonomous_agent_loop, _sl_tp_monitor_loop,
+    _agent_last_cycle_time, _agent_next_cycle_time,
+)
+from api.websocket import WS_MANAGER, _run_cmd
 
-try:
+# ── Settings / DB init ─────────────────────────────────────
+if SETTINGS_AVAILABLE:
     from config.settings import get_settings
-    from data.storage.models import init_db, get_session, Trade, EquitySnapshot, PaperPosition
-    SETTINGS_AVAILABLE = True
-except ImportError:
-    SETTINGS_AVAILABLE = False
+    from data.storage.models import init_db
 
-# ── Real market data via yfinance (no API key needed) ────
-try:
+# yfinance import (for chart data route)
+if YF_AVAILABLE:
     import yfinance as yf
-    import pandas as pd
-    YF_AVAILABLE = True
-    logger.info("yfinance available -- real market data enabled")
-except ImportError:
-    YF_AVAILABLE = False
-    logger.warning("yfinance not installed -- using demo data (run: pip install yfinance pandas)")
 
-# ── 5-minute data cache ──────────────────────────────────
-_DATA_CACHE: dict = {}
-_CACHE_LOCK  = threading.Lock()
-CACHE_TTL    = 300   # seconds
-_EXECUTOR    = ThreadPoolExecutor(max_workers=4)
-
-
-def _cache_get(key: str):
-    with _CACHE_LOCK:
-        e = _DATA_CACHE.get(key)
-    return e["v"] if e and (time.time() - e["t"]) < CACHE_TTL else None
-
-
-def _cache_set(key: str, val):
-    with _CACHE_LOCK:
-        _DATA_CACHE[key] = {"v": val, "t": time.time()}
-
-
-# ── Basic credential obfuscation ────────────────────────
-_CRED_APP_KEY = os.environ.get("DALIO_CRED_KEY", "DaLiOs_AlLwEaThEr_2024!").encode("utf-8")
-
-
-def _xor_bytes(data: bytes, key: bytes) -> bytes:
-    return bytes(b ^ key[i % len(key)] for i, b in enumerate(data))
-
-
-def _encrypt_value(plaintext: str) -> str:
-    """XOR + base64 obfuscation for stored credentials."""
-    xored = _xor_bytes(plaintext.encode("utf-8"), _CRED_APP_KEY)
-    return base64.b64encode(xored).decode("ascii")
-
-
-def _decrypt_value(encoded: str) -> str:
-    """Reverse XOR + base64 obfuscation."""
-    xored = base64.b64decode(encoded.encode("ascii"))
-    return _xor_bytes(xored, _CRED_APP_KEY).decode("utf-8")
-
-
-def _encrypt_creds(creds: dict) -> dict:
-    """Encrypt all string values in a broker credentials dict."""
-    result = {}
-    for broker, data in creds.items():
-        result[broker] = {}
-        for k, v in data.items():
-            if isinstance(v, str):
-                result[broker][k] = {"_enc": _encrypt_value(v)}
-            else:
-                result[broker][k] = v
-    return result
-
-
-def _decrypt_creds(creds: dict) -> dict:
-    """Decrypt all encrypted values in a broker credentials dict."""
-    result = {}
-    for broker, data in creds.items():
-        result[broker] = {}
-        for k, v in data.items():
-            if isinstance(v, dict) and "_enc" in v:
-                try:
-                    result[broker][k] = _decrypt_value(v["_enc"])
-                except Exception:
-                    result[broker][k] = v
-            else:
-                result[broker][k] = v
-    return result
-
-
-def _yf_fetch_sync(tickers: list, period: str = "3mo") -> Optional[dict]:
-    """Blocking yfinance download → dict[ticker → list[float]] of closing prices."""
-    if not YF_AVAILABLE or not tickers:
-        return None
-    try:
-        raw = yf.download(
-            tickers if len(tickers) > 1 else tickers[0],
-            period=period,
-            auto_adjust=True,
-            progress=False,
-            threads=True,
-            timeout=10,
-        )
-        if raw is None or raw.empty:
-            return None
-        # Normalise MultiIndex vs flat columns
-        if isinstance(raw.columns, pd.MultiIndex):
-            close = raw["Close"] if "Close" in raw.columns.get_level_values(0) else None
-        elif "Close" in raw.columns:
-            t = tickers[0]
-            close = pd.DataFrame({t: raw["Close"]})
-        else:
-            return None
-        if close is None or close.empty:
-            return None
-        result = {}
-        for t in tickers:
-            col = close[t] if t in close.columns else None
-            if col is not None:
-                vals = [float(v) for v in col.dropna().tolist()[-90:]]
-                if vals:
-                    result[t] = vals
-        return result or None
-    except Exception as exc:
-        logger.warning(f"yfinance error: {exc}")
-        return None
-
-
-_VALID_PERIODS = {'1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max'}
-_VALID_INTERVALS = {'1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1wk', '1mo', '3mo'}
-
-
-async def _get_prices(tickers: list, period: str = "3mo") -> Optional[dict]:
-    """Async wrapper around yfinance; caches 5 min. Times out in 12s."""
-    if period not in _VALID_PERIODS:
-        logger.warning(f"Invalid period '{period}', returning empty")
-        return None
-    key = f"px_{hash(tuple(sorted(tickers)))}_{period}"
-    cached = _cache_get(key)
-    if cached is not None:
-        return cached
-    loop = asyncio.get_running_loop()
-    try:
-        result = await asyncio.wait_for(
-            loop.run_in_executor(_EXECUTOR, _yf_fetch_sync, tickers, period),
-            timeout=12.0,
-        )
-    except asyncio.TimeoutError:
-        logger.warning("yfinance timed out -- using demo data")
-        result = None
-    if result:
-        _cache_set(key, result)
-    return result
-
-
-def _calc_rsi(closes: list, period: int = 14) -> float:
-    """Wilder RSI from closing price list."""
-    if len(closes) < period + 2:
-        return 50.0
-    arr = np.array(closes, dtype=float)
-    delta = np.diff(arr)
-    gain = np.where(delta > 0, delta, 0.0)
-    loss = np.where(delta < 0, -delta, 0.0)
-    avg_g = float(np.mean(gain[:period]))
-    avg_l = float(np.mean(loss[:period]))
-    for g, l in zip(gain[period:], loss[period:]):
-        avg_g = (avg_g * (period - 1) + g) / period
-        avg_l = (avg_l * (period - 1) + l) / period
-    if avg_l == 0:
-        return 100.0
-    return round(100.0 - 100.0 / (1.0 + avg_g / avg_l), 1)
-
-
-def _calc_trend(closes: list) -> str:
-    if len(closes) < 20:
-        return "sideways"
-    sma20 = float(np.mean(closes[-20:]))
-    last  = closes[-1]
-    if last > sma20 * 1.015:
-        return "uptrend"
-    if last < sma20 * 0.985:
-        return "downtrend"
-    return "sideways"
-
-
-# ── Ticker conversion utilities ──────────────────────────
-# yfinance/CoinGecko use -USD tickers for data. CoinSpot trades in -AUD.
-# These helpers bridge that gap.
-
-# Cached AUD/USD exchange rate (refreshed every 5 min with other caches)
-_AUD_USD_RATE: float = 0.0  # 0 = not fetched yet
-
-
-async def _get_aud_usd_rate() -> float:
-    """Get current AUD/USD rate. Cached 5 min."""
-    global _AUD_USD_RATE
-    cached = _cache_get("aud_usd_rate")
-    if cached is not None:
-        _AUD_USD_RATE = cached
-        return cached
-    # Try yfinance first
-    if YF_AVAILABLE:
-        try:
-            loop = asyncio.get_running_loop()
-
-            def _fetch_fx():
-                import yfinance as _yf_fx
-                hist = _yf_fx.Ticker("AUDUSD=X").history(period="5d")
-                if hist is not None and not hist.empty and "Close" in hist.columns:
-                    return float(hist["Close"].iloc[-1])
-                return None
-            rate = await asyncio.wait_for(
-                loop.run_in_executor(_EXECUTOR, _fetch_fx), timeout=8.0)
-            if rate and 0.3 < rate < 1.2:  # sanity check
-                _AUD_USD_RATE = rate
-                _cache_set("aud_usd_rate", rate)
-                return rate
-        except Exception:
-            pass
-    # Fallback: CoinGecko BTC price comparison
-    try:
-        import aiohttp as _aio_fx
-        async with _aio_fx.ClientSession(timeout=_aio_fx.ClientTimeout(total=5)) as s:
-            async with s.get(
-                "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,aud"
-            ) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    usd = data.get("bitcoin", {}).get("usd", 0)
-                    aud = data.get("bitcoin", {}).get("aud", 0)
-                    if usd and aud:
-                        rate = usd / aud  # AUD/USD = how many USD per AUD
-                        _AUD_USD_RATE = rate
-                        _cache_set("aud_usd_rate", rate)
-                        return rate
-    except Exception:
-        pass
-    # Last resort: hardcoded reasonable estimate
-    if _AUD_USD_RATE > 0:
-        return _AUD_USD_RATE
-    _AUD_USD_RATE = 0.65
-    return 0.65
-
-
-def _usd_to_aud(usd_price: float) -> float:
-    """Convert USD price to AUD using cached rate."""
-    if _AUD_USD_RATE > 0:
-        return round(usd_price / _AUD_USD_RATE, 4)
-    return round(usd_price / 0.65, 4)  # fallback
-
-
-def _to_data_ticker(ticker: str) -> str:
-    """Convert any ticker format to the yfinance/CoinGecko -USD format for data fetching."""
-    return ticker.replace("-AUD", "-USD")
-
-
-def _to_trade_ticker(ticker: str) -> str:
-    """Convert any ticker format to the CoinSpot -AUD format for trade execution."""
-    if "-USD" in ticker:
-        return ticker.replace("-USD", "-AUD")
-    return ticker
-
-
-def _is_crypto(ticker: str) -> bool:
-    """Check if a ticker is a crypto pair."""
-    return "-USD" in ticker or "-AUD" in ticker
-
-
-# ── CoinGecko coin-ID map ────────────────────────────────
-_COINGECKO_MAP = {
-    "BTC-USD": "bitcoin",      "ETH-USD": "ethereum",       "BNB-USD": "binancecoin",
-    "SOL-USD": "solana",       "XRP-USD": "ripple",          "ADA-USD": "cardano",
-    "AVAX-USD":"avalanche-2",  "DOT-USD": "polkadot",        "LINK-USD":"chainlink",
-    "MATIC-USD":"matic-network","DOGE-USD":"dogecoin",       "LTC-USD": "litecoin",
-    "UNI-USD": "uniswap",      "ATOM-USD":"cosmos",          "NEAR-USD":"near",
-    "FTM-USD": "fantom",       "ALGO-USD":"algorand",        "XLM-USD": "stellar",
-    "AAVE-USD":"aave",         "SNX-USD": "havven",
-}
-
-
-async def _get_crypto_coingecko() -> Optional[dict]:
-    """Fetch real crypto prices from CoinGecko free API (no API key needed).
-    Returns both USD and AUD prices for CoinSpot trade execution."""
-    key = "coingecko_prices"
-    cached = _cache_get(key)
-    if cached is not None:
-        return cached
-    ids = ",".join(_COINGECKO_MAP.values())
-    url = (
-        "https://api.coingecko.com/api/v3/simple/price"
-        f"?ids={ids}&vs_currencies=usd,aud&include_24hr_change=true"
-    )
-    try:
-        import aiohttp
-        async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=8),
-            headers={"User-Agent": "DALIOS/1.0"},
-        ) as session:
-            async with session.get(url) as resp:
-                if resp.status != 200:
-                    return None
-                data = await resp.json()
-        rev = {v: k for k, v in _COINGECKO_MAP.items()}
-        result = {}
-        for cid, vals in data.items():
-            if cid not in rev:
-                continue
-            usd_ticker = rev[cid]
-            result[usd_ticker] = {
-                "price":      vals.get("usd"),
-                "price_aud":  vals.get("aud"),
-                "change_pct": round(vals.get("usd_24h_change") or 0, 2),
-                "source":     "CoinGecko",
-            }
-            # Also store under -AUD ticker for CoinSpot lookups
-            aud_ticker = _to_trade_ticker(usd_ticker)
-            result[aud_ticker] = {
-                "price":      vals.get("aud"),
-                "change_pct": round(vals.get("usd_24h_change") or 0, 2),
-                "source":     "CoinGecko",
-            }
-        if result:
-            _cache_set(key, result)
-        return result or None
-    except Exception as exc:
-        logger.warning(f"CoinGecko error: {exc}")
-        return None
-
-
-def _calc_atr(closes: list, period: int = 14) -> float:
-    if len(closes) < period + 1:
-        return closes[-1] * 0.02 if closes else 1.0
-    diffs = [abs(closes[i] - closes[i - 1]) for i in range(-period, 0)]
-    return float(np.mean(diffs))
-
-
-def _calc_ema(closes: list, span: int) -> list:
-    """Compute exponential moving average from a list of closes."""
-    if not closes:
-        return []
-    alpha = 2.0 / (span + 1)
-    ema = [closes[0]]
-    for c in closes[1:]:
-        ema.append(alpha * c + (1 - alpha) * ema[-1])
-    return ema
-
-
-def _calc_macd(closes: list) -> dict:
-    """Compute MACD, signal line, and crossover from a list of closes."""
-    if len(closes) < 35:
-        return {"macd": 0.0, "signal_line": 0.0, "macd_signal": "neutral", "macd_crossover": False}
-    ema12 = _calc_ema(closes, 12)
-    ema26 = _calc_ema(closes, 26)
-    macd_line = [e12 - e26 for e12, e26 in zip(ema12, ema26)]
-    signal_line = _calc_ema(macd_line, 9)
-    macd_val = macd_line[-1]
-    sig_val = signal_line[-1]
-    prev_macd = macd_line[-2] if len(macd_line) >= 2 else 0
-    prev_sig = signal_line[-2] if len(signal_line) >= 2 else 0
-    return {
-        "macd": round(macd_val, 4),
-        "signal_line": round(sig_val, 4),
-        "macd_signal": "bullish" if macd_val > sig_val else "bearish",
-        "macd_crossover": macd_val > sig_val and prev_macd <= prev_sig,
-    }
-
-
-def _calc_bollinger(closes: list, period: int = 20) -> dict:
-    """Compute Bollinger Bands position from a list of closes."""
-    if len(closes) < period:
-        return {"bb_position": "mid", "bb_pct": 0.5}
-    window = closes[-period:]
-    sma = float(np.mean(window))
-    std = float(np.std(window))
-    upper = sma + 2 * std
-    lower = sma - 2 * std
-    last = closes[-1]
-    if last > upper:
-        pos = "above_upper"
-    elif last < lower:
-        pos = "below_lower"
-    else:
-        pos = "mid"
-    bb_pct = (last - lower) / (upper - lower + 1e-9)
-    return {"bb_position": pos, "bb_pct": round(bb_pct, 4)}
-
-
-def _calc_sma(closes: list, period: int) -> float:
-    """Simple moving average of last `period` values."""
-    if len(closes) < period:
-        return closes[-1] if closes else 0.0
-    return float(np.mean(closes[-period:]))
 
 # ─────────────────────────────────────────────
 # App setup
@@ -435,44 +105,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# ── In-memory rate limiter ────────────────────────────────
-class RateLimiter:
-    """Simple sliding-window rate limiter. Tracks request timestamps per IP."""
-
-    # Endpoints with stricter limits (10 req/min)
-    TRADING_PATHS = {"/api/paper/order", "/api/real/order", "/api/broker/connect"}
-
-    def __init__(self, general_limit: int = 60, trading_limit: int = 10, window: int = 60):
-        self.general_limit = general_limit
-        self.trading_limit = trading_limit
-        self.window = window          # seconds
-        self._hits: dict[str, list[float]] = {}   # key -> list of timestamps
-        self._lock = threading.Lock()
-
-    def _key(self, ip: str, path: str) -> tuple[str, int]:
-        """Return (bucket_key, max_allowed) for this request."""
-        for tp in self.TRADING_PATHS:
-            if path == tp:
-                return f"trade:{ip}", self.trading_limit
-        return f"general:{ip}", self.general_limit
-
-    def is_allowed(self, ip: str, path: str) -> bool:
-        bucket, limit = self._key(ip, path)
-        now = time.time()
-        with self._lock:
-            timestamps = self._hits.get(bucket, [])
-            # Drop timestamps outside the window
-            cutoff = now - self.window
-            timestamps = [t for t in timestamps if t > cutoff]
-            if len(timestamps) >= limit:
-                self._hits[bucket] = timestamps
-                return False
-            timestamps.append(now)
-            self._hits[bucket] = timestamps
-            return True
-
-
 _rate_limiter = RateLimiter()
 
 
@@ -480,19 +112,14 @@ _rate_limiter = RateLimiter()
 async def rate_limit_middleware(request: Request, call_next):
     """Enforce per-IP rate limits. Static files and WebSocket upgrades are exempt."""
     path = request.url.path
-
-    # Exempt static files and websocket upgrades
     if path.startswith("/static") or path.startswith("/ws"):
         return await call_next(request)
-
     ip = request.client.host if request.client else "unknown"
-
     if not _rate_limiter.is_allowed(ip, path):
         return JSONResponse(
             status_code=429,
             content={"detail": "Rate limit exceeded. Please try again later."},
         )
-
     return await call_next(request)
 
 
@@ -512,6 +139,7 @@ async def api_key_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+# ── Static files & UI ──────────────────────────────────────
 UI_DIR = ROOT / "ui"
 STATIC_DIR = UI_DIR / "static"
 
@@ -519,11 +147,15 @@ if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
+# ─────────────────────────────────────────────
+# Startup / Shutdown
+# ─────────────────────────────────────────────
+
 @app.on_event("startup")
 async def _on_startup():
     global REAL_EQUITY_CURVE
 
-    # ── Initialise database (create tables if missing) ──
+    # Initialise database
     if SETTINGS_AVAILABLE:
         try:
             init_db()
@@ -532,3067 +164,27 @@ async def _on_startup():
             logger.warning(f"Database init skipped: {exc}")
 
     _load_paper_state()
-    REAL_EQUITY_CURVE = _load_real_equity()
 
-    # ── Fetch AUD/USD exchange rate for crypto price conversion ──
+    import api.state as _state_mod
+    _state_mod.REAL_EQUITY_CURVE = _load_real_equity()
+
+    # Fetch AUD/USD exchange rate
     try:
         rate = await _get_aud_usd_rate()
         logger.info(f"AUD/USD rate: {rate:.4f}")
     except Exception as exc:
         logger.warning(f"AUD/USD rate fetch failed: {exc}")
 
-    # ── Launch SL/TP monitoring background task ──
+    # Launch SL/TP monitoring background task
     asyncio.get_event_loop().create_task(_sl_tp_monitor_loop())
     logger.info("SL/TP monitor started (30s interval)")
 
-    # ── Launch autonomous agent loop background task ──
+    # Launch autonomous agent loop background task
     asyncio.get_event_loop().create_task(_autonomous_agent_loop())
     auto_status = "ENABLED" if AGENT_CONFIG.get("enabled", False) else "DISABLED"
     logger.info(f"Autonomous agent loop started ({auto_status}, interval {AGENT_CONFIG.get('interval_seconds', 300)}s)")
 
     logger.info(f"Startup complete -- trading mode: {TRADING_MODE}")
-
-# ─────────────────────────────────────────────
-# State
-# ─────────────────────────────────────────────
-
-class SystemState:
-    def __init__(self):
-        self.agent = None
-        self.booted = False
-        self.mode = "PAPER"
-        self.paused = False
-        self.start_time = datetime.utcnow()
-        self.cycle_count = 0
-        self.last_cycle: Optional[dict] = None
-        self.last_health: Optional[dict] = None
-        self.last_sentiment: Optional[dict] = None
-        self.last_quadrant: Optional[dict] = None
-        self.alert_log: list[dict] = []
-        self.equity_history: list[dict] = []
-        self.initial_equity = 100_000.0
-        self._init_equity_history()
-
-    def _init_equity_history(self):
-        """Generate seed equity curve for demo mode."""
-        equity = self.initial_equity
-        for i in range(90):
-            equity *= (1 + random.gauss(0.0008, 0.008))
-            self.equity_history.append({
-                "t": (datetime.utcnow().replace(hour=0, minute=0, second=0)
-                      .__class__.fromtimestamp(
-                          datetime.utcnow().timestamp() - (90 - i) * 86400
-                      )).strftime("%Y-%m-%d"),
-                "v": round(equity, 2),
-            })
-
-    def uptime_seconds(self) -> int:
-        return int((datetime.utcnow() - self.start_time).total_seconds())
-
-    def add_alert(self, alert_type: str, message: str, level: str = "INFO"):
-        entry = {
-            "id": len(self.alert_log),
-            "type": alert_type,
-            "message": message,
-            "level": level,
-            "timestamp": datetime.utcnow().isoformat(),
-        }
-        self.alert_log.insert(0, entry)
-        self.alert_log = self.alert_log[:200]  # Keep last 200
-
-
-STATE = SystemState()
-
-# ── Circuit Breaker — risk management safety rails ────────
-try:
-    from trading.circuit_breaker import CircuitBreaker
-    CIRCUIT_BREAKER = CircuitBreaker(starting_equity=STATE.initial_equity)
-    logger.info("CircuitBreaker initialised")
-except Exception as _cb_err:
-    CIRCUIT_BREAKER = None
-    logger.warning(f"CircuitBreaker not available: {_cb_err}")
-
-# ── Notification Manager — Discord/Telegram alerts ───────
-try:
-    from notifications.notifier import NotificationManager
-    NOTIFIER = NotificationManager()
-    logger.info("NotificationManager initialised")
-except Exception as _nm_err:
-    NOTIFIER = None
-    logger.warning(f"NotificationManager not available: {_nm_err}")
-
-
-# ─────────────────────────────────────────────
-# Persistence helpers
-# ─────────────────────────────────────────────
-
-DATA_DIR = ROOT / "data"
-DATA_DIR.mkdir(exist_ok=True)
-(DATA_DIR / "storage").mkdir(exist_ok=True)  # SQLite DB lives here
-
-PAPER_STATE_FILE   = DATA_DIR / "paper_portfolio.json"
-REAL_EQUITY_FILE   = DATA_DIR / "real_equity.json"
-WATCHLIST_FILE     = DATA_DIR / "watchlist.json"
-PAPER_CONFIG_FILE  = DATA_DIR / "paper_config.json"
-AGENT_CONFIG_FILE  = DATA_DIR / "agent_config.json"
-
-
-# ── Agent auto-trading config persistence ──────────────────────────
-
-_AGENT_CONFIG_DEFAULTS = {
-    "enabled": False,
-    "interval_seconds": 300,
-    "min_confidence": 60,
-}
-
-
-def _load_agent_config() -> dict:
-    """Load agent auto-trading config from disk, or return defaults."""
-    try:
-        if AGENT_CONFIG_FILE.exists():
-            with open(AGENT_CONFIG_FILE) as f:
-                cfg = json.load(f)
-            # Merge with defaults so new keys are always present
-            merged = {**_AGENT_CONFIG_DEFAULTS, **cfg}
-            return merged
-    except Exception as exc:
-        logger.warning(f"Failed to load agent config: {exc}")
-    return dict(_AGENT_CONFIG_DEFAULTS)
-
-
-def _save_agent_config(cfg: dict) -> None:
-    """Persist agent auto-trading config to disk."""
-    try:
-        with open(AGENT_CONFIG_FILE, "w") as f:
-            json.dump(cfg, f, indent=2)
-    except Exception as exc:
-        logger.warning(f"Failed to save agent config: {exc}")
-
-
-AGENT_CONFIG = _load_agent_config()
-
-
-def _save_paper_state() -> None:
-    try:
-        payload = {
-            "cash":           PAPER.cash,
-            "positions":      PAPER.positions,
-            "history":        PAPER.history,
-            "equity_history": PAPER.equity_history,
-            "order_id":       PAPER.order_id,
-        }
-        PAPER_STATE_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    except Exception as exc:
-        logger.warning(f"Failed to save paper state: {exc}")
-    # Also sync open positions to DB
-    _db_sync_positions(PAPER.positions)
-
-
-def _load_paper_state() -> None:
-    if not PAPER_STATE_FILE.exists():
-        return
-    try:
-        payload = json.loads(PAPER_STATE_FILE.read_text(encoding="utf-8"))
-        PAPER.cash           = float(payload.get("cash", PAPER_STARTING_CASH))
-        PAPER.positions      = payload.get("positions", {})
-        PAPER.history        = payload.get("history", [])
-        PAPER.equity_history = payload.get("equity_history", [])
-        PAPER.order_id       = int(payload.get("order_id", 0))
-        logger.info(f"Paper portfolio loaded -- cash=${PAPER.cash:,.2f}, "
-                    f"{len(PAPER.positions)} positions, {len(PAPER.equity_history)} equity pts")
-    except Exception as exc:
-        logger.warning(f"Failed to load paper state (starting fresh): {exc}")
-
-
-# ─────────────────────────────────────────────
-# Database persistence helpers (dual write)
-# ─────────────────────────────────────────────
-
-def _db_save_trade(trade_dict: dict) -> None:
-    """Insert a single closed-trade record into the DB."""
-    if not SETTINGS_AVAILABLE:
-        return
-    try:
-        session = get_session()
-        ts = trade_dict.get("timestamp")
-        if isinstance(ts, str):
-            try:
-                ts = datetime.fromisoformat(ts)
-            except (ValueError, TypeError):
-                ts = datetime.utcnow()
-        record = Trade(
-            ticker=trade_dict.get("ticker", ""),
-            side=trade_dict.get("side", "SELL"),
-            qty=float(trade_dict.get("qty", 0)),
-            price=float(trade_dict.get("exit_price", trade_dict.get("price", 0))),
-            fees=float(trade_dict.get("fees", 0)),
-            pnl=trade_dict.get("pnl"),
-            pnl_pct=trade_dict.get("pnl_pct"),
-            entry_price=trade_dict.get("entry_price"),
-            exit_price=trade_dict.get("exit_price"),
-            timestamp=ts,
-        )
-        session.add(record)
-        session.commit()
-        session.close()
-    except Exception as exc:
-        logger.warning(f"DB: failed to save trade: {exc}")
-
-
-def _db_save_equity_snapshot(value: float) -> None:
-    """Insert a single equity data-point into the DB."""
-    if not SETTINGS_AVAILABLE:
-        return
-    try:
-        session = get_session()
-        record = EquitySnapshot(value=value, timestamp=datetime.utcnow())
-        session.add(record)
-        session.commit()
-        session.close()
-    except Exception as exc:
-        logger.warning(f"DB: failed to save equity snapshot: {exc}")
-
-
-def _db_get_trades(limit: int = 100) -> list[dict]:
-    """Query recent closed trades from DB, newest first."""
-    if not SETTINGS_AVAILABLE:
-        return []
-    try:
-        session = get_session()
-        rows = (
-            session.query(Trade)
-            .order_by(Trade.timestamp.desc())
-            .limit(limit)
-            .all()
-        )
-        result = []
-        for r in rows:
-            result.append({
-                "id": r.id,
-                "ticker": r.ticker,
-                "side": r.side,
-                "qty": r.qty,
-                "price": r.price,
-                "fees": r.fees,
-                "pnl": r.pnl,
-                "pnl_pct": r.pnl_pct,
-                "entry_price": r.entry_price,
-                "exit_price": r.exit_price,
-                "timestamp": r.timestamp.isoformat() if r.timestamp else None,
-            })
-        session.close()
-        return result
-    except Exception as exc:
-        logger.warning(f"DB: failed to get trades: {exc}")
-        return []
-
-
-def _db_get_equity_curve(limit: int = 2000) -> list[dict]:
-    """Query equity history from DB, oldest first (for charting)."""
-    if not SETTINGS_AVAILABLE:
-        return []
-    try:
-        session = get_session()
-        rows = (
-            session.query(EquitySnapshot)
-            .order_by(EquitySnapshot.timestamp.desc())
-            .limit(limit)
-            .all()
-        )
-        # Reverse so oldest is first (for chart rendering)
-        result = [
-            {"t": r.timestamp.isoformat() if r.timestamp else None, "v": r.value}
-            for r in reversed(rows)
-        ]
-        session.close()
-        return result
-    except Exception as exc:
-        logger.warning(f"DB: failed to get equity curve: {exc}")
-        return []
-
-
-def _db_sync_positions(positions: dict) -> None:
-    """Replace all paper_positions rows with current in-memory state."""
-    if not SETTINGS_AVAILABLE:
-        return
-    try:
-        session = get_session()
-        session.query(PaperPosition).delete()
-        for ticker, pos in positions.items():
-            entry_time = pos.get("entry_time")
-            if isinstance(entry_time, str):
-                try:
-                    entry_time = datetime.fromisoformat(entry_time)
-                except (ValueError, TypeError):
-                    entry_time = datetime.utcnow()
-            record = PaperPosition(
-                ticker=ticker,
-                side=pos.get("side", "LONG"),
-                qty=float(pos.get("qty", 0)),
-                entry_price=float(pos.get("entry_price", 0)),
-                stop_loss=pos.get("stop_loss"),
-                take_profit=pos.get("take_profit"),
-                entry_time=entry_time,
-            )
-            session.add(record)
-        session.commit()
-        session.close()
-    except Exception as exc:
-        logger.warning(f"DB: failed to sync positions: {exc}")
-
-
-def _load_real_equity() -> list:
-    if not REAL_EQUITY_FILE.exists():
-        return []
-    try:
-        return json.loads(REAL_EQUITY_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return []
-
-
-def _save_real_equity(curve: list) -> None:
-    try:
-        REAL_EQUITY_FILE.write_text(json.dumps(curve, indent=2), encoding="utf-8")
-    except Exception as exc:
-        logger.warning(f"Failed to save real equity: {exc}")
-
-
-# ─────────────────────────────────────────────
-# Paper Trading Portfolio
-# ─────────────────────────────────────────────
-
-# ─── Paper config (persisted) ────────────────
-def _load_paper_config() -> dict:
-    if PAPER_CONFIG_FILE.exists():
-        try:
-            return json.loads(PAPER_CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    return {"starting_cash": 1_000.0}
-
-def _save_paper_config() -> None:
-    try:
-        PAPER_CONFIG_FILE.write_text(json.dumps({"starting_cash": PAPER_STARTING_CASH}, indent=2), encoding="utf-8")
-    except Exception as exc:
-        logger.warning(f"Failed to save paper config: {exc}")
-
-_paper_cfg         = _load_paper_config()
-PAPER_STARTING_CASH: float = float(_paper_cfg.get("starting_cash", 1_000.0))
-# Persist config file on first startup if it doesn't exist
-if not PAPER_CONFIG_FILE.exists():
-    try:
-        PAPER_CONFIG_FILE.write_text(json.dumps({"starting_cash": PAPER_STARTING_CASH}, indent=2), encoding="utf-8")
-    except Exception:
-        pass
-
-# ─── Watchlist ────────────────────────────────
-def _load_watchlist() -> list:
-    if WATCHLIST_FILE.exists():
-        try:
-            return json.loads(WATCHLIST_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    return []
-
-def _save_watchlist(wl: list) -> None:
-    try:
-        WATCHLIST_FILE.write_text(json.dumps(wl, indent=2), encoding="utf-8")
-    except Exception as exc:
-        logger.warning(f"Failed to save watchlist: {exc}")
-
-WATCHLIST: list = _load_watchlist()
-
-# ── Trading Fee Schedule (percentage of trade value) ─────────────────
-# Covers brokerage, spread, exchange fees. Conservative estimates.
-TRADING_FEES = {
-    "asx":         0.10,   # 0.10% — typical ASX online broker (CommSec, SelfWealth)
-    "us_equity":   0.05,   # 0.05% — typical US broker (incl. SEC/FINRA micro-fees)
-    "crypto":      0.20,   # 0.20% — crypto exchange (Binance 0.1%, CoinSpot 0.1-1%)
-    "commodities": 0.10,   # 0.10% — commodity ETF brokerage
-    "forex":       0.03,   # 0.03% — forex spread cost estimate
-    "default":     0.10,   # 0.10% — fallback for unknown asset types
-}
-
-def _get_fee_pct(ticker: str) -> float:
-    """Return the estimated round-trip fee percentage for a ticker."""
-    if ticker in CRYPTO_TICKERS or ticker.endswith("-USD"):
-        return TRADING_FEES["crypto"]
-    elif ticker.endswith(".AX"):
-        return TRADING_FEES["asx"]
-    elif ticker in COMMODITY_TICKERS:
-        return TRADING_FEES["commodities"]
-    else:
-        return TRADING_FEES["default"]
-
-def _calc_fee(ticker: str, qty: float, price: float) -> float:
-    """Calculate fee in dollars for a single leg of a trade."""
-    return round(qty * price * _get_fee_pct(ticker) / 100, 4)
-
-
-class PaperPortfolio:
-    def __init__(self):
-        self.cash            = PAPER_STARTING_CASH
-        self.positions: dict = {}
-        self.history:   list = []
-        self.equity_history: list = []  # [{t: ISO, v: float}]
-        self.order_id   = 0
-
-    def _next_id(self) -> int:
-        self.order_id += 1
-        return self.order_id
-
-    def total_value(self, prices: dict) -> float:
-        """Portfolio total = cash + market value of all positions."""
-        invested = sum(
-            pos["qty"] * prices.get(t, pos["entry_price"])
-            for t, pos in self.positions.items()
-        )
-        return round(self.cash + invested, 2)
-
-    def unrealised_pnl(self, prices: dict) -> float:
-        total = 0.0
-        for t, pos in self.positions.items():
-            cur = prices.get(t, pos["entry_price"])
-            if pos["side"] == "LONG":
-                total += (cur - pos["entry_price"]) * pos["qty"]
-            else:
-                total += (pos["entry_price"] - cur) * pos["qty"]
-        return round(total, 2)
-
-    def place_order(self, ticker: str, side: str, qty: float, price: float,
-                    stop_loss: float = None, take_profit: float = None) -> dict:
-        cost = qty * price
-        fee  = _calc_fee(ticker, qty, price)
-        oid  = self._next_id()
-        ts   = datetime.utcnow().isoformat()
-
-        if side == "BUY":
-            total_cost = cost + fee
-            if total_cost > self.cash:
-                raise ValueError(f"Insufficient cash -- need ${total_cost:,.2f} (incl ${fee:.2f} fee), have ${self.cash:,.2f}")
-            self.cash -= total_cost
-            if ticker in self.positions and self.positions[ticker]["side"] == "LONG":
-                # Add to existing long
-                pos = self.positions[ticker]
-                total_qty   = pos["qty"] + qty
-                total_cost  = pos["entry_price"] * pos["qty"] + price * qty
-                pos["entry_price"] = round(total_cost / total_qty, 4)
-                pos["qty"]         = total_qty
-                # Update SL/TP if provided (new values take precedence)
-                if stop_loss is not None:
-                    pos["stop_loss"] = stop_loss
-                if take_profit is not None:
-                    pos["take_profit"] = take_profit
-            else:
-                self.positions[ticker] = {
-                    "qty": qty, "entry_price": round(price, 4),
-                    "entry_time": ts, "side": "LONG", "cost_basis": round(cost, 2),
-                    "stop_loss": stop_loss, "take_profit": take_profit,
-                }
-        else:  # SELL / close
-            if ticker not in self.positions:
-                raise ValueError(f"No open position in {ticker}")
-            pos   = self.positions[ticker]
-            close_qty = min(qty, pos["qty"])
-            sell_fee  = _calc_fee(ticker, close_qty, price)
-            proceeds  = close_qty * price - sell_fee
-            # Also account for the buy-side fee already embedded in cost_basis
-            buy_fee   = _calc_fee(ticker, close_qty, pos["entry_price"])
-            if pos["side"] == "LONG":
-                pnl = (price - pos["entry_price"]) * close_qty - buy_fee - sell_fee
-            else:
-                pnl = (pos["entry_price"] - price) * close_qty - buy_fee - sell_fee
-            self.cash += proceeds
-            self.history.insert(0, {
-                "id": oid, "ticker": ticker, "side": "SELL",
-                "qty": close_qty, "entry_price": pos["entry_price"],
-                "exit_price": round(price, 4), "pnl": round(pnl, 2),
-                "pnl_pct": round(pnl / (pos["entry_price"] * close_qty) * 100, 2),
-                "fees": round(buy_fee + sell_fee, 2),
-                "entry_time": pos.get("entry_time", ts),
-                "timestamp": ts,
-            })
-            pos["qty"] -= close_qty
-            if pos["qty"] <= 0:
-                del self.positions[ticker]
-        STATE.add_alert("PAPER", f"Order #{oid}: {side} {qty:.4g} {ticker} @ ${price:.4f} (fee ${fee:.2f})", "INFO")
-        return {"order_id": oid, "ticker": ticker, "side": side, "qty": qty, "price": price, "fee": fee, "timestamp": ts}
-
-    def reset(self):
-        self.cash            = PAPER_STARTING_CASH
-        self.positions       = {}
-        self.history         = []
-        self.equity_history  = []
-        self.order_id        = 0
-        STATE.add_alert("PAPER", f"Portfolio reset to ${PAPER_STARTING_CASH:,.2f} starting cash", "INFO")
-
-
-PAPER = PaperPortfolio()
-
-# ── Async locks for global mutable state ────────────────────────────
-_PAPER_LOCK     = asyncio.Lock()
-_MODE_LOCK      = asyncio.Lock()
-_WATCHLIST_LOCK  = asyncio.Lock()
-
-
-# ── Position sizing / risk parameters ─────────────────────────────
-_RISK_MAX_POS_SIZE_PCT  = 10.0   # max % of portfolio in a single position
-_RISK_MAX_OPEN          = 20     # max number of concurrent open positions
-_RISK_MAX_DAILY_LOSS    = 2.0    # max daily loss % before blocking new buys
-
-if SETTINGS_AVAILABLE:
-    try:
-        _s = get_settings()
-        _RISK_MAX_POS_SIZE_PCT = getattr(_s, "max_pos_size_pct", 10.0)
-        _RISK_MAX_OPEN         = getattr(_s, "max_open_positions", 20)
-        _RISK_MAX_DAILY_LOSS   = getattr(_s, "max_daily_loss_pct", 2.0)
-    except Exception:
-        pass  # keep defaults
-
-
-def _calculate_position_size(ticker: str, price: float, side: str,
-                             portfolio: PaperPortfolio,
-                             prices: dict) -> dict:
-    """Calculate the maximum allowed quantity for a trade based on risk limits.
-
-    Returns dict with keys: max_allowed_qty, position_pct, reason.
-    Raises ValueError if the trade is completely blocked.
-    """
-    total_value = portfolio.total_value(prices)
-    if total_value <= 0:
-        raise ValueError("Portfolio value is zero or negative -- cannot size position")
-
-    # --- SELL orders: no position sizing restrictions ---
-    if side != "BUY":
-        existing = portfolio.positions.get(ticker)
-        return {
-            "max_allowed_qty": existing["qty"] if existing else 0,
-            "position_pct": 0.0,
-            "reason": "sell_no_limit",
-        }
-
-    # --- Check max open positions ---
-    if ticker not in portfolio.positions and len(portfolio.positions) >= _RISK_MAX_OPEN:
-        raise ValueError(
-            f"Max open positions reached ({_RISK_MAX_OPEN}). "
-            f"Close an existing position before opening a new one."
-        )
-
-    # --- Check daily loss limit ---
-    today_str = datetime.utcnow().strftime("%Y-%m-%d")
-    today_pnl = sum(
-        t["pnl"] for t in portfolio.history
-        if t.get("timestamp", "").startswith(today_str)
-    )
-    if total_value > 0:
-        daily_loss_pct = abs(min(0, today_pnl)) / total_value * 100
-        if daily_loss_pct >= _RISK_MAX_DAILY_LOSS:
-            raise ValueError(
-                f"Daily loss limit reached ({daily_loss_pct:.1f}% >= {_RISK_MAX_DAILY_LOSS}%). "
-                f"No new BUY orders allowed today."
-            )
-
-    # --- Calculate max position value ---
-    max_position_value = total_value * (_RISK_MAX_POS_SIZE_PCT / 100.0)
-
-    # Account for existing position in same ticker
-    existing = portfolio.positions.get(ticker)
-    current_position_value = 0.0
-    if existing and existing["side"] == "LONG":
-        current_position_value = existing["qty"] * prices.get(ticker, existing["entry_price"])
-
-    remaining_allowance = max(0, max_position_value - current_position_value)
-
-    if remaining_allowance <= 0:
-        raise ValueError(
-            f"Position in {ticker} already at max size "
-            f"(${current_position_value:,.2f} >= {_RISK_MAX_POS_SIZE_PCT}% of portfolio ${total_value:,.2f})"
-        )
-
-    # Also cap by available cash
-    max_by_cash = portfolio.cash / price if price > 0 else 0
-    max_by_risk = remaining_allowance / price if price > 0 else 0
-    max_allowed_qty = min(max_by_cash, max_by_risk)
-
-    position_pct = 0.0
-    if total_value > 0:
-        position_pct = round((current_position_value + max_allowed_qty * price) / total_value * 100, 2)
-
-    return {
-        "max_allowed_qty": round(max_allowed_qty, 8),
-        "position_pct": min(position_pct, _RISK_MAX_POS_SIZE_PCT),
-        "reason": "ok",
-    }
-
-
-# ── Stop-Loss / Take-Profit monitoring ────────────────────────────
-
-async def _check_stop_loss_take_profit():
-    """Iterate open paper positions and auto-close any that hit SL or TP."""
-    if not PAPER.positions:
-        return
-    # Snapshot tickers to avoid dict-changed-during-iteration
-    tickers = list(PAPER.positions.keys())
-    for ticker in tickers:
-        pos = PAPER.positions.get(ticker)
-        if pos is None:
-            continue
-        sl = pos.get("stop_loss")
-        tp = pos.get("take_profit")
-        if sl is None and tp is None:
-            continue
-        price = await _live_price(ticker)
-        if price is None:
-            continue
-        price = float(price)
-        triggered = None
-        if sl is not None and price <= sl:
-            triggered = "STOP-LOSS"
-        elif tp is not None and price >= tp:
-            triggered = "TAKE-PROFIT"
-        if triggered is None:
-            continue
-        # Auto-close the position
-        async with _PAPER_LOCK:
-            # Re-check after acquiring lock (may have been closed already)
-            if ticker not in PAPER.positions:
-                continue
-            qty = PAPER.positions[ticker]["qty"]
-            try:
-                result = PAPER.place_order(ticker, "SELL", qty, price)
-            except ValueError as exc:
-                logger.warning(f"SL/TP auto-close failed for {ticker}: {exc}")
-                continue
-            # Equity snapshot + persist
-            _tickers = list(PAPER.positions.keys())
-            _prices  = await _prices_for_positions(_tickers) if _tickers else {}
-            current_equity = PAPER.total_value(_prices)
-            PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
-            PAPER.equity_history = PAPER.equity_history[-2000:]
-            _save_paper_state()
-            # DB: persist trade + equity snapshot
-            if PAPER.history:
-                _db_save_trade(PAPER.history[0])
-            _db_save_equity_snapshot(current_equity)
-        # Alert + broadcast
-        pnl = PAPER.history[0]["pnl"] if PAPER.history else 0
-        level_str = f"{triggered} hit"
-        STATE.add_alert("SL/TP",
-            f"{level_str}: auto-closed {ticker} {qty:.4g} @ ${price:.4f} "
-            f"(PnL ${pnl:+,.2f})", "WARNING")
-        await WS_MANAGER.broadcast({
-            "type": "PAPER_SL_TP",
-            "data": {**result, "trigger": triggered, "pnl": pnl},
-        })
-        logger.info(f"{triggered} triggered for {ticker} @ ${price:.4f} -- position auto-closed")
-
-
-async def _sl_tp_monitor_loop():
-    """Background loop: check SL/TP every 30 seconds."""
-    while True:
-        try:
-            await _check_stop_loss_take_profit()
-        except Exception as exc:
-            logger.warning(f"SL/TP monitor error: {exc}")
-        await asyncio.sleep(30)
-
-
-# ── Autonomous Agent Loop ──────────────────────────────────────────
-
-_agent_last_cycle_time: Optional[str] = None
-_agent_next_cycle_time: Optional[str] = None
-
-
-async def _autonomous_agent_loop():
-    """Background loop: scan markets, generate signals, auto-execute paper trades.
-
-    Runs every AGENT_CONFIG['interval_seconds'] (default 300s / 5 min).
-    Auto-trading is disabled by default — user must enable via POST /api/agent/toggle.
-    Only executes trades automatically in paper mode. In live mode, signals are
-    logged but require manual execution.
-    """
-    global _agent_last_cycle_time, _agent_next_cycle_time
-
-    # Brief initial delay to let startup finish
-    await asyncio.sleep(10)
-    logger.info("Autonomous agent loop started (waiting for enable)")
-
-    while True:
-        interval = AGENT_CONFIG.get("interval_seconds", 300)
-        if not AGENT_CONFIG.get("enabled", False):
-            _agent_next_cycle_time = None
-            await asyncio.sleep(5)  # Check enable flag every 5s
-            continue
-
-        _agent_next_cycle_time = (
-            datetime.utcnow().__class__.utcnow()
-            .replace(microsecond=0)
-            .isoformat()
-        )
-
-        try:
-            await _run_autonomous_cycle()
-        except Exception as exc:
-            logger.error(f"Autonomous cycle error: {exc}")
-            STATE.add_alert("AGENT", f"Autonomous cycle failed: {exc}", "ERROR")
-
-        # Calculate next cycle time
-        await asyncio.sleep(interval)
-
-
-async def _run_autonomous_cycle():
-    """Execute one autonomous scan/signal/trade cycle."""
-    global _agent_last_cycle_time, _agent_next_cycle_time
-
-    cycle_start = datetime.utcnow()
-    STATE.cycle_count += 1
-    cycle_num = STATE.cycle_count
-
-    logger.info(f"Autonomous cycle #{cycle_num} starting...")
-
-    # 1. Refresh scanner data for all markets
-    markets_refreshed = 0
-    for market in ("asx", "crypto", "commodities"):
-        try:
-            await market_scanner(market)
-            markets_refreshed += 1
-        except Exception as exc:
-            logger.warning(f"Scanner refresh failed for {market}: {exc}")
-
-    # 2. Generate signals
-    signals = await _gen_signals(12)
-    min_confidence = AGENT_CONFIG.get("min_confidence", 60)
-
-    # 3. Filter signals by minimum confidence
-    strong_signals = [s for s in signals if s.get("confidence", 0) >= min_confidence]
-    buy_signals = [s for s in strong_signals if s.get("action") == "BUY"]
-    sell_signals = [s for s in strong_signals if s.get("action") == "SELL"]
-
-    trades_executed = 0
-    trade_details = []
-
-    # 4. Determine trading mode
-    is_paper = TRADING_MODE.upper() != "LIVE"
-
-    # 5. Process SELL signals — close held positions
-    for sig in sell_signals:
-        ticker = sig["ticker"]
-        if ticker not in PAPER.positions:
-            continue  # No position to close
-
-        if not is_paper:
-            logger.info(
-                f"[LIVE MODE] SELL signal for {ticker} (conf {sig['confidence']}%) "
-                f"— requires manual execution"
-            )
-            STATE.add_alert(
-                "AGENT",
-                f"SELL signal: {ticker} @ ${sig['price']:.4f} "
-                f"(conf {sig['confidence']}%) — manual execution required (live mode)",
-                "WARNING",
-            )
-            continue
-
-        # Auto-close in paper mode
-        try:
-            pos = PAPER.positions[ticker]
-            qty = pos["qty"]
-            price = await _live_price(ticker)
-            if price is None:
-                price = sig["price"]
-            price = float(price)
-
-            async with _PAPER_LOCK:
-                if ticker not in PAPER.positions:
-                    continue
-                result = PAPER.place_order(ticker, "SELL", qty, price)
-                _tickers = list(PAPER.positions.keys())
-                _prices = await _prices_for_positions(_tickers) if _tickers else {}
-                current_equity = PAPER.total_value(_prices)
-                PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
-                PAPER.equity_history = PAPER.equity_history[-2000:]
-                _save_paper_state()
-                if PAPER.history:
-                    _db_save_trade(PAPER.history[0])
-                _db_save_equity_snapshot(current_equity)
-
-            pnl = result.get("pnl", PAPER.history[0]["pnl"] if PAPER.history else 0)
-            trades_executed += 1
-            trade_details.append(f"SELL {ticker} x{qty:.4g} @ ${price:.4f}")
-            STATE.add_alert(
-                "AGENT",
-                f"Auto-closed {ticker} x{qty:.4g} @ ${price:.4f} (PnL ${pnl:+,.2f})",
-                "INFO",
-            )
-            await WS_MANAGER.broadcast({"type": "PAPER_ORDER", "data": result})
-            logger.info(f"Cycle #{cycle_num}: auto-closed {ticker} @ ${price:.4f}")
-
-        except Exception as exc:
-            logger.warning(f"Cycle #{cycle_num}: failed to close {ticker}: {exc}")
-
-    # 6. Process BUY signals — open new positions (paper mode only)
-    for sig in buy_signals:
-        ticker = sig["ticker"]
-        # Skip if already holding this ticker
-        if ticker in PAPER.positions:
-            continue
-
-        if not is_paper:
-            logger.info(
-                f"[LIVE MODE] BUY signal for {ticker} (conf {sig['confidence']}%) "
-                f"— requires manual execution"
-            )
-            STATE.add_alert(
-                "AGENT",
-                f"BUY signal: {ticker} @ ${sig['price']:.4f} "
-                f"(conf {sig['confidence']}%) — manual execution required (live mode)",
-                "WARNING",
-            )
-            continue
-
-        # Auto-execute in paper mode with position sizing
-        try:
-            price = await _live_price(ticker)
-            if price is None:
-                price = sig["price"]
-            price = float(price)
-
-            async with _PAPER_LOCK:
-                # Position sizing check
-                _tickers_pre = list(set(list(PAPER.positions.keys()) + [ticker]))
-                _prices_pre = await _prices_for_positions(_tickers_pre) if _tickers_pre else {}
-                _prices_pre[ticker] = price
-
-                try:
-                    sizing = _calculate_position_size(ticker, price, "BUY", PAPER, _prices_pre)
-                except ValueError as e:
-                    logger.info(f"Cycle #{cycle_num}: position sizing blocked {ticker}: {e}")
-                    continue
-
-                max_qty = sizing["max_allowed_qty"]
-                if max_qty <= 0:
-                    continue
-
-                # Use signal's suggested position size (1-5% of portfolio)
-                pos_size_pct = sig.get("position_size_pct", 2.0)
-                total_value = PAPER.total_value(_prices_pre)
-                target_value = total_value * (pos_size_pct / 100.0)
-                target_qty = target_value / price if price > 0 else 0
-
-                # Cap to max allowed
-                qty = min(target_qty, max_qty)
-                if qty <= 0:
-                    continue
-
-                # Round qty sensibly
-                if price > 100:
-                    qty = round(qty, 2)
-                elif price > 1:
-                    qty = round(qty, 4)
-                else:
-                    qty = round(qty, 6)
-
-                if qty <= 0:
-                    continue
-
-                # Use signal's SL/TP
-                sl = sig.get("stop_loss")
-                tp = sig.get("take_profit")
-
-                result = PAPER.place_order(ticker, "BUY", qty, price,
-                                           stop_loss=sl, take_profit=tp)
-
-                # Equity snapshot + persist
-                _tickers_post = list(PAPER.positions.keys())
-                _prices_post = await _prices_for_positions(_tickers_post) if _tickers_post else {}
-                current_equity = PAPER.total_value(_prices_post)
-                PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
-                PAPER.equity_history = PAPER.equity_history[-2000:]
-                _save_paper_state()
-                _db_save_equity_snapshot(current_equity)
-
-            trades_executed += 1
-            trade_details.append(f"BUY {ticker} x{qty:.4g} @ ${price:.4f}")
-            STATE.add_alert(
-                "AGENT",
-                f"Auto-bought {ticker} x{qty:.4g} @ ${price:.4f} "
-                f"(conf {sig['confidence']}%, SL ${sl}, TP ${tp})",
-                "INFO",
-            )
-            await WS_MANAGER.broadcast({"type": "PAPER_ORDER", "data": result})
-            logger.info(f"Cycle #{cycle_num}: auto-bought {ticker} x{qty:.4g} @ ${price:.4f}")
-
-        except Exception as exc:
-            logger.warning(f"Cycle #{cycle_num}: failed to buy {ticker}: {exc}")
-
-    # 7. Generate opportunities
-    opportunities = await _gen_opportunities(8)
-
-    # 8. Build cycle result
-    health = _gen_portfolio_health()
-    quadrant = _gen_quadrant_data()
-    _agent_last_cycle_time = datetime.utcnow().isoformat()
-    interval = AGENT_CONFIG.get("interval_seconds", 300)
-    _agent_next_cycle_time = (
-        datetime.utcnow().__class__.utcnow()
-        .replace(microsecond=0)
-        .isoformat()
-    )
-
-    result = {
-        "type": "CYCLE_COMPLETE",
-        "cycle": cycle_num,
-        "autonomous": True,
-        "quadrant": quadrant.get("quadrant", "unknown"),
-        "signals_found": len(signals),
-        "strong_signals": len(strong_signals),
-        "trades_executed": trades_executed,
-        "trade_details": trade_details,
-        "top_signals": signals[:5],
-        "opportunities": len(opportunities),
-        "portfolio_health": health,
-        "markets_refreshed": markets_refreshed,
-        "timestamp": _agent_last_cycle_time,
-    }
-    STATE.last_cycle = result
-
-    # 9. Summary log + alert
-    elapsed = (datetime.utcnow() - cycle_start).total_seconds()
-    summary = (
-        f"Cycle #{cycle_num} complete -- "
-        f"{len(signals)} signals, {len(strong_signals)} above {min_confidence}% conf, "
-        f"{trades_executed} trades executed ({elapsed:.1f}s)"
-    )
-    logger.info(summary)
-    STATE.add_alert("CYCLE", summary, "INFO")
-
-    # 10. Broadcast via WebSocket
-    await WS_MANAGER.broadcast({"type": "CYCLE_UPDATE", "data": result})
-
-
-# ─────────────────────────────────────────────
-# Broker Abstraction -- live trading
-# ─────────────────────────────────────────────
-
-class BrokerBase:
-    name: str = "base"
-    def is_connected(self) -> bool: raise NotImplementedError
-    async def connect(self, **kwargs) -> None: raise NotImplementedError
-    async def get_account(self) -> dict: raise NotImplementedError
-    async def place_order(self, ticker: str, side: str, qty: float, price: Optional[float]) -> dict: raise NotImplementedError
-    async def get_positions(self) -> list: raise NotImplementedError
-    async def get_history(self) -> list: raise NotImplementedError
-    async def close_position(self, ticker: str) -> dict: raise NotImplementedError
-
-
-class IBKRBroker(BrokerBase):
-    name = "ibkr"
-
-    def __init__(self):
-        self._ib = None
-        self._connected = False
-
-    def is_connected(self) -> bool:
-        return self._connected and self._ib is not None
-
-    async def connect(self, host: str = "127.0.0.1", port: int = 7497, client_id: int = 1, **kwargs) -> None:
-        try:
-            from ib_insync import IB
-        except ImportError:
-            raise ImportError("ib_insync not installed. Run: pip install ib_insync")
-        ib = IB()
-        await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: ib.connect(host, int(port), clientId=int(client_id), timeout=10))
-        self._ib = ib
-        self._connected = True
-        logger.info(f"IBKR connected -- {host}:{port}")
-
-    async def get_account(self) -> dict:
-        if not self.is_connected(): raise RuntimeError("IBKR not connected")
-        summary = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._ib.accountSummary)
-        vals = {row.tag: row.value for row in summary}
-        return {"broker": "ibkr", "account_value": float(vals.get("NetLiquidation", 0)),
-                "buying_power": float(vals.get("BuyingPower", 0)), "cash": float(vals.get("TotalCashValue", 0)), "currency": "AUD"}
-
-    async def place_order(self, ticker: str, side: str, qty: float, price: Optional[float] = None) -> dict:
-        if not self.is_connected(): raise RuntimeError("IBKR not connected")
-        from ib_insync import Stock, MarketOrder, LimitOrder
-        contract = Stock(ticker, "SMART", "USD")
-        order = LimitOrder(side.upper(), qty, price) if price else MarketOrder(side.upper(), qty)
-        trade = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._ib.placeOrder, contract, order)
-        return {"order_id": trade.order.orderId, "ticker": ticker, "side": side, "qty": qty,
-                "price": price, "status": trade.orderStatus.status, "timestamp": datetime.utcnow().isoformat()}
-
-    async def get_positions(self) -> list:
-        if not self.is_connected(): raise RuntimeError("IBKR not connected")
-        raw = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._ib.positions)
-        return [{"ticker": p.contract.symbol, "qty": p.position, "avg_cost": round(p.avgCost, 4),
-                 "market_val": None, "pnl": None, "side": "LONG" if p.position > 0 else "SHORT"} for p in raw]
-
-    async def get_history(self) -> list:
-        if not self.is_connected(): raise RuntimeError("IBKR not connected")
-        fills = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._ib.fills)
-        return [{"ticker": f.contract.symbol, "side": f.execution.side, "qty": f.execution.shares,
-                 "price": f.execution.price, "timestamp": str(f.execution.time)} for f in fills]
-
-    async def close_position(self, ticker: str) -> dict:
-        positions = await self.get_positions()
-        pos = next((p for p in positions if p["ticker"].upper() == ticker.upper()), None)
-        if not pos: raise ValueError(f"No open IBKR position in {ticker}")
-        side = "SELL" if pos["qty"] > 0 else "BUY"
-        return await self.place_order(ticker, side, abs(pos["qty"]), None)
-
-
-class AlpacaBroker(BrokerBase):
-    name = "alpaca"
-
-    def __init__(self):
-        self._api = None
-        self._connected = False
-
-    def is_connected(self) -> bool:
-        return self._connected and self._api is not None
-
-    async def connect(self, api_key: str, api_secret: str,
-                      base_url: str = "https://paper-api.alpaca.markets", **kwargs) -> None:
-        try:
-            import alpaca_trade_api as tradeapi
-        except ImportError:
-            raise ImportError("alpaca-trade-api not installed. Run: pip install alpaca-trade-api")
-        api = tradeapi.REST(api_key, api_secret, base_url, api_version="v2")
-        await asyncio.get_running_loop().run_in_executor(_EXECUTOR, api.get_account)
-        self._api = api
-        self._connected = True
-        logger.info(f"Alpaca connected -- {base_url}")
-
-    async def get_account(self) -> dict:
-        if not self.is_connected(): raise RuntimeError("Alpaca not connected")
-        acct = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._api.get_account)
-        return {"broker": "alpaca", "account_value": float(acct.portfolio_value),
-                "buying_power": float(acct.buying_power), "cash": float(acct.cash),
-                "currency": "USD", "status": acct.status}
-
-    async def place_order(self, ticker: str, side: str, qty: float, price: Optional[float] = None) -> dict:
-        if not self.is_connected(): raise RuntimeError("Alpaca not connected")
-        order = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._api.submit_order(
-            symbol=ticker, qty=qty, side=side.lower(),
-            type="limit" if price else "market",
-            time_in_force="gtc",
-            limit_price=str(price) if price else None,
-        ))
-        return {"order_id": str(order.id), "ticker": ticker, "side": side, "qty": qty,
-                "price": price, "status": order.status, "timestamp": datetime.utcnow().isoformat()}
-
-    async def get_positions(self) -> list:
-        if not self.is_connected(): raise RuntimeError("Alpaca not connected")
-        raw = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._api.list_positions)
-        return [{"ticker": p.symbol, "qty": float(p.qty), "avg_cost": float(p.avg_entry_price),
-                 "market_val": float(p.market_value), "pnl": float(p.unrealized_pl),
-                 "pnl_pct": round(float(p.unrealized_plpc) * 100, 2), "side": p.side} for p in raw]
-
-    async def get_history(self) -> list:
-        if not self.is_connected(): raise RuntimeError("Alpaca not connected")
-        raw = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._api.list_orders(status="filled", limit=100))
-        return [{"ticker": o.symbol, "side": o.side, "qty": float(o.filled_qty or 0),
-                 "price": float(o.filled_avg_price) if o.filled_avg_price else None,
-                 "timestamp": o.filled_at.isoformat() if o.filled_at else None} for o in raw]
-
-    async def close_position(self, ticker: str) -> dict:
-        if not self.is_connected(): raise RuntimeError("Alpaca not connected")
-        order = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._api.close_position(ticker))
-        return {"order_id": str(order.id), "ticker": ticker, "side": "SELL",
-                "status": order.status, "timestamp": datetime.utcnow().isoformat()}
-
-
-class BinanceBroker(BrokerBase):
-    name = "binance"
-
-    def __init__(self):
-        self._client = None
-        self._connected = False
-
-    def is_connected(self) -> bool:
-        return self._connected and self._client is not None
-
-    async def connect(self, api_key: str, api_secret: str, testnet: bool = False, **kwargs) -> None:
-        try:
-            from binance.client import Client as BinanceClient
-        except ImportError:
-            raise ImportError("python-binance not installed. Run: pip install python-binance")
-        client = BinanceClient(api_key, api_secret, testnet=testnet)
-        await asyncio.get_running_loop().run_in_executor(_EXECUTOR, client.get_account)
-        self._client = client
-        self._connected = True
-        logger.info(f"Binance connected -- {'testnet' if testnet else 'live'}")
-
-    async def get_account(self) -> dict:
-        if not self.is_connected(): raise RuntimeError("Binance not connected")
-        acct = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._client.get_account)
-        usdt = next((float(b["free"]) + float(b["locked"]) for b in acct.get("balances", []) if b["asset"] == "USDT"), 0.0)
-        free_usdt = next((float(b["free"]) for b in acct.get("balances", []) if b["asset"] == "USDT"), 0.0)
-        return {"broker": "binance", "account_value": usdt, "buying_power": free_usdt, "cash": free_usdt, "currency": "USDT"}
-
-    async def place_order(self, ticker: str, side: str, qty: float, price: Optional[float] = None) -> dict:
-        if not self.is_connected(): raise RuntimeError("Binance not connected")
-        symbol = ticker.replace("/", "").replace("-", "").upper()
-        params = dict(symbol=symbol, side=side.upper(), type="LIMIT" if price else "MARKET", quantity=qty)
-        if price:
-            params["price"] = str(price)
-            params["timeInForce"] = "GTC"
-        order = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._client.create_order(**params))
-        return {"order_id": str(order["orderId"]), "ticker": ticker, "side": side, "qty": qty,
-                "price": price, "status": order.get("status"), "timestamp": datetime.utcnow().isoformat()}
-
-    async def get_positions(self) -> list:
-        if not self.is_connected(): raise RuntimeError("Binance not connected")
-        acct = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._client.get_account)
-        return [{"ticker": b["asset"], "qty": float(b["free"]) + float(b["locked"]),
-                 "avg_cost": None, "market_val": None, "pnl": None, "side": "LONG"}
-                for b in acct.get("balances", [])
-                if (float(b["free"]) + float(b["locked"])) > 0 and b["asset"] not in ("USDT", "BUSD")]
-
-    async def get_history(self) -> list:
-        if not self.is_connected(): raise RuntimeError("Binance not connected")
-        orders = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._client.get_all_orders(symbol="BTCUSDT", limit=50))
-        return [{"ticker": o["symbol"], "side": o["side"], "qty": float(o["executedQty"]),
-                 "price": float(o["price"]) if o["price"] else None, "timestamp": str(o["time"])}
-                for o in orders if o["status"] == "FILLED"]
-
-    async def close_position(self, ticker: str) -> dict:
-        positions = await self.get_positions()
-        asset = ticker.replace("/", "").replace("-", "").replace("USDT", "").upper()
-        pos = next((p for p in positions if p["ticker"].upper() == asset), None)
-        if not pos: raise ValueError(f"No Binance balance for {ticker}")
-        return await self.place_order(ticker, "SELL", pos["qty"], None)
-
-
-class CoinbaseBroker(BrokerBase):
-    name = "coinbase"
-
-    def __init__(self):
-        self._client = None
-        self._connected = False
-
-    def is_connected(self) -> bool:
-        return self._connected and self._client is not None
-
-    async def connect(self, api_key: str, api_secret: str, **kwargs) -> None:
-        try:
-            from coinbase.rest import RESTClient
-        except ImportError:
-            raise ImportError("coinbase-advanced-py not installed. Run: pip install coinbase-advanced-py")
-        client = RESTClient(api_key=api_key, api_secret=api_secret)
-        await asyncio.get_running_loop().run_in_executor(_EXECUTOR, client.get_accounts)
-        self._client = client
-        self._connected = True
-        logger.info("Coinbase Advanced Trade connected")
-
-    async def get_account(self) -> dict:
-        if not self.is_connected(): raise RuntimeError("Coinbase not connected")
-        accounts = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._client.get_accounts)
-        acct_list = accounts.accounts if hasattr(accounts, "accounts") else []
-        cash = sum(float(getattr(a, "available_balance", type("", (), {"value": "0"})).value)
-                   for a in acct_list if getattr(a, "currency", "") in ("USD", "USDC"))
-        return {"broker": "coinbase", "account_value": cash, "buying_power": cash, "cash": cash, "currency": "USD"}
-
-    async def place_order(self, ticker: str, side: str, qty: float, price: Optional[float] = None) -> dict:
-        if not self.is_connected(): raise RuntimeError("Coinbase not connected")
-        import uuid
-        product_id = ticker.upper().replace("/", "-")
-        client_order_id = str(uuid.uuid4())
-        cfg = {"limit_limit_gtc": {"base_size": str(qty), "limit_price": str(price)}} if price \
-              else {"market_market_ioc": {"base_size": str(qty)}}
-        order = await asyncio.get_running_loop().run_in_executor(
-            _EXECUTOR, lambda: self._client.create_order(
-                client_order_id=client_order_id, product_id=product_id, side=side.upper(), order_configuration=cfg))
-        return {"order_id": getattr(order, "order_id", client_order_id), "ticker": ticker, "side": side,
-                "qty": qty, "price": price, "status": "FILLED" if getattr(order, "success", False) else "PENDING",
-                "timestamp": datetime.utcnow().isoformat()}
-
-    async def get_positions(self) -> list:
-        if not self.is_connected(): raise RuntimeError("Coinbase not connected")
-        accounts = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._client.get_accounts)
-        acct_list = accounts.accounts if hasattr(accounts, "accounts") else []
-        return [{"ticker": getattr(a, "currency", ""), "qty": float(getattr(a, "available_balance", type("", (), {"value": "0"})).value),
-                 "avg_cost": None, "market_val": None, "pnl": None, "side": "LONG"}
-                for a in acct_list if getattr(a, "currency", "") not in ("USD", "USDC", "USDT")
-                and float(getattr(a, "available_balance", type("", (), {"value": "0"})).value) > 0]
-
-    async def get_history(self) -> list:
-        if not self.is_connected(): raise RuntimeError("Coinbase not connected")
-        orders = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._client.list_orders(order_status=["FILLED"], limit=50))
-        return [{"ticker": getattr(o, "product_id", ""), "side": getattr(o, "side", ""),
-                 "qty": float(getattr(o, "filled_size", 0) or 0), "price": float(getattr(o, "average_filled_price", 0) or 0),
-                 "timestamp": str(getattr(o, "created_time", ""))} for o in (orders.orders if hasattr(orders, "orders") else [])]
-
-    async def close_position(self, ticker: str) -> dict:
-        positions = await self.get_positions()
-        asset = ticker.split("-")[0].upper()
-        pos = next((p for p in positions if p["ticker"].upper() == asset), None)
-        if not pos: raise ValueError(f"No Coinbase balance for {ticker}")
-        return await self.place_order(ticker, "SELL", pos["qty"], None)
-
-
-class CoinSpotBroker(BrokerBase):
-    """CoinSpot Australian crypto exchange — REST API v2."""
-    name = "coinspot"
-    _BASE = "https://www.coinspot.com.au/api/v2"
-
-    def __init__(self):
-        self._api_key:    Optional[str] = None
-        self._api_secret: Optional[str] = None
-        self._connected   = False
-
-    def is_connected(self) -> bool:
-        return self._connected
-
-    def _sign_request(self, data: dict):
-        """Sign a CoinSpot API request.
-        
-        CoinSpot is picky about JSON format:
-        - nonce must be an integer (not string), always increasing
-        - Compact JSON separators (no spaces) — signed body must match posted body exactly
-        - Float values must avoid scientific notation (e.g. 0.00019 not 1.9e-04)
-        """
-        import time as _t, hmac as _hmac, hashlib as _hs
-
-        nonce = int(_t.time() * 1000)
-        data["nonce"] = nonce
-
-        # Force all float values to fixed-point strings to avoid scientific notation
-        # CoinSpot expects "amount":"0.00019" not "amount":1.9e-04
-        cleaned = {}
-        for k, v in data.items():
-            if isinstance(v, float):
-                # Format to 8 decimal places, strip trailing zeros
-                cleaned[k] = f"{v:.8f}".rstrip("0").rstrip(".")
-            else:
-                cleaned[k] = v
-
-        body = json.dumps(cleaned, separators=(",", ":"))
-        sig  = _hmac.new(self._api_secret.encode("utf-8"), body.encode("utf-8"), _hs.sha512).hexdigest()
-        return body, sig
-
-    async def _post(self, endpoint: str, payload: dict) -> dict:
-        body, sig = self._sign_request(payload)
-        headers   = {"Content-Type": "application/json",
-                     "key":  self._api_key,
-                     "sign": sig}
-        logger.debug(f"CoinSpot POST {endpoint} body=[REDACTED]")
-        timeout = aiohttp.ClientTimeout(total=12)
-        async with aiohttp.ClientSession(timeout=timeout) as sess:
-            async with sess.post(f"{self._BASE}{endpoint}", data=body, headers=headers) as resp:
-                result = await resp.json(content_type=None)
-                if result.get("status") == "error":
-                    logger.warning(f"CoinSpot error on {endpoint}: {result.get('message','unknown')} | body=[REDACTED]")
-                    raise RuntimeError(f"CoinSpot error: {result.get('message','unknown')}")
-                return result
-
-    async def connect(self, api_key: str, api_secret: str, **kwargs) -> None:
-        self._api_key    = api_key
-        self._api_secret = api_secret
-        # Verify credentials with a balances fetch
-        await self.get_account()
-        self._connected = True
-        logger.info("CoinSpot connected")
-
-    async def get_account(self) -> dict:
-        result  = await self._post("/ro/my/balances", {})
-        bals    = result.get("balances", [])
-        total   = sum(float(v.get("audbalance", 0))
-                      for b in bals if isinstance(b, dict)
-                      for v in b.values() if isinstance(v, dict))
-        return {"broker": "coinspot", "account_value": round(total, 2),
-                "buying_power": round(total, 2), "cash": round(total, 2), "currency": "AUD"}
-
-    async def place_order(self, ticker: str, side: str, qty: float,
-                          price: Optional[float] = None) -> dict:
-        coin     = ticker.replace("-AUD", "").replace("-USD", "").upper()
-        endpoint = ("/my/buy/now"
-                    if side.upper() in ("BUY", "LONG")
-                    else "/my/sell/now")
-        result   = await self._post(endpoint, {"cointype": coin, "amount": qty, "amounttype": "coin"})
-        return {"order_id": result.get("id", f"cs_{int(datetime.utcnow().timestamp())}"),
-                "ticker": ticker, "side": side, "qty": qty, "price": price,
-                "timestamp": datetime.utcnow().isoformat()}
-
-    async def get_positions(self) -> list:
-        result = await self._post("/ro/my/balances", {})
-        out    = []
-        for b in result.get("balances", []):
-            if not isinstance(b, dict): continue
-            for coin, details in b.items():
-                if not isinstance(details, dict): continue
-                bal = float(details.get("balance", 0))
-                if bal > 0:
-                    out.append({"ticker": f"{coin}-AUD", "qty": bal,
-                                "avg_cost": None,
-                                "market_val": float(details.get("audbalance", 0)),
-                                "pnl": None, "side": "LONG"})
-        return out
-
-    async def get_history(self) -> list:
-        result = await self._post("/ro/my/orders/completed", {})
-        rows   = []
-        for o in result.get("buyorders", []):
-            rows.append({"ticker": f"{o.get('cointype','')}-AUD", "side": "BUY",
-                         "qty": float(o.get("amount", 0)),
-                         "price": float(o.get("rate", 0)),
-                         "timestamp": o.get("created", "")})
-        for o in result.get("sellorders", []):
-            rows.append({"ticker": f"{o.get('cointype','')}-AUD", "side": "SELL",
-                         "qty": float(o.get("amount", 0)),
-                         "price": float(o.get("rate", 0)),
-                         "timestamp": o.get("created", "")})
-        return rows
-
-    async def close_position(self, ticker: str) -> dict:
-        positions = await self.get_positions()
-        coin      = ticker.replace("-AUD", "").replace("-USD", "").upper()
-        pos       = next((p for p in positions if coin in p["ticker"].upper()), None)
-        if not pos:
-            raise ValueError(f"No CoinSpot balance for {ticker}")
-        return await self.place_order(ticker, "SELL", pos["qty"])
-
-
-class GenericCryptoBroker(BrokerBase):
-    """Generic HMAC-signed crypto exchange broker for exchanges that follow
-    the standard API key + secret pattern. Subclass and set name, _BASE, and
-    override methods as needed for exchange-specific behaviour."""
-    name: str = "generic"
-    _BASE: str = ""
-
-    def __init__(self):
-        self._api_key:    Optional[str] = None
-        self._api_secret: Optional[str] = None
-        self._passphrase: Optional[str] = None
-        self._connected   = False
-
-    def is_connected(self) -> bool:
-        return self._connected
-
-    def _headers(self, body: str = "") -> dict:
-        import time as _t, hmac as _hmac, hashlib as _hs
-        ts = str(int(_t.time() * 1000))
-        msg = ts + body
-        sig = _hmac.new(self._api_secret.encode(), msg.encode(), _hs.sha256).hexdigest()
-        h = {"Content-Type": "application/json", "API-KEY": self._api_key,
-             "API-SIGN": sig, "API-TIMESTAMP": ts}
-        if self._passphrase:
-            h["API-PASSPHRASE"] = self._passphrase
-        return h
-
-    async def connect(self, api_key: str, api_secret: str, passphrase: str = "", **kwargs) -> None:
-        self._api_key    = api_key
-        self._api_secret = api_secret
-        self._passphrase = passphrase or None
-        self._connected  = True
-        logger.info(f"{self.name.upper()} credentials saved (connection validated on first trade)")
-
-    async def get_account(self) -> dict:
-        return {"broker": self.name, "account_value": 0, "buying_power": 0,
-                "cash": 0, "currency": "USD", "note": "Connect and trade to populate"}
-
-    async def place_order(self, ticker: str, side: str, qty: float, price: Optional[float] = None) -> dict:
-        raise NotImplementedError(f"{self.name.upper()} order routing not yet implemented — coming soon")
-
-    async def get_positions(self) -> list:
-        return []
-
-    async def get_history(self) -> list:
-        return []
-
-    async def close_position(self, ticker: str) -> dict:
-        raise NotImplementedError(f"{self.name.upper()} close not yet implemented")
-
-
-class KrakenBroker(GenericCryptoBroker):
-    name = "kraken"
-    _BASE = "https://api.kraken.com"
-
-
-class BybitBroker(GenericCryptoBroker):
-    name = "bybit"
-    _BASE = "https://api.bybit.com"
-
-
-class OKXBroker(GenericCryptoBroker):
-    name = "okx"
-    _BASE = "https://www.okx.com"
-
-    async def connect(self, api_key: str, api_secret: str, passphrase: str = "", **kwargs) -> None:
-        if not passphrase:
-            raise ValueError("OKX requires a passphrase in addition to API key and secret")
-        await super().connect(api_key, api_secret, passphrase, **kwargs)
-
-
-class KuCoinBroker(GenericCryptoBroker):
-    name = "kucoin"
-    _BASE = "https://api.kucoin.com"
-
-    async def connect(self, api_key: str, api_secret: str, passphrase: str = "", **kwargs) -> None:
-        if not passphrase:
-            raise ValueError("KuCoin requires a passphrase in addition to API key and secret")
-        await super().connect(api_key, api_secret, passphrase, **kwargs)
-
-
-class BitgetBroker(GenericCryptoBroker):
-    name = "bitget"
-    _BASE = "https://api.bitget.com"
-
-    async def connect(self, api_key: str, api_secret: str, passphrase: str = "", **kwargs) -> None:
-        if not passphrase:
-            raise ValueError("Bitget requires a passphrase in addition to API key and secret")
-        await super().connect(api_key, api_secret, passphrase, **kwargs)
-
-
-class IndependentReserveBroker(GenericCryptoBroker):
-    name = "independentreserve"
-    _BASE = "https://api.independentreserve.com"
-
-
-class SelfWealthBroker(GenericCryptoBroker):
-    name = "selfwealth"
-    _BASE = "https://api.selfwealth.com.au"
-
-class IGBroker(GenericCryptoBroker):
-    name = "ig"
-    _BASE = "https://api.ig.com/gateway/deal"
-
-class CMCBroker(GenericCryptoBroker):
-    name = "cmc"
-    _BASE = "https://ciapi.cityindex.com/TradingAPI"
-
-class SchwabBroker(GenericCryptoBroker):
-    name = "schwab"
-    _BASE = "https://api.schwabapi.com/trader/v1"
-
-
-class StakeBroker(GenericCryptoBroker):
-    name = "stake"
-    _BASE = "https://api.hellostake.com/api"
-
-class CommsecBroker(GenericCryptoBroker):
-    name = "commsec"
-    _BASE = "https://api.commsec.com.au/v1"
-
-class MomooBroker(GenericCryptoBroker):
-    name = "moomoo"
-    _BASE = "https://openapi.moomoo.com/v1"
-
-class SuperheroBroker(GenericCryptoBroker):
-    name = "superhero"
-    _BASE = "https://api.superhero.com.au/v1"
-
-class NabtradeBroker(GenericCryptoBroker):
-    name = "nabtrade"
-    _BASE = "https://api.nabtrade.com.au/v1"
-
-class RobinhoodBroker(GenericCryptoBroker):
-    name = "robinhood"
-    _BASE = "https://trading.robinhood.com/api/v1"
-
-class WebullBroker(GenericCryptoBroker):
-    name = "webull"
-    _BASE = "https://userapi.webull.com/api"
-
-
-ACTIVE_BROKER: Optional[BrokerBase] = None
-REAL_EQUITY_CURVE: list = []
-
-# ─── Trading mode persistence ─────────────────
-_MODE_FILE = Path(__file__).parent.parent / "data" / "trading_mode.json"
-
-def _load_trading_mode() -> str:
-    """Load persisted trading mode, default to 'paper'."""
-    try:
-        if _MODE_FILE.exists():
-            import json as _json
-            return _json.loads(_MODE_FILE.read_text()).get("mode", "paper")
-    except Exception:
-        pass
-    return "paper"
-
-def _save_trading_mode(mode: str):
-    """Persist trading mode to disk."""
-    try:
-        import json as _json
-        _MODE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        _MODE_FILE.write_text(_json.dumps({"mode": mode}))
-    except Exception:
-        pass
-
-TRADING_MODE: str = _load_trading_mode()
-
-
-# ─────────────────────────────────────────────
-# WebSocket Manager
-# ─────────────────────────────────────────────
-
-class ConnectionManager:
-    def __init__(self):
-        self.active: list[WebSocket] = []
-
-    async def connect(self, ws: WebSocket):
-        await ws.accept()
-        self.active.append(ws)
-        logger.info(f"WebSocket connected. Active connections: {len(self.active)}")
-
-    def disconnect(self, ws: WebSocket):
-        if ws in self.active:
-            self.active.remove(ws)
-        logger.info(f"WebSocket disconnected. Active connections: {len(self.active)}")
-
-    async def broadcast(self, data: dict):
-        dead = []
-        for ws in self.active:
-            try:
-                await ws.send_json(data)
-            except Exception:
-                dead.append(ws)
-        for ws in dead:
-            self.disconnect(ws)
-
-
-WS_MANAGER = ConnectionManager()
-
-
-# ─────────────────────────────────────────────
-# Demo / Fallback Data Generators
-# ─────────────────────────────────────────────
-
-ASX_TICKERS = [
-    # ── Big 4 Banks ──────────────────────────────────────
-    "CBA.AX", "WBC.AX", "ANZ.AX", "NAB.AX",
-    # ── Other Banks & Financials ─────────────────────────
-    "MQG.AX", "BEN.AX", "BOQ.AX", "SUN.AX", "QBE.AX", "IAG.AX",
-    "AMP.AX", "ASX.AX", "PPT.AX", "CGF.AX", "CPU.AX", "NHF.AX",
-    "MPL.AX", "NIB.AX", "AUB.AX",
-    # ── Mining & Resources ───────────────────────────────
-    "BHP.AX", "RIO.AX", "FMG.AX", "S32.AX", "MIN.AX", "LYC.AX",
-    "IGO.AX", "SFR.AX", "PLS.AX", "ILU.AX", "AWC.AX",
-    "LTR.AX", "NIC.AX", "WSA.AX",
-    # ── Gold & Precious Metals ───────────────────────────
-    "NST.AX", "EVN.AX", "SBM.AX", "RRL.AX", "SAR.AX",
-    "GOR.AX", "CMM.AX", "RMS.AX", "DEG.AX", "WAF.AX",
-    # ── Energy ───────────────────────────────────────────
-    "WDS.AX", "STO.AX", "BPT.AX", "AGL.AX", "ORG.AX",
-    "APA.AX", "KAR.AX", "CVN.AX",
-    # ── Healthcare & Biotech ─────────────────────────────
-    "CSL.AX", "RMD.AX", "COH.AX", "SHL.AX", "ANN.AX",
-    "PME.AX", "EBO.AX", "HLS.AX", "PNV.AX", "RHC.AX",
-    "CUV.AX", "NEU.AX", "TLX.AX", "MSB.AX",
-    # ── Technology ───────────────────────────────────────
-    "WTC.AX", "XRO.AX", "ALU.AX", "MP1.AX", "TNE.AX",
-    "REA.AX", "APX.AX", "TYR.AX", "SDR.AX", "DTL.AX",
-    "ZIP.AX", "EML.AX", "HUB.AX", "NXT.AX",
-    # ── Consumer / Retail ────────────────────────────────
-    "WES.AX", "WOW.AX", "COL.AX", "JBH.AX", "TWE.AX",
-    "HVN.AX", "DMP.AX", "SUL.AX", "LOV.AX", "KGN.AX",
-    "TPW.AX", "MYR.AX", "NCK.AX",
-    # ── Consumer Staples & Food ──────────────────────────
-    "GNC.AX", "NUF.AX", "ELD.AX", "BKL.AX",
-    # ── REITs ────────────────────────────────────────────
-    "GMG.AX", "SCG.AX", "GPT.AX", "VCX.AX", "CLW.AX",
-    "MGR.AX", "DXS.AX", "CHC.AX", "BWP.AX", "NSR.AX",
-    "CQR.AX", "HMC.AX", "ABP.AX", "SCP.AX", "HDN.AX",
-    # ── Industrials & Infrastructure ─────────────────────
-    "TCL.AX", "QAN.AX", "BXB.AX", "AZJ.AX", "QUB.AX",
-    "WOR.AX", "MND.AX", "JHX.AX", "CSR.AX", "BLD.AX",
-    "DOW.AX", "SVW.AX",
-    # ── Telecom ──────────────────────────────────────────
-    "TLS.AX", "TPG.AX", "SPK.AX",
-    # ── Media ────────────────────────────────────────────
-    "NWS.AX", "SEK.AX", "CAR.AX", "REA.AX", "NEC.AX",
-    # ── LICs & ETFs ──────────────────────────────────────
-    "VAS.AX", "VGS.AX", "IOZ.AX", "STW.AX", "NDQ.AX",
-    "A200.AX", "GOLD.AX", "ETHI.AX",
-    # ── Diversified ──────────────────────────────────────
-    "AFI.AX", "ARG.AX", "MLT.AX", "WAM.AX",
-]
-
-# Crypto -- top liquid pairs from Binance/Coinbase/Kraken in yfinance USD format
-CRYPTO_TICKERS = [
-    # ── Layer 1 Major ─────────────────────────────────────
-    "BTC-USD", "ETH-USD", "BNB-USD", "SOL-USD", "XRP-USD",
-    "ADA-USD", "AVAX-USD", "DOT-USD", "TRX-USD", "LTC-USD",
-    "ATOM-USD", "NEAR-USD", "ALGO-USD", "XLM-USD", "VET-USD",
-    "ICP-USD", "HBAR-USD", "FIL-USD", "EOS-USD", "XTZ-USD",
-    "NEO-USD", "IOTA-USD", "XMR-USD", "ZEC-USD", "DASH-USD",
-    "WAVES-USD", "ICX-USD", "ONT-USD", "QTUM-USD", "ZIL-USD",
-    # ── Layer 2 & Scaling ─────────────────────────────────
-    "MATIC-USD", "ARB-USD", "OP-USD", "IMX-USD", "LRC-USD",
-    "SKL-USD", "METIS-USD",
-    # ── New-Gen L1 ────────────────────────────────────────
-    "APT-USD", "SUI-USD", "INJ-USD", "SEI-USD", "TIA-USD",
-    "PYTH-USD", "JUP-USD",
-    # ── DeFi -- DEX & Lending ──────────────────────────────
-    "UNI-USD", "AAVE-USD", "MKR-USD", "COMP-USD", "YFI-USD",
-    "SUSHI-USD", "1INCH-USD", "CRV-USD", "BAL-USD", "DYDX-USD",
-    "GMX-USD", "SNX-USD", "PENDLE-USD", "CAKE-USD",
-    "CVX-USD", "FXS-USD",
-    # ── DeFi -- Staking ────────────────────────────────────
-    "LDO-USD", "RPL-USD", "ANKR-USD",
-    # ── Gaming & Metaverse ────────────────────────────────
-    "SAND-USD", "MANA-USD", "ENJ-USD", "AXS-USD", "GALA-USD",
-    "FLOW-USD", "BEAM-USD", "RONIN-USD",
-    # ── Meme Coins ────────────────────────────────────────
-    "DOGE-USD", "SHIB-USD", "PEPE-USD", "FLOKI-USD", "BONK-USD",
-    "WIF-USD",
-    # ── Infrastructure & Oracles ──────────────────────────
-    "LINK-USD", "BAND-USD", "API3-USD", "TRB-USD",
-    # ── Storage & Data ────────────────────────────────────
-    "AR-USD", "STORJ-USD",
-    # ── Privacy ───────────────────────────────────────────
-    "SCRT-USD", "ROSE-USD",
-    # ── Cross-chain & Interop ─────────────────────────────
-    "RUNE-USD", "AXL-USD",
-    # ── AI & Data ─────────────────────────────────────────
-    "FET-USD", "AGIX-USD", "OCEAN-USD", "NMR-USD",
-    "TAO-USD", "RNDR-USD", "WLD-USD",
-    # ── Exchange Tokens ───────────────────────────────────
-    "CRO-USD", "KCS-USD",
-    # ── Web3 & Social ─────────────────────────────────────
-    "BAT-USD", "ZRX-USD", "GRT-USD", "LPT-USD",
-    # ── RWA ───────────────────────────────────────────────
-    "ONDO-USD",
-    # ── Misc High-liquidity ───────────────────────────────
-    "THETA-USD", "CHZ-USD", "CELR-USD", "MINA-USD",
-    "KAVA-USD", "CFX-USD", "JASMY-USD", "FTM-USD",
-    "HOT-USD", "WIN-USD", "REEF-USD", "OMG-USD",
-]
-
-COMMODITY_TICKERS = [
-    # ── Precious Metals ETFs ──────────────────────────────
-    "GLD", "IAU", "SLV", "SIVR", "PPLT", "PALL",
-    # ── Precious Metals Futures ───────────────────────────
-    "GC=F", "SI=F", "PL=F", "PA=F",
-    # ── Energy ETFs ───────────────────────────────────────
-    "USO", "BNO", "UNG", "UGA", "XLE", "VDE",
-    # ── Energy Futures ────────────────────────────────────
-    "CL=F", "BZ=F", "NG=F", "RB=F", "HO=F",
-    # ── Base Metals ETFs ──────────────────────────────────
-    "COPX", "CPER", "DBB", "XME", "REMX", "LIT", "URA",
-    # ── Base Metals Futures ───────────────────────────────
-    "HG=F", "ALI=F",
-    # ── Agriculture ETFs ──────────────────────────────────
-    "DBA", "MOO", "WEAT", "CORN", "SOYB", "CANE",
-    # ── Agriculture Futures ───────────────────────────────
-    "ZW=F", "ZC=F", "ZS=F", "ZO=F", "KC=F", "CT=F", "SB=F",
-    # ── Livestock Futures ─────────────────────────────────
-    "LE=F", "GF=F", "HE=F",
-    # ── Broad Commodity ETFs ──────────────────────────────
-    "PDBC", "GSG", "FTGC",
-    # ── Timber & Water ────────────────────────────────────
-    "WOOD", "PHO",
-    # ── Carbon ────────────────────────────────────────────
-    "KRBN",
-    # ── Miner Proxies ─────────────────────────────────────
-    "GDX", "GDXJ", "SIL", "FCX", "NEM", "GOLD", "AEM", "WPM",
-    # ── Oil Majors ────────────────────────────────────────
-    "XOM", "CVX",
-]
-
-ALL_TICKERS  = ASX_TICKERS + CRYPTO_TICKERS + COMMODITY_TICKERS
-CORR_TICKERS = ASX_TICKERS  # Use ASX for correlation heatmap
-
-QUADRANT_META = {
-    "rising_growth": {
-        "label": "RISING GROWTH",
-        "color": "#00ff41",
-        "icon": "▲",
-        "description": "Economy expanding. Favour equities, commodities, corporate bonds. Reduce nominal bonds.",
-        "favoured": ["Equities", "Commodities", "Corporate Bonds", "EM Debt"],
-        "avoid": ["Nominal Bonds", "Defensive Cash"],
-    },
-    "falling_growth": {
-        "label": "FALLING GROWTH",
-        "color": "#ff4444",
-        "icon": "▼",
-        "description": "Recessionary pressure. Favour long-duration bonds, defensive equities. Reduce cyclicals.",
-        "favoured": ["Long Bonds", "Defensive Equities", "Gold", "Cash"],
-        "avoid": ["Cyclicals", "Commodities", "EM"],
-    },
-    "rising_inflation": {
-        "label": "RISING INFLATION",
-        "color": "#ffb300",
-        "icon": "↑",
-        "description": "Prices rising faster than growth. Favour gold, inflation-linked bonds, energy, real assets.",
-        "favoured": ["Gold", "Energy", "TIPS", "Commodities", "Real Assets"],
-        "avoid": ["Nominal Bonds", "Growth Equities"],
-    },
-    "falling_inflation": {
-        "label": "FALLING INFLATION",
-        "color": "#00e5ff",
-        "icon": "↓",
-        "description": "Disinflation / deflation. Favour equities, nominal bonds, consumer staples.",
-        "favoured": ["Equities", "Nominal Bonds", "Consumer Staples"],
-        "avoid": ["Commodities", "Gold", "Energy"],
-    },
-}
-
-
-def _gen_price_history_demo(price: float, trend: str, n_points: int = 30) -> list:
-    """Seeded random-walk ending at `price`, shaped by trend direction."""
-    drift = 0.003 if trend == "uptrend" else -0.003 if trend == "downtrend" else 0.0
-    pts = []
-    p = price * (1 - drift * n_points)  # start slightly in past
-    for _ in range(n_points):
-        p = p * (1 + drift + random.gauss(0, 0.012))
-        pts.append(round(p, 4))
-    pts[-1] = price  # anchor last point to actual price
-    return pts
-
-
-async def _gen_signals(n: int = 12) -> list[dict]:
-    """
-    Generate trade signals from real price data.
-    Fetches prices PER MARKET TYPE to avoid mixed-ticker yfinance failures.
-    Crypto: CoinGecko history → yfinance fallback.
-    ASX/Commodities: yfinance (separate calls so one doesn't block the other).
-    Results cached 2 min so repeat loads are instant.
-    """
-    cache_key = f"signals_{n}"
-    cached = _cache_get(cache_key)
-    if cached is not None:
-        return cached
-
-    # ── Seed candidate pool — equal split across ASX / Crypto / Commodities ──
-    cached_by_market: dict = {"asx": [], "crypto": [], "commodities": []}
-    for mkt in ("asx", "crypto", "commodities"):
-        sc = _scanner_cache.get(mkt)
-        if sc:
-            rows = sorted(sc["rows"], key=lambda r: abs(r.get("change_pct", 0)), reverse=True)
-            cached_by_market[mkt] = [r["ticker"] for r in rows if r.get("price", 0) > 0][:n]
-
-    # Sample fresh tickers per market to pad empty cache slots
-    n_each = max(4, (n * 2) // 3)
-    fresh = {
-        "asx":         random.sample(ASX_TICKERS,        min(n_each, len(ASX_TICKERS))),
-        "crypto":      random.sample(CRYPTO_TICKERS,     min(n_each, len(CRYPTO_TICKERS))),
-        "commodities": random.sample(COMMODITY_TICKERS,  min(n_each, len(COMMODITY_TICKERS))),
-    }
-
-    # Build per-market candidate lists (deduped, cached first)
-    market_candidates = {}
-    for mkt in ("asx", "crypto", "commodities"):
-        market_candidates[mkt] = list(dict.fromkeys(
-            cached_by_market[mkt] + fresh[mkt]
-        ))[:n_each]
-
-    # ── Fetch prices PER MARKET (prevents mixed-ticker yfinance failures) ──
-    prices_map: dict = {}
-
-    # ASX — yfinance (all .AX tickers in one call)
-    asx_cands = market_candidates["asx"][:10]
-    if asx_cands:
-        asx_prices = await _get_prices(asx_cands, "3mo")
-        if asx_prices:
-            prices_map.update(asx_prices)
-
-    # Commodities — yfinance (futures/ETFs in separate call)
-    comm_cands = market_candidates["commodities"][:10]
-    if comm_cands:
-        comm_prices = await _get_prices(comm_cands, "3mo")
-        if comm_prices:
-            prices_map.update(comm_prices)
-
-    # Crypto — yfinance -USD pairs (separate call, these often need individual fallback)
-    crypto_cands = market_candidates["crypto"][:10]
-    if crypto_cands:
-        crypto_prices = await _get_prices(crypto_cands, "3mo")
-        if crypto_prices:
-            prices_map.update(crypto_prices)
-
-    # Crypto fallback: if yfinance returned nothing for crypto, try individual fetches
-    crypto_missing = [t for t in crypto_cands if t not in prices_map]
-    if crypto_missing and YF_AVAILABLE:
-        logger.info(f"Crypto signal fallback: fetching {len(crypto_missing)} tickers individually")
-        loop = asyncio.get_running_loop()
-        import yfinance as _yf_sig
-
-        def _fetch_single_crypto(tkr):
-            try:
-                hist = _yf_sig.Ticker(tkr).history(period="3mo", interval="1d", auto_adjust=True)
-                if hist is not None and not hist.empty and "Close" in hist.columns:
-                    closes = hist["Close"].dropna().tolist()
-                    if len(closes) >= 10:
-                        return (tkr, [float(c) for c in closes[-90:]])
-            except Exception:
-                pass
-            return None
-
-        tasks = [loop.run_in_executor(_EXECUTOR, _fetch_single_crypto, t) for t in crypto_missing[:8]]
-        results = await asyncio.gather(*tasks)
-        for res in results:
-            if res:
-                prices_map[res[0]] = res[1]
-
-    # All candidates across markets
-    candidates = list(dict.fromkeys(
-        market_candidates["asx"] + market_candidates["crypto"] + market_candidates["commodities"]
-    ))
-
-    # Also pull single-day prices from scanner cache
-    cache_prices: dict = {}
-    for mkt in ("asx", "crypto", "commodities"):
-        sc = _scanner_cache.get(mkt)
-        if sc:
-            for r in sc["rows"]:
-                if r.get("price", 0) > 0:
-                    cache_prices[r["ticker"]] = r["price"]
-
-    signals = []
-    for ticker in candidates:
-        closes = prices_map.get(ticker)
-        # Require at least 10 data points
-        if not closes or len(closes) < 10:
-            continue
-
-        is_crypto_ticker = ticker in CRYPTO_TICKERS or _is_crypto(ticker)
-        price  = round(closes[-1], 4 if "USD" in ticker else 2)
-        rsi    = _calc_rsi(closes)
-        trend  = _calc_trend(closes)
-        atr    = _calc_atr(closes)
-        macd_data = _calc_macd(closes)
-        bb_data   = _calc_bollinger(closes)
-
-        # ── Multi-indicator scoring (inspired by SignalGenerator engine) ──
-        score = 0.0
-        signal_reasons = []
-
-        # RSI contribution
-        if is_crypto_ticker:
-            rsi_oversold, rsi_overbought = 38, 62
-        else:
-            rsi_oversold, rsi_overbought = 32, 68
-
-        if rsi < rsi_oversold:
-            score += 2.0
-            signal_reasons.append(f"RSI oversold ({rsi:.0f})")
-        elif rsi > rsi_overbought:
-            score -= 2.0
-            signal_reasons.append(f"RSI overbought ({rsi:.0f})")
-        elif rsi < 45:
-            score += 0.5
-        elif rsi > 55:
-            score -= 0.5
-
-        # MACD contribution
-        if macd_data["macd_signal"] == "bullish":
-            score += 1.5
-            signal_reasons.append("MACD bullish")
-        else:
-            score -= 1.5
-            signal_reasons.append("MACD bearish")
-        if macd_data["macd_crossover"]:
-            score += 1.0
-            signal_reasons.append("Fresh MACD crossover")
-
-        # Bollinger Bands contribution
-        if bb_data["bb_position"] == "below_lower":
-            score += 1.5
-            signal_reasons.append("Below lower Bollinger Band")
-        elif bb_data["bb_position"] == "above_upper":
-            score -= 1.5
-            signal_reasons.append("Above upper Bollinger Band")
-
-        # Trend contribution
-        if trend == "uptrend":
-            score += 2.0
-            signal_reasons.append("Confirmed uptrend")
-        elif trend == "downtrend":
-            score -= 2.0
-            signal_reasons.append("Confirmed downtrend")
-
-        # Momentum (rate of change)
-        if len(closes) >= 10:
-            roc = (closes[-1] / closes[-10] - 1) * 100
-            if roc > 5:
-                score += 0.5
-            elif roc < -5:
-                score -= 0.5
-
-        # Determine action from composite score
-        if score >= 3.0:
-            action = "BUY"
-        elif score <= -3.0:
-            action = "SHORT"
-        elif score >= 1.5:
-            action = "LONG"
-        elif score <= -1.5:
-            action = "SELL"
-        else:
-            action = "HOLD"
-
-        price_history = [round(c, 4 if "USD" in ticker else 2) for c in closes[-30:]]
-
-        sl_offset = max(atr * 1.5, price * 0.025)
-        tp_offset = atr * 2.5
-
-        # Confidence derived from score magnitude (normalised to 0-100%)
-        conf_floor = 40.0 if is_crypto_ticker else 50.0
-        conf = round(min(95, max(conf_floor, abs(score) / 10.0 * 100)), 1)
-
-        # quadrant_fit computed from ASSET_CLASS_MAP + current quadrant
-        qdata = STATE.last_quadrant or {}
-        quadrant = qdata.get("quadrant", "rising_growth")
-        pb = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
-        ac = ASSET_CLASS_MAP.get(ticker, "equities")
-        if ac in pb["strong_buy"]:   q_fit = "strong"
-        elif ac in pb["buy"]:         q_fit = "moderate"
-        elif ac in pb["avoid"]:       q_fit = "avoid"
-        else:                          q_fit = "neutral"
-
-        # Estimate days to reach target based on ~0.8% avg daily move
-        predicted_days = max(3, min(60, int(tp_offset / max(price * 0.008, 0.01))))
-
-        # Position size suggestion: 1–5% of portfolio based on confidence
-        pos_size_pct = round(min(5.0, max(1.0, (conf - 50) / 9)), 1)
-
-        # Determine market type for the signal
-        if is_crypto_ticker:
-            sig_market = "crypto"
-        elif ticker in COMMODITY_TICKERS:
-            sig_market = "commodities"
-        else:
-            sig_market = "asx"
-
-        # Build signal dict
-        rr_ratio = round(tp_offset / sl_offset, 2)
-        sig = {
-            "ticker": ticker,
-            "trade_ticker": _to_trade_ticker(ticker) if is_crypto_ticker else ticker,
-            "currency": "AUD" if is_crypto_ticker else "USD",
-            "market": sig_market,
-            "action": action,
-            "confidence": conf,
-            "price": price,
-            "data_source": "LIVE",
-            "quadrant_fit": q_fit,
-            "rsi": rsi,
-            "trend": trend,
-            "macd_signal": macd_data["macd_signal"],
-            "macd_value": macd_data["macd"],
-            "macd_crossover": macd_data["macd_crossover"],
-            "bb_position": bb_data["bb_position"],
-            "bb_pct": bb_data["bb_pct"],
-            "signal_score": round(score, 2),
-            "signal_reasons": signal_reasons,
-            "stop_loss":  round(price - sl_offset, 2) if action in ("SELL","SHORT") else round(price - sl_offset, 2),
-            "take_profit": round(price + tp_offset, 2) if action in ("BUY","LONG")  else round(price - tp_offset, 2),
-            "rr_ratio": rr_ratio,
-            "fee_pct": _get_fee_pct(ticker),
-            "round_trip_fee_pct": round(_get_fee_pct(ticker) * 2, 2),
-            "net_rr_ratio": round(max(0, (tp_offset - price * _get_fee_pct(ticker) * 2 / 100)) / sl_offset, 2),
-            "position_size_pct": pos_size_pct,
-            "dalio_justification": _gen_justification(
-                ticker, action, rsi=rsi, rr=rr_ratio,
-                macd_signal=macd_data["macd_signal"],
-                bb_position=bb_data["bb_position"],
-                trend=trend, q_fit=q_fit,
-            ),
-            "price_history": price_history,
-            "predicted_days": predicted_days,
-            "timestamp": datetime.utcnow().isoformat(),
-        }
-
-        # Add AUD price for crypto signals (for CoinSpot execution context)
-        if is_crypto_ticker:
-            sig["price_aud"] = _usd_to_aud(price)
-            sig["stop_loss_aud"] = _usd_to_aud(sig["stop_loss"])
-            sig["take_profit_aud"] = _usd_to_aud(sig["take_profit"])
-
-        signals.append(sig)
-
-    # ── Ensure balanced market representation in final output ──
-    # Take top signals per market to avoid ASX crowding out crypto/commodities
-    active = [s for s in signals if s["action"] != "HOLD"]
-    if not active:
-        active = sorted(signals, key=lambda s: s["confidence"], reverse=True)
-
-    # Balanced selection: up to n/3 per market, fill remainder with best overall
-    per_market = max(2, n // 3)
-    balanced = []
-    for mkt in ("asx", "crypto", "commodities"):
-        mkt_sigs = sorted(
-            [s for s in active if s.get("market") == mkt],
-            key=lambda s: s["confidence"], reverse=True
-        )
-        balanced.extend(mkt_sigs[:per_market])
-
-    # Fill remaining slots with best overall signals not already included
-    seen = {s["ticker"] for s in balanced}
-    remaining = [s for s in active if s["ticker"] not in seen]
-    remaining.sort(key=lambda s: s["confidence"], reverse=True)
-    balanced.extend(remaining[:max(0, n - len(balanced))])
-
-    # Final sort by confidence
-    balanced.sort(key=lambda s: s["confidence"], reverse=True)
-    result = balanced[:n]
-    _cache_set(cache_key, result)
-    logger.info(f"Signals generated: {len(result)} total — "
-                f"ASX:{sum(1 for s in result if s.get('market')=='asx')} "
-                f"Crypto:{sum(1 for s in result if s.get('market')=='crypto')} "
-                f"Commodities:{sum(1 for s in result if s.get('market')=='commodities')}")
-    return result
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# TRADE OPPORTUNITY ENGINE
-# Synthesises scanner rows, price history, RSI/trend, and Dalio quadrant
-# ──────────────────────────────────────────────────────────────────────────────
-
-def _opp_from_signal_fallback(sigs: list, quadrant: str, playbook: dict,
-                               qdata: dict, existing_classes: list, n: int) -> list:
-    """Fallback when no scanner cache exists — build opps from signal list."""
-    regime_label = qdata.get("label", quadrant.replace("_"," ").title())
-    results = []
-    for s in sigs:
-        if s["action"] in ("HOLD", "SELL", "SHORT"):
-            continue
-        ac    = ASSET_CLASS_MAP.get(s["ticker"], "equities")
-        q_fit = ("strong"   if ac in playbook["strong_buy"] else
-                 "moderate" if ac in playbook["buy"]        else
-                 "avoid"    if ac in playbook["avoid"]      else "neutral")
-        q_w   = {"strong": 1.4, "moderate": 1.0, "neutral": 0.6, "avoid": 0.2}[q_fit]
-        score = round(s["confidence"] * q_w, 1)
-        jus   = s.get("dalio_justification", {})
-        reason_0 = (f"Regime: {regime_label} — {ac.replace('_',' ').title()} is "
-                    f"{'favoured' if q_fit in ('strong','moderate') else 'on avoid list'}.")
-        reason_1 = f"RSI {s['rsi']:.0f} | trend: {s['trend']} | signal: {s['action']}"
-        reasoning = [reason_0, reason_1]
-        if isinstance(jus, dict):
-            for key in ("narrative", "recommendation"):
-                val = jus.get(key, "")
-                if val and isinstance(val, str):
-                    reasoning.append(val[:120])
-                    break
-        results.append({
-            "ticker": s["ticker"], "market": "signal", "action": s["action"],
-            "price": s["price"], "change_pct": 0, "rsi": s["rsi"],
-            "trend": s["trend"], "above_sma20": s["trend"] == "uptrend",
-            "hi_52w": s["take_profit"], "lo_52w": s["stop_loss"],
-            "pct_from_hi": 0, "pct_from_lo": 0, "sma20": s["price"],
-            "stop_loss": s["stop_loss"], "take_profit": s["take_profit"],
-            "rr_ratio": s["rr_ratio"], "score": score,
-            "asset_class": ac, "quadrant_fit": q_fit,
-            "data_source": s["data_source"],
-            "reasoning": reasoning,
-            "volume_fmt": "--", "sector": "--",
-            "quadrant": quadrant, "regime_label": regime_label,
-        })
-    results.sort(key=lambda o: o["score"], reverse=True)
-    return results[:n]
-
-
-async def _gen_opportunities(n: int = 8) -> list[dict]:
-    """
-    Return the top-N trade opportunities by synthesising:
-      1. All cached scanner rows (ASX, crypto, commodities)
-      2. 3-month price history → RSI, trend, 20-day SMA, 52-week range
-      3. Dalio quadrant playbook (regime fit scoring)
-      4. Current portfolio state (diversification bonus)
-    """
-    import time as _t
-
-    qdata    = STATE.last_quadrant or _gen_quadrant_data()
-    quadrant = qdata.get("quadrant", "rising_growth")
-    playbook = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
-    existing_classes = [ASSET_CLASS_MAP.get(t, "equities") for t in PAPER.positions]
-
-    # 1. Collect all scanner rows from cache ──────────────────────────────
-    all_rows: list[dict] = []
-    for mkt in ("crypto", "asx", "commodities"):
-        cached = _scanner_cache.get(mkt)
-        if cached:
-            for r in cached["rows"]:
-                row = dict(r)
-                row["_market"] = mkt
-                all_rows.append(row)
-
-    if not all_rows:
-        # No cache — fall back to signal-based suggestions
-        sigs = await _gen_signals(n * 2)
-        return _opp_from_signal_fallback(sigs, quadrant, playbook, qdata, existing_classes, n)
-
-    # 2. Pre-score with scanner data only (fast, no extra API calls) ──────
-    def _prescore(r: dict) -> float:
-        tkr = r["ticker"]
-        if tkr in PAPER.positions:
-            return -999.0                         # skip held positions
-        ac  = ASSET_CLASS_MAP.get(tkr, "equities")
-        chg = r.get("change_pct", 0.0)
-        q_s = (100 if ac in playbook["strong_buy"] else
-               70  if ac in playbook["buy"]        else
-               10  if ac in playbook["avoid"]      else 45)
-        mom = min(abs(chg) * 3.0, 30.0)
-        dir_b = (15 if ac in playbook["strong_buy"] and chg > 0 else
-                 10 if ac in playbook["avoid"] and chg < 0      else 0)
-        div_b = max(0.0, 20.0 - existing_classes.count(ac) * 5)
-        return q_s * 0.40 + mom * 0.25 + dir_b * 0.20 + div_b * 0.15
-
-    all_rows.sort(key=_prescore, reverse=True)
-    candidates = [r for r in all_rows if r["ticker"] not in PAPER.positions][:30]
-
-    # 3. Fetch 3-month price history — SPLIT BY MARKET to avoid mixed-ticker failures
-    cand_by_mkt: dict = {"asx": [], "crypto": [], "commodities": []}
-    for r in candidates[:24]:
-        mkt = r.get("_market", "asx")
-        cand_by_mkt[mkt].append(r["ticker"])
-
-    history_map: dict = {}
-    for mkt, tkrs in cand_by_mkt.items():
-        if not tkrs:
-            continue
-        chunk = await _get_prices(tkrs[:10], "3mo")
-        if chunk:
-            history_map.update(chunk)
-
-    # Crypto individual fallback for any that bulk missed
-    crypto_missing = [t for t in cand_by_mkt.get("crypto", []) if t not in history_map]
-    if crypto_missing and YF_AVAILABLE:
-        loop = asyncio.get_running_loop()
-        import yfinance as _yf_opp
-
-        def _fetch_one_opp(tkr):
-            try:
-                hist = _yf_opp.Ticker(tkr).history(period="3mo", interval="1d", auto_adjust=True)
-                if hist is not None and not hist.empty and "Close" in hist.columns:
-                    closes = hist["Close"].dropna().tolist()
-                    if len(closes) >= 10:
-                        return (tkr, [float(c) for c in closes[-90:]])
-            except Exception:
-                pass
-            return None
-
-        tasks = [loop.run_in_executor(_EXECUTOR, _fetch_one_opp, t) for t in crypto_missing[:8]]
-        results = await asyncio.gather(*tasks)
-        for res in results:
-            if res:
-                history_map[res[0]] = res[1]
-
-    # 4. Full scoring with technicals ─────────────────────────────────────
-    opportunities: list[dict] = []
-
-    for r in candidates:
-        tkr    = r["ticker"]
-        ac     = ASSET_CLASS_MAP.get(tkr, "equities")
-        closes = history_map.get(tkr)
-        chg    = r.get("change_pct", 0.0)
-        price  = r.get("price", 0.0)
-        if not price:
-            continue
-
-        # Technical indicators
-        if closes and len(closes) >= 14:
-            rsi        = _calc_rsi(closes)
-            trend      = _calc_trend(closes)
-            hi52       = float(max(closes))
-            lo52       = float(min(closes))
-            sma20      = float(np.mean(closes[-20:])) if len(closes) >= 20 else price
-            above_sma  = price > sma20
-            vol_d      = float(np.std(np.diff(closes)) / price) if len(closes) > 2 else 0.02
-            data_src   = "LIVE"
-        else:
-            rsi        = 50.0
-            trend      = "sideways"
-            hi52       = price * 1.20
-            lo52       = price * 0.80
-            sma20      = price
-            above_sma  = chg > 0
-            vol_d      = 0.025
-            data_src   = "SCANNER"
-
-        pct_from_hi = round((price / hi52 - 1) * 100, 1) if hi52 else 0
-        pct_from_lo = round((price / lo52 - 1) * 100, 1) if lo52 else 0
-
-        # Determine primary action
-        if   rsi < 32 and trend != "downtrend": action = "BUY"
-        elif rsi > 68 and trend != "uptrend":   action = "SELL"
-        elif trend == "uptrend" and rsi < 58:   action = "LONG"
-        elif trend == "downtrend" and rsi > 42: action = "SHORT"
-        else:                                   action = "WATCH"
-
-        # For BUY opportunities list: skip pure shorts unless quadrant says avoid
-        is_short_signal = action in ("SELL", "SHORT")
-        is_avoid_class  = ac in playbook["avoid"]
-        if is_short_signal and not is_avoid_class:
-            continue
-
-        # Quadrant weight
-        q_score = (100 if ac in playbook["strong_buy"] else
-                   70  if ac in playbook["buy"]        else
-                   10  if ac in playbook["avoid"]      else 45)
-        q_fit   = ("strong"   if ac in playbook["strong_buy"] else
-                   "moderate" if ac in playbook["buy"]        else
-                   "avoid"    if ac in playbook["avoid"]      else "neutral")
-
-        # RSI score: oversold is good for longs, overbought for shorts
-        if not is_short_signal:
-            rsi_score = max(0.0, 50.0 - rsi) * 0.8   # max 40 pts when RSI=0
-        else:
-            rsi_score = max(0.0, rsi - 50.0) * 0.8
-
-        mom_score  = min(abs(chg) * 2.5, 25.0)
-        div_score  = max(0.0, 20.0 - existing_classes.count(ac) * 5.0)
-        composite  = round(
-            q_score   * 0.35 +
-            rsi_score * 0.30 +
-            mom_score * 0.20 +
-            div_score * 0.15,
-            1
-        )
-
-        # Risk/reward targets using volatility-derived ATR proxy
-        atr = max(vol_d * price * 14, price * 0.01)
-        sl  = round(price - atr * 1.5, 4)
-        tp  = round(price + atr * 2.5, 4)
-        rr  = round((tp - price) / max(price - sl, 1e-6), 2)
-
-        # Reasoning bullets
-        reasons = [
-            f"Regime: {quadrant.replace('_',' ').title()} — "
-            f"{ac.replace('_',' ').title()} is "
-            f"{'FAVOURED (strong buy)' if q_fit=='strong' else 'favoured' if q_fit=='moderate' else 'AVOID LIST' if q_fit=='avoid' else 'neutral'}.",
-            f"RSI {rsi:.0f} ({'oversold' if rsi<35 else 'overbought' if rsi>65 else 'neutral'}) | "
-            f"Trend: {trend} | {'Above' if above_sma else 'Below'} 20-day SMA.",
-            f"Today: {'+' if chg>=0 else ''}{chg:.2f}% | "
-            f"52w range: {pct_from_lo:+.1f}% from low, {pct_from_hi:+.1f}% from high.",
-            f"Stop ${sl:,.4f} → Target ${tp:,.4f} | R:R {rr:.1f}x",
-        ]
-        if pct_from_lo < 10:
-            reasons.append("Near 52-week low — potential high-reward entry zone.")
-        if above_sma and chg > 1:
-            reasons.append("Strong momentum: price above SMA and up today.")
-        if existing_classes.count(ac) == 0:
-            reasons.append(f"No current {ac.replace('_',' ')} exposure — adds portfolio diversification.")
-
-        opportunities.append({
-            "ticker":       tkr,
-            "market":       r["_market"],
-            "action":       action,
-            "price":        price,
-            "change_pct":   round(chg, 2),
-            "rsi":          round(rsi, 1),
-            "trend":        trend,
-            "above_sma20":  above_sma,
-            "hi_52w":       round(hi52, 4),
-            "lo_52w":       round(lo52, 4),
-            "pct_from_hi":  pct_from_hi,
-            "pct_from_lo":  pct_from_lo,
-            "sma20":        round(sma20, 4),
-            "stop_loss":    sl,
-            "take_profit":  tp,
-            "rr_ratio":     rr,
-            "fee_pct":      _get_fee_pct(tkr),
-            "round_trip_fee_pct": round(_get_fee_pct(tkr) * 2, 2),
-            "net_profit_pct": round((tp - price) / price * 100 - _get_fee_pct(tkr) * 2, 2),
-            "score":        composite,
-            "asset_class":  ac,
-            "quadrant_fit": q_fit,
-            "data_source":  data_src,
-            "reasoning":    reasons,
-            "volume_fmt":   r.get("volume_fmt", "--"),
-            "sector":       r.get("sector", "--"),
-            "quadrant":     quadrant,
-            "regime_label": qdata.get("label", quadrant),
-        })
-
-    opportunities.sort(key=lambda o: o["score"], reverse=True)
-    return opportunities[:n]
-
-
-def _gen_justification(ticker: str, action: str, **kwargs) -> dict:
-    """
-    Generate Dalio-framework justification using real signal data.
-    Accepts keyword args from the signal computation (rsi, rr, macd_signal, etc.)
-    to build an evidence-based narrative instead of random values.
-    """
-    # Pull real quadrant from state, fall back to computed
-    qdata = STATE.last_quadrant or {}
-    quadrant = qdata.get("quadrant", "rising_growth")
-    meta = QUADRANT_META.get(quadrant, QUADRANT_META["rising_growth"])
-
-    # Use real values passed from signal generator, with sensible defaults
-    rsi_val = kwargs.get("rsi", 50.0)
-    rr = kwargs.get("rr", 2.0)
-    macd_sig = kwargs.get("macd_signal", "neutral")
-    bb_pos = kwargs.get("bb_position", "mid")
-    trend = kwargs.get("trend", "sideways")
-    q_fit = kwargs.get("q_fit", "neutral")
-
-    # Derive sentiment from cached sentiment data if available
-    sent_score = 0.0
-    sent_source = "keyword"
-    if STATE.last_sentiment:
-        qs = STATE.last_sentiment.get("quadrant_sentiment", {})
-        q_sent = qs.get(quadrant, {})
-        sent_score = q_sent.get("avg_score", 0.0)
-        sent_source = STATE.last_sentiment.get("sentiment_model", "keyword")
-
-    # Estimate correlation contribution from position count
-    n_positions = len(PAPER.positions) + 1
-    corr_estimate = round(max(-0.15, min(0.1, 0.3 - 0.03 * n_positions)), 3)
-
-    # Estimate Sharpe improvement based on confidence/RR
-    sharpe_est = round(max(0.01, min(0.4, (rr - 1.0) * 0.1)), 3)
-
-    # Risk contribution based on equal-weight share
-    risk_contrib = round(100.0 / max(n_positions, 1), 2)
-
-    action_word = {
-        "BUY": "long", "LONG": "long",
-        "SELL": "exit", "SHORT": "short", "HOLD": "hold",
-    }.get(action, "enter")
-
-    sentiment_word = "positive" if sent_score > 0.1 else "negative" if sent_score < -0.1 else "neutral"
-    rsi_desc = "oversold" if rsi_val < 35 else "overbought" if rsi_val > 65 else "neutral"
-    quadrant_label = quadrant.replace("_", " ").title()
-
-    ai_overview = (
-        f"{ticker} presents a {action.lower()} opportunity under the current {quadrant_label} regime. "
-        f"Sentiment ({sent_source}) is {sentiment_word} (score {sent_score:+.3f}), "
-        f"RSI reads {rsi_val:.0f} ({rsi_desc}), MACD is {macd_sig}, "
-        f"BB position: {bb_pos}, trend: {trend}. "
-        f"Risk/reward ratio is {rr}:1. "
-        f"Estimated correlation delta {corr_estimate:+.3f} — within Holy Grail threshold. "
-        f"Quadrant fit: {q_fit}. "
-        f"Dalio framework favours {', '.join(meta['favoured'][:3])} in this environment."
-    )
-
-    reasons = [
-        f"Asset has {q_fit} alignment with {quadrant_label} environment",
-        f"Sentiment ({sent_source}): {sentiment_word} ({sent_score:+.3f}) for {ticker}",
-        f"RSI {rsi_val:.0f} — {rsi_desc} zone",
-        f"MACD {macd_sig} | Bollinger: {bb_pos} | Trend: {trend}",
-        f"Correlation delta {corr_estimate:+.3f} — within Holy Grail threshold",
-    ]
-
-    return {
-        "quadrant": quadrant,
-        "quadrant_description": meta["description"],
-        "sentiment_score": sent_score,
-        "sentiment_model": sent_source,
-        "sharpe_improvement": sharpe_est,
-        "correlation_delta": corr_estimate,
-        "risk_contribution_pct": risk_contrib,
-        "ai_overview": ai_overview,
-        "reasons": reasons,
-        "data_source": "LIVE",
-    }
-
-
-def _gen_quadrant_data() -> dict:
-    """
-    Classify economic quadrant from real market data when available.
-    Uses: market breadth (% of tracked stocks up), gold direction (inflation proxy),
-    bond proxy TLT direction (growth expectations), and overall volatility.
-    Falls back to random only if no market data is available at all.
-    """
-    try:
-        return _classify_quadrant_from_market_data()
-    except Exception as exc:
-        logger.warning(f"Real quadrant classification failed ({exc}), using random fallback")
-        return _gen_quadrant_data_random()
-
-
-def _classify_quadrant_from_market_data() -> dict:
-    """Derive economic quadrant from cached scanner/price data."""
-    # ── Gather signals from scanner cache ──
-    growth_score = 0.0   # positive = rising growth, negative = falling
-    inflation_score = 0.0  # positive = rising inflation, negative = falling
-    confidence_factors = 0
-    data_sources = []
-
-    # 1. Market breadth: % of ASX stocks that are positive today
-    asx_cache = _scanner_cache.get("asx")
-    if asx_cache and asx_cache.get("rows"):
-        rows = asx_cache["rows"]
-        up_count = sum(1 for r in rows if r.get("change_pct", 0) > 0)
-        breadth = up_count / max(len(rows), 1)
-        # breadth > 0.6 = broad rally (growth), < 0.4 = broad selloff
-        growth_score += (breadth - 0.5) * 4.0  # range ~ -2 to +2
-        confidence_factors += 1
-        data_sources.append("ASX breadth")
-
-    # 2. Gold direction: rising gold = inflation fears
-    gold_price_data = None
-    for gold_ticker in ("GC=F", "GOLD.AX", "GLD"):
-        cached = _cache_get(f"px_{hash((gold_ticker,))}_{gold_ticker}_3mo")
-        if cached:
-            gold_price_data = cached
-            break
-    # Also check scanner cache for gold/commodity tickers
-    comm_cache = _scanner_cache.get("commodities")
-    if comm_cache and comm_cache.get("rows"):
-        for r in comm_cache["rows"]:
-            tkr = r.get("ticker", "")
-            if "GC=F" in tkr or "GOLD" in tkr.upper():
-                chg = r.get("change_pct", 0)
-                if chg > 0.5:
-                    inflation_score += 1.5
-                elif chg < -0.5:
-                    inflation_score -= 1.0
-                confidence_factors += 1
-                data_sources.append("Gold price")
-                break
-            # Oil as inflation proxy
-            if "CL=F" in tkr or "OIL" in tkr.upper() or "BZ=F" in tkr:
-                chg = r.get("change_pct", 0)
-                if chg > 1.0:
-                    inflation_score += 1.0
-                elif chg < -1.0:
-                    inflation_score -= 0.5
-                confidence_factors += 1
-                data_sources.append("Oil price")
-                break
-
-    # 3. Use crypto as risk-on/risk-off gauge
-    crypto_cache = _scanner_cache.get("crypto")
-    if crypto_cache and crypto_cache.get("rows"):
-        rows = crypto_cache["rows"]
-        avg_chg = np.mean([r.get("change_pct", 0) for r in rows[:5]])
-        # Crypto up = risk-on = growth
-        growth_score += min(max(avg_chg * 0.3, -1.5), 1.5)
-        confidence_factors += 1
-        data_sources.append("Crypto sentiment")
-
-    # 4. Sentiment from cached news (conflict = inflation bias)
-    if STATE.last_sentiment:
-        sent = STATE.last_sentiment
-        if sent.get("conflict_risk_elevated"):
-            inflation_score += 1.5
-            confidence_factors += 1
-            data_sources.append("Conflict risk")
-        dom_q = sent.get("dominant_quadrant", "")
-        if "inflation" in dom_q:
-            inflation_score += 0.8
-        elif "growth" in dom_q:
-            growth_score += 0.5 if "rising" in dom_q else -0.5
-
-    # ── Classify quadrant ──
-    if confidence_factors == 0:
-        # No data at all — truly random fallback
-        raise ValueError("No market data available for quadrant classification")
-
-    if growth_score > 0.3 and inflation_score <= 0.5:
-        q = "rising_growth"
-    elif growth_score <= -0.3 and inflation_score <= 0.5:
-        q = "falling_growth"
-    elif inflation_score > 0.5:
-        q = "rising_inflation"
-    else:
-        q = "falling_inflation"
-
-    meta = QUADRANT_META[q]
-    confidence = min(92, max(55, 50 + confidence_factors * 8 + abs(growth_score + inflation_score) * 5))
-
-    # Approximate GDP/CPI from market signals
-    gdp_proxy = round(2.5 + growth_score * 0.8, 2)
-    cpi_proxy = round(3.0 + inflation_score * 1.2, 2)
-    gdp_trend = "rising" if growth_score > 0.3 else "falling" if growth_score < -0.3 else "stable"
-    cpi_trend = "rising" if inflation_score > 0.5 else "falling" if inflation_score < -0.3 else "stable"
-
-    conflict = False
-    if STATE.last_sentiment:
-        conflict = STATE.last_sentiment.get("conflict_risk_elevated", False)
-
-    return {
-        "quadrant": q,
-        "label": meta["label"],
-        "color": meta["color"],
-        "description": meta["description"],
-        "gdp_value": gdp_proxy,
-        "gdp_trend": gdp_trend,
-        "cpi_value": cpi_proxy,
-        "cpi_trend": cpi_trend,
-        "conflict_risk_elevated": conflict,
-        "favoured_assets": meta["favoured"],
-        "avoid_assets": meta["avoid"],
-        "confidence": round(confidence, 1),
-        "macro_source": f"Market-derived ({', '.join(data_sources)})",
-        "sentiment_source": "RSS keyword analysis",
-        "data_source": "LIVE" if confidence_factors >= 2 else "PARTIAL",
-        "timestamp": datetime.utcnow().isoformat(),
-    }
-
-
-def _gen_quadrant_data_random() -> dict:
-    """Pure random fallback — used only when no market data exists."""
-    q = random.choice(list(QUADRANT_META.keys()))
-    meta = QUADRANT_META[q]
-    return {
-        "quadrant": q,
-        "label": meta["label"],
-        "color": meta["color"],
-        "description": meta["description"],
-        "gdp_value": round(random.uniform(-1.5, 4.5), 2),
-        "gdp_trend": random.choice(["rising", "falling", "stable"]),
-        "cpi_value": round(random.uniform(1.5, 8.5), 2),
-        "cpi_trend": random.choice(["rising", "falling", "stable"]),
-        "conflict_risk_elevated": random.choices([False, True], weights=[75, 25])[0],
-        "favoured_assets": meta["favoured"],
-        "avoid_assets": meta["avoid"],
-        "confidence": round(random.uniform(65, 92), 1),
-        "macro_source": "DEMO (no market data available)",
-        "sentiment_source": "DEMO",
-        "data_source": "DEMO",
-        "timestamp": datetime.utcnow().isoformat(),
-    }
-
-
-# ─── Real Financial News RSS Feeds ─────────────────────────────────────────
-_NEWS_RSS_FEEDS = [
-    # ── Equities / General ──────────────────────────────────────────────────
-    ("Reuters Business",   "https://feeds.reuters.com/reuters/businessNews"),
-    ("Reuters Markets",    "https://feeds.reuters.com/reuters/UKmarkets"),
-    ("Reuters Top News",   "https://feeds.reuters.com/reuters/topNews"),
-    ("Reuters Tech",       "https://feeds.reuters.com/reuters/technologyNews"),
-    ("Yahoo Finance",      "https://finance.yahoo.com/news/rssindex"),
-    ("MarketWatch",        "https://feeds.marketwatch.com/marketwatch/topstories/"),
-    ("MarketWatch Stocks", "https://feeds.marketwatch.com/marketwatch/StockstoWatch/"),
-    ("MarketWatch Econ",   "https://feeds.marketwatch.com/marketwatch/economy/"),
-    ("CNBC Finance",       "https://www.cnbc.com/id/10000664/device/rss/rss.html"),
-    ("CNBC World",         "https://www.cnbc.com/id/100727362/device/rss/rss.html"),
-    ("CNBC Earnings",      "https://www.cnbc.com/id/15839135/device/rss/rss.html"),
-    ("Investing.com",      "https://www.investing.com/rss/news_25.rss"),
-    ("Investing Forex",    "https://www.investing.com/rss/news_1.rss"),
-    ("Investing Stocks",   "https://www.investing.com/rss/news_14.rss"),
-    ("Investing Commodities","https://www.investing.com/rss/news_11.rss"),
-    ("Seeking Alpha",      "https://seekingalpha.com/market_currents.xml"),
-    ("AFR",                "https://www.afr.com/rss/feed/latest"),
-    ("AFR Markets",        "https://www.afr.com/rss/feed/markets"),
-    ("ABC Finance AU",     "https://www.abc.net.au/news/feed/1399786/rss.xml"),
-    ("FT Markets",         "https://www.ft.com/rss/home/uk"),
-    ("Bloomberg Mkts",     "https://feeds.bloomberg.com/markets/news.rss"),
-    ("WSJ Markets",        "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"),
-    ("WSJ Business",       "https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml"),
-    ("WSJ World",          "https://feeds.a.dj.com/rss/RSSWorldNews.xml"),
-    ("Barrons",            "https://feeds.barrons.com/barrons/articles.rss"),
-    ("Motley Fool",        "https://www.fool.com/feeds/index.aspx"),
-    ("Benzinga",           "https://www.benzinga.com/feed"),
-    ("Zacks",              "https://www.zacks.com/feeds/"),
-    ("TheStreet",          "https://www.thestreet.com/feeds/rss"),
-    # ── Crypto-specific ─────────────────────────────────────────────────────
-    ("CoinDesk",           "https://www.coindesk.com/arc/outboundfeeds/rss/"),
-    ("CoinTelegraph",      "https://cointelegraph.com/rss"),
-    ("Decrypt",            "https://decrypt.co/feed"),
-    ("CryptoSlate",        "https://cryptoslate.com/feed/"),
-    ("Bitcoin Magazine",   "https://bitcoinmagazine.com/.rss/full/"),
-    ("The Block",          "https://www.theblock.co/rss.xml"),
-    ("CryptoPotato",       "https://cryptopotato.com/feed/"),
-    ("NewsBTC",            "https://www.newsbtc.com/feed/"),
-    ("AMBCrypto",          "https://ambcrypto.com/feed/"),
-    ("U.Today Crypto",     "https://u.today/rss"),
-    # ── Commodities / Macro ─────────────────────────────────────────────────
-    ("Kitco Gold",         "https://www.kitco.com/rss/kitconews.xml"),
-    ("OilPrice.com",       "https://oilprice.com/rss/main"),
-    ("Mining.com",         "https://www.mining.com/feed/"),
-    ("Platts",             "https://www.spglobal.com/commodityinsights/en/rss-feed/platts-metals"),
-    ("AgriCensus",         "https://www.agricensus.com/feed/"),
-    # ── Geopolitical / Macro ──────────────────────────────────────────────────
-    ("BBC Business",       "https://feeds.bbci.co.uk/news/business/rss.xml"),
-    ("BBC World",          "https://feeds.bbci.co.uk/news/world/rss.xml"),
-    ("Al Jazeera Business","https://www.aljazeera.com/xml/rss/all.xml"),
-    ("The Guardian Money", "https://www.theguardian.com/uk/money/rss"),
-    ("Guardian Business",  "https://www.theguardian.com/uk/business/rss"),
-    ("Guardian World",     "https://www.theguardian.com/world/rss"),
-    ("NPR Economy",        "https://feeds.npr.org/1006/rss.xml"),
-    ("NPR Business",       "https://feeds.npr.org/1006/rss.xml"),
-    ("Economist Finance",  "https://www.economist.com/finance-and-economics/rss.xml"),
-    ("AP Business",        "https://rsshub.app/apnews/topics/business"),
-    ("CNN Business",       "http://rss.cnn.com/rss/money_news_economy.rss"),
-    ("CNN Markets",        "http://rss.cnn.com/rss/money_markets.rss"),
-    ("ABC News US",        "https://abcnews.go.com/abcnews/moneyheadlines"),
-    ("Forbes",             "https://www.forbes.com/business/feed/"),
-    ("Forbes Investing",   "https://www.forbes.com/investing/feed/"),
-    # ── Asia-Pacific ──────────────────────────────────────────────────────────
-    ("Nikkei Asia",        "https://asia.nikkei.com/rss"),
-    ("SMH Business AU",    "https://www.smh.com.au/rss/business.xml"),
-    ("SMH Money AU",       "https://www.smh.com.au/rss/money.xml"),
-    ("LiveWire AU",        "https://www.livewiremarkets.com/rss"),
-    ("SCMP Economy",       "https://www.scmp.com/rss/5/feed"),
-    ("Channel News Asia",  "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511"),
-    ("Straits Times Biz",  "https://www.straitstimes.com/news/business/rss.xml"),
-    ("Economic Times IN",  "https://economictimes.indiatimes.com/rssfeedstopstories.cms"),
-    ("Mint India",         "https://www.livemint.com/rss/markets"),
-    # ── Europe ─────────────────────────────────────────────────────────────────
-    ("DW Business",        "https://rss.dw.com/xml/rss-en-bus"),
-    ("Euronews Business",  "https://www.euronews.com/rss?level=tag&name=business"),
-    ("Irish Times Biz",    "https://www.irishtimes.com/cmlink/the-irish-times-business-1.920361"),
-    ("Telegraph Business", "https://www.telegraph.co.uk/business/rss.xml"),
-    # ── Google News RSS (no API key required) ───────────────────────────────
-    ("GNews Crypto",       "https://news.google.com/rss/search?q=cryptocurrency+bitcoin+ethereum&hl=en&gl=US&ceid=US:en"),
-    ("GNews Commodities",  "https://news.google.com/rss/search?q=gold+oil+commodities+futures&hl=en&gl=US&ceid=US:en"),
-    ("GNews ASX",          "https://news.google.com/rss/search?q=ASX+Australian+stocks+market&hl=en-AU&gl=AU&ceid=AU:en"),
-    ("GNews Markets",      "https://news.google.com/rss/search?q=stock+market+interest+rates+inflation&hl=en&gl=US&ceid=US:en"),
-    ("GNews Geopolitics",  "https://news.google.com/rss/search?q=geopolitics+sanctions+trade+war&hl=en&gl=US&ceid=US:en"),
-    ("GNews Central Banks","https://news.google.com/rss/search?q=federal+reserve+ECB+RBA+interest+rates&hl=en&gl=US&ceid=US:en"),
-    ("GNews Forex",        "https://news.google.com/rss/search?q=forex+currency+USD+EUR+AUD&hl=en&gl=US&ceid=US:en"),
-    ("GNews Bonds",        "https://news.google.com/rss/search?q=treasury+bonds+yields+fixed+income&hl=en&gl=US&ceid=US:en"),
-    ("GNews Real Estate",  "https://news.google.com/rss/search?q=real+estate+housing+market+REIT&hl=en&gl=US&ceid=US:en"),
-    ("GNews ETF",          "https://news.google.com/rss/search?q=ETF+index+fund+passive+investing&hl=en&gl=US&ceid=US:en"),
-    ("GNews Energy",       "https://news.google.com/rss/search?q=energy+oil+gas+renewable+OPEC&hl=en&gl=US&ceid=US:en"),
-    ("GNews Tech Stocks",  "https://news.google.com/rss/search?q=tech+stocks+NASDAQ+AI+semiconductor&hl=en&gl=US&ceid=US:en"),
-    ("GNews Earnings",     "https://news.google.com/rss/search?q=earnings+report+quarterly+results+revenue&hl=en&gl=US&ceid=US:en"),
-    ("GNews IPO",          "https://news.google.com/rss/search?q=IPO+listing+SPAC+public+offering&hl=en&gl=US&ceid=US:en"),
-    ("GNews China Econ",   "https://news.google.com/rss/search?q=China+economy+trade+manufacturing&hl=en&gl=US&ceid=US:en"),
-    ("GNews Recession",    "https://news.google.com/rss/search?q=recession+downturn+economic+slowdown&hl=en&gl=US&ceid=US:en"),
-]
-
-_BULLISH_WORDS  = {"rally","surge","gain","high","record","beat","growth","rise","up","profit",
-                   "positive","strong","outperform","buy","upgrade","bullish","recovery","soar"}
-_BEARISH_WORDS  = {"fall","drop","crash","low","miss","recession","down","loss","negative","weak",
-                   "risk","warning","downgrade","sell","bearish","slump","plunge","cut","concern"}
-_CONFLICT_WORDS = {"war","conflict","military","sanctions","attack","threat","crisis","invasion",
-                   "strike","bomb","weapons","troops","geopolit"}
-_INFLATION_KW   = {"inflation","cpi","pce","rates","fed","rba","boe","ecb","oil","energy",
-                   "commodit","gold","silver","copper","wheat","supply"}
-_GROWTH_KW      = {"gdp","jobs","employment","payroll","earnings","revenue","ism","pmi",
-                   "retail","consumer","spending","trade","export","import"}
-_DEFLAT_KW      = {"deflation","disinflation","rate cut","pivot","quantitative","qe","stimulus"}
-
-
-def _score_headline(title: str, body: str = "") -> dict:
-    """Classify a headline into Dalio quadrant + sentiment using keyword scoring."""
-    text = (title + " " + body).lower()
-    words = set(text.replace(",", " ").replace(".", " ").split())
-
-    bull  = len(words & _BULLISH_WORDS)
-    bear  = len(words & _BEARISH_WORDS)
-    conf  = len(words & _CONFLICT_WORDS)
-    infl  = len(words & _INFLATION_KW)
-    grow  = len(words & _GROWTH_KW)
-    defl  = len(words & _DEFLAT_KW)
-
-    # Sentiment
-    if bull > bear + 1:
-        sentiment = "positive"
-    elif bear > bull + 1:
-        sentiment = "negative"
-    else:
-        sentiment = "neutral"
-
-    # Quadrant
-    if infl >= grow and infl >= defl:
-        quadrant = "rising_inflation" if bull >= bear else "falling_inflation"
-    elif defl > infl:
-        quadrant = "falling_inflation"
-    elif grow > 0 and bull >= bear:
-        quadrant = "rising_growth"
-    else:
-        quadrant = "falling_growth"
-
-    return {
-        "sentiment":     sentiment,
-        "quadrant":      quadrant,
-        "conflict_risk": conf > 0,
-        "bull_score":    bull,
-        "bear_score":    bear,
-    }
-
-
-async def _fetch_real_news() -> list[dict]:
-    """
-    Fetch ALL available articles from financial RSS feeds.
-    Returns headlines scored by Dalio quadrant + sentiment.
-    Falls back to HEADLINE_POOL if all feeds fail.
-    """
-    loop = asyncio.get_running_loop()
-    articles: list[dict] = []
-
-    def _parse_one_feed(feed_name: str, url: str) -> list[dict]:
-        try:
-            import feedparser
-            feed = feedparser.parse(url)
-            items = []
-            for entry in feed.entries:
-                title = (getattr(entry, "title", "") or "").strip()
-                if not title or len(title) < 15:
-                    continue
-                body  = (getattr(entry, "summary", "") or "")[:400]
-                score = _score_headline(title, body)
-                items.append({
-                    "title":        title,
-                    "source":       feed_name,
-                    "sentiment":    score["sentiment"],
-                    "quadrant":     score["quadrant"],
-                    "conflict_risk": score["conflict_risk"],
-                    "bull_score":   score["bull_score"],
-                    "bear_score":   score["bear_score"],
-                    "timestamp":    datetime.utcnow().isoformat(),
-                })
-            return items
-        except Exception as exc:
-            logger.debug(f"RSS [{feed_name}] failed: {exc}")
-            return []
-
-    futures = [
-        loop.run_in_executor(None, _parse_one_feed, name, url)
-        for name, url in _NEWS_RSS_FEEDS
-    ]
-    try:
-        results = await asyncio.wait_for(asyncio.gather(*futures, return_exceptions=True), timeout=30)
-    except asyncio.TimeoutError:
-        logger.warning("RSS aggregate fetch timed out after 30s")
-        results = []
-    for batch in results:
-        if isinstance(batch, list):
-            articles.extend(batch)
-
-    if not articles:
-        logger.warning("All RSS feeds failed — using static headline pool")
-        articles = _gen_static_headlines()
-
-    # Deduplicate by title prefix
-    seen: set = set()
-    unique: list = []
-    for a in articles:
-        key = a["title"][:60].lower()
-        if key not in seen:
-            seen.add(key)
-            unique.append(a)
-
-    # Sort: conflict first, then by sentiment extremity
-    unique.sort(key=lambda h: (h["conflict_risk"], abs(h["bull_score"] - h["bear_score"])), reverse=True)
-    logger.info(f"News scan: {len(unique)} unique articles from {len(_NEWS_RSS_FEEDS)} feeds")
-    return unique
-
-
-# Fallback static headlines (used only when all RSS feeds fail)
-_STATIC_HEADLINE_POOL = [
-    ("Fed signals pause in rate hikes amid cooling inflation",       "rising_growth",    "positive"),
-    ("RBA holds rates as Australian GDP surprises to upside",        "rising_growth",    "positive"),
-    ("Oil surges 4% on Middle East supply disruption fears",         "rising_inflation", "negative"),
-    ("BHP reports record iron ore shipments, ASX rallies",           "rising_growth",    "positive"),
-    ("China manufacturing PMI contracts for third straight month",   "falling_growth",   "negative"),
-    ("Gold hits 3-month high as USD weakens on jobs data miss",      "rising_inflation", "positive"),
-    ("Military conflict escalates in Eastern Europe, safe havens bid","rising_inflation","negative"),
-    ("US CPI drops to 2.4%, markets price in rate cuts",             "falling_inflation","positive"),
-    ("Tech layoffs accelerate, NASDAQ futures lower",                "falling_growth",   "negative"),
-    ("OPEC+ announces surprise production cut of 500k bpd",          "rising_inflation", "neutral"),
-    ("ASX 200 closes at 5-year high on earnings season beat",        "rising_growth",    "positive"),
-    ("Copper prices plunge on weak Chinese demand outlook",          "falling_growth",   "negative"),
-    ("Wheat prices spike amid Black Sea shipping disruptions",       "rising_inflation", "negative"),
-    ("Australian dollar rallies as trade surplus widens",            "rising_growth",    "positive"),
-    ("Silver ETF inflows surge as inflation expectations rise",      "rising_inflation", "positive"),
-    ("US 10-year yield falls as economic data disappoints",          "falling_growth",   "negative"),
-    ("Amazon, Alphabet earnings beat; tech sector rallies",         "rising_growth",    "positive"),
-    ("Iron ore falls on Chinese property sector concerns",           "falling_growth",   "negative"),
-    ("TIPS inflows accelerate as breakeven inflation widens",        "rising_inflation", "neutral"),
-    ("S&P 500 hits fresh record as rate cut hopes persist",         "rising_growth",    "positive"),
-]
-
-
-def _gen_static_headlines() -> list[dict]:
-    """Return ALL static headlines (no random sampling)."""
-    return [
-        {
-            "title":        h[0],
-            "quadrant":     h[1],
-            "sentiment":    h[2],
-            "source":       "Market Intelligence",
-            "timestamp":    datetime.utcnow().isoformat(),
-            "conflict_risk": "military" in h[0].lower() or "conflict" in h[0].lower(),
-            "bull_score":   1 if h[2] == "positive" else 0,
-            "bear_score":   1 if h[2] == "negative" else 0,
-        }
-        for h in _STATIC_HEADLINE_POOL
-    ]
-
-
-async def _gen_sentiment_data() -> dict:
-    """
-    Build sentiment data from real RSS news.
-    Tries FinBERT for higher-quality sentiment scoring when torch/transformers
-    are available. Falls back to keyword-based scoring otherwise.
-    All articles shown — no random sampling.
-    """
-    from collections import defaultdict
-
-    articles = await _fetch_real_news()
-
-    # ── Try FinBERT enhancement on article titles ──
-    articles = _try_finbert_sentiment(articles)
-
-    total    = len(articles)
-    conflict = sum(1 for a in articles if a["conflict_risk"])
-
-    # Per-quadrant stats
-    q_counts: dict = defaultdict(lambda: {"count": 0, "bull": 0, "bear": 0, "scores": []})
-    for a in articles:
-        q = a["quadrant"]
-        q_counts[q]["count"] += 1
-        # Use FinBERT score if available, otherwise derive from bull/bear
-        score = a.get("finbert_score", None)
-        if score is not None:
-            q_counts[q]["scores"].append(score)
-            if score > 0.1:
-                q_counts[q]["bull"] += 1
-            elif score < -0.1:
-                q_counts[q]["bear"] += 1
-        else:
-            if a["sentiment"] == "positive":
-                q_counts[q]["bull"] += 1
-            elif a["sentiment"] == "negative":
-                q_counts[q]["bear"] += 1
-
-    quadrant_sentiment: dict = {}
-    for q in QUADRANT_META:
-        s = q_counts[q]
-        c = max(s["count"], 1)
-        # Prefer FinBERT mean score if available
-        if s["scores"]:
-            avg_score = round(float(np.mean(s["scores"])), 3)
-        else:
-            avg_score = round((s["bull"] - s["bear"]) / c, 3)
-        quadrant_sentiment[q] = {
-            "avg_score":    avg_score,
-            "article_count": s["count"],
-            "bullish_pct":  round(s["bull"] / c * 100, 1),
-        }
-
-    dominant = max(quadrant_sentiment, key=lambda q: quadrant_sentiment[q]["article_count"])
-
-    sentiment_model = "FinBERT" if articles and articles[0].get("finbert_score") is not None else "Keyword"
-
-    return {
-        "total_articles":          total,
-        "conflict_risk_articles":  conflict,
-        "conflict_risk_elevated":  conflict >= max(3, int(total * 0.08)),
-        "dominant_quadrant":       dominant,
-        "quadrant_sentiment":      quadrant_sentiment,
-        "top_headlines":           articles,   # ALL articles, no cap
-        "sentiment_model":         sentiment_model,
-        "timestamp":               datetime.utcnow().isoformat(),
-    }
-
-
-# ── FinBERT lazy loader (cached singleton) ──
-_FINBERT_MODEL = None
-_FINBERT_TOKENIZER = None
-_FINBERT_LOADED = False  # True once we've attempted load (even if failed)
-
-
-def _try_finbert_sentiment(articles: list[dict]) -> list[dict]:
-    """
-    Attempt to score articles with FinBERT. If torch/transformers unavailable
-    or model fails, returns articles unchanged (keyword scores preserved).
-    """
-    global _FINBERT_MODEL, _FINBERT_TOKENIZER, _FINBERT_LOADED
-
-    if not articles:
-        return articles
-
-    # Only attempt loading once
-    if not _FINBERT_LOADED:
-        _FINBERT_LOADED = True
-        try:
-            import torch
-            from transformers import AutoTokenizer, AutoModelForSequenceClassification
-            model_name = "ProsusAI/finbert"
-            logger.info(f"Loading FinBERT model: {model_name}")
-            _FINBERT_TOKENIZER = AutoTokenizer.from_pretrained(model_name)
-            _FINBERT_MODEL = AutoModelForSequenceClassification.from_pretrained(model_name)
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            _FINBERT_MODEL.to(device)
-            _FINBERT_MODEL.eval()
-            logger.info(f"FinBERT loaded on {device}")
-        except Exception as e:
-            logger.info(f"FinBERT not available ({e}), using keyword sentiment")
-            _FINBERT_MODEL = None
-            _FINBERT_TOKENIZER = None
-
-    if _FINBERT_MODEL is None or _FINBERT_TOKENIZER is None:
-        return articles
-
-    # Score articles in batches
-    try:
-        import torch
-        device = next(_FINBERT_MODEL.parameters()).device
-        batch_size = 16
-        labels = ["positive", "negative", "neutral"]
-
-        for i in range(0, len(articles), batch_size):
-            batch = articles[i:i + batch_size]
-            texts = [a["title"][:512] for a in batch]
-            inputs = _FINBERT_TOKENIZER(
-                texts, return_tensors="pt", truncation=True,
-                max_length=512, padding=True
-            ).to(device)
-            with torch.no_grad():
-                outputs = _FINBERT_MODEL(**inputs)
-            probs = torch.softmax(outputs.logits, dim=1).cpu().numpy()
-            for j, a in enumerate(batch):
-                prob_dict = dict(zip(labels, probs[j].tolist()))
-                score = prob_dict["positive"] - prob_dict["negative"]
-                a["finbert_score"] = round(score, 4)
-                # Override keyword sentiment with FinBERT result
-                a["sentiment"] = labels[int(np.argmax(probs[j]))]
-                a["bull_score"] = round(prob_dict["positive"], 3)
-                a["bear_score"] = round(prob_dict["negative"], 3)
-
-        logger.info(f"FinBERT scored {len(articles)} articles")
-    except Exception as e:
-        logger.warning(f"FinBERT batch scoring failed ({e}), keeping keyword scores")
-
-    return articles
-
-
-def _gen_correlation_matrix_demo() -> dict:
-    """Fallback demo correlation matrix."""
-    tickers = CORR_TICKERS
-    n = len(tickers)
-    mat = np.eye(n)
-    for i in range(n):
-        for j in range(i + 1, n):
-            r = round(random.uniform(-0.25, 0.55), 3)
-            mat[i][j] = r
-            mat[j][i] = r
-    upper = np.triu_indices(n, k=1)
-    return {
-        "tickers": tickers,
-        "matrix": mat.tolist(),
-        "mean_correlation": round(float(np.mean(mat[upper])), 3),
-        "max_correlation": round(float(np.max(mat[upper])), 3),
-        "holy_grail_count": sum(
-            1 for i in range(n)
-            if np.mean(np.abs(mat[i][np.arange(n) != i])) < 0.35
-        ),
-        "threshold": 0.3,
-        "data_source": "DEMO",
-        "timestamp": datetime.utcnow().isoformat(),
-    }
-
-
-async def _real_correlation_matrix() -> Optional[dict]:
-    """Compute Pearson correlation from 3-month daily returns via yfinance."""
-    tickers = CORR_TICKERS
-    prices_map = await _get_prices(tickers, "3mo")
-    if not prices_map or len(prices_map) < 4:
-        return None
-    valid = [t for t in tickers if t in prices_map and len(prices_map[t]) >= 20]
-    if len(valid) < 4:
-        return None
-    min_len = min(len(prices_map[t]) for t in valid)
-    closes  = np.array([prices_map[t][-min_len:] for t in valid], dtype=float)
-    returns = np.diff(closes, axis=1) / closes[:, :-1]
-    corr    = np.round(np.corrcoef(returns), 3)
-    n       = len(valid)
-    upper   = np.triu_indices(n, k=1)
-    hg_count = sum(
-        1 for i in range(n)
-        if float(np.mean(np.abs(corr[i][np.arange(n) != i]))) < 0.35
-    )
-    return {
-        "tickers": valid,
-        "matrix": corr.tolist(),
-        "mean_correlation": round(float(np.mean(corr[upper])), 3),
-        "max_correlation": round(float(np.max(corr[upper])), 3),
-        "holy_grail_count": hg_count,
-        "threshold": 0.3,
-        "data_source": "LIVE",
-        "timestamp": datetime.utcnow().isoformat(),
-    }
-
-
-def _gen_portfolio_health() -> dict:
-    """Real portfolio health from PAPER state — no fake data."""
-    initial = PAPER_STARTING_CASH
-    equity  = PAPER.cash
-    if PAPER.equity_history:
-        equity = PAPER.equity_history[-1]["v"]
-
-    # Daily P&L from equity history
-    daily_pnl = 0.0
-    if len(PAPER.equity_history) >= 2:
-        daily_pnl = round(PAPER.equity_history[-1]["v"] - PAPER.equity_history[-2]["v"], 2)
-
-    # Drawdown
-    drawdown = 0.0
-    if PAPER.equity_history:
-        peak = max(e["v"] for e in PAPER.equity_history)
-        drawdown = round((peak - equity) / peak * 100, 2) if peak > 0 else 0.0
-
-    # Sharpe
-    sharpe = 0.0
-    if len(PAPER.equity_history) >= 10:
-        try:
-            eq_arr = np.array([e["v"] for e in PAPER.equity_history], dtype=float)
-            rets   = np.diff(eq_arr) / eq_arr[:-1]
-            if rets.std() > 0:
-                sharpe = round(float((rets.mean() / rets.std()) * (252 ** 0.5)), 2)
-        except Exception:
-            pass
-
-    open_count = len(PAPER.positions)
-
-    # Real positions list
-    positions_list = [
-        {
-            "ticker": t,
-            "side": pos.get("side", "LONG"),
-            "size_pct": round(pos["qty"] * pos["entry_price"] / max(equity, 1) * 100, 1),
-            "unrealised_pnl_pct": 0.0,  # live P&L computed in /api/paper/portfolio
-        }
-        for t, pos in PAPER.positions.items()
-    ]
-
-    return {
-        "timestamp":             datetime.utcnow().isoformat(),
-        "equity":                round(equity, 2),
-        "initial_equity":        initial,
-        "cash":                  round(PAPER.cash, 2),
-        "total_return_pct":      round((equity / initial - 1) * 100, 2) if initial else 0.0,
-        "daily_pnl":             daily_pnl,
-        "daily_pnl_pct":         round(daily_pnl / equity * 100, 3) if equity else 0.0,
-        "drawdown_pct":          drawdown,
-        "open_positions":        open_count,
-        "dalio_diversification_met": open_count >= 3,
-        "selected_portfolio_size": open_count,
-        "circuit_breaker_active": drawdown > 9.5,
-        "daily_limit_pct":       2.0,
-        "max_drawdown_pct":      10.0,
-        "sharpe_ratio":          sharpe,
-        "positions":             positions_list,
-    }
-
-
-def _gen_backtest_results() -> dict:
-    """Generate simulated backtest results.
-    NOTE: This returns SIMULATED data — real walk-forward backtesting
-    requires the backtesting module to be integrated with historical data."""
-    periods = []
-    cumulative = STATE.initial_equity
-    for i in range(8):
-        ret = round(random.gauss(3.5, 6.0), 2)
-        cumulative *= (1 + ret / 100)
-        periods.append({
-            "period": i + 1,
-            "train_start": f"202{2 + i // 4}-Q{(i % 4) + 1}",
-            "return_pct": ret,
-            "sharpe": round(random.uniform(0.9, 2.8), 2),
-            "max_drawdown": round(random.uniform(-12, -1), 2),
-            "win_rate": round(random.uniform(50, 72), 1),
-            "trades": random.randint(28, 85),
-        })
-    return {
-        "status": "SIMULATED",
-        "data_source": "simulated",
-        "training_months": 12,
-        "test_months": 3,
-        "periods": len(periods),
-        "total_return_pct": round((cumulative / STATE.initial_equity - 1) * 100, 2),
-        "annualised_return_pct": round(random.uniform(18, 42), 2),
-        "sharpe_ratio": round(random.uniform(1.6, 2.4), 2),
-        "sortino_ratio": round(random.uniform(2.0, 3.1), 2),
-        "calmar_ratio": round(random.uniform(1.8, 2.9), 2),
-        "max_drawdown_pct": round(random.uniform(-9, -5), 2),
-        "win_rate_pct": round(random.uniform(57, 68), 1),
-        "avg_trade_return_pct": round(random.uniform(1.5, 3.2), 2),
-        "period_results": periods,
-        "timestamp": datetime.utcnow().isoformat(),
-    }
 
 
 # ─────────────────────────────────────────────
@@ -3608,12 +200,11 @@ async def root():
 
 
 # ─────────────────────────────────────────────
-# Routes -- API
+# Routes -- System Status
 # ─────────────────────────────────────────────
 
 @app.get("/api/status")
 async def get_status():
-    # Use the in-memory TRADING_MODE (set by POST /api/mode) — not the .env default
     mode = TRADING_MODE.upper() if TRADING_MODE else "PAPER"
     return {
         "status": "PAUSED" if getattr(STATE, 'paused', False) else "OPERATIONAL",
@@ -3633,11 +224,14 @@ async def toggle_pause(body: dict):
     return {"paused": STATE.paused, "status": "PAUSED" if STATE.paused else "OPERATIONAL"}
 
 
+# ─────────────────────────────────────────────
+# Routes -- Portfolio Health & Equity
+# ─────────────────────────────────────────────
+
 @app.get("/api/portfolio/health")
 async def portfolio_health():
     data = _gen_portfolio_health()
     STATE.last_health = data
-    # Append to equity history
     STATE.equity_history.append({"t": datetime.utcnow().strftime("%Y-%m-%d %H:%M"), "v": data["equity"]})
     STATE.equity_history = STATE.equity_history[-500:]
     return data
@@ -3645,12 +239,15 @@ async def portfolio_health():
 
 @app.get("/api/portfolio/equity_history")
 async def equity_history():
-    # Try DB first, fall back to in-memory STATE
     db_curve = _db_get_equity_curve(limit=2000)
     if db_curve:
         return {"history": db_curve, "source": "db"}
     return {"history": STATE.equity_history, "source": "json"}
 
+
+# ─────────────────────────────────────────────
+# Routes -- Signals, Quadrant, Sentiment, Correlation
+# ─────────────────────────────────────────────
 
 @app.get("/api/signals")
 async def get_signals():
@@ -3670,18 +267,18 @@ async def get_quadrant():
 
 
 _SENTIMENT_CACHE: dict = {}
-_SENTIMENT_TTL = 300  # 5 minutes — keep news fresh
+_SENTIMENT_TTL = 300
+
 
 @app.get("/api/sentiment")
 async def get_sentiment():
-    import time as _t
     cached = _SENTIMENT_CACHE.get("data")
-    if cached and (_t.time() - _SENTIMENT_CACHE.get("ts", 0)) < _SENTIMENT_TTL:
+    if cached and (time.time() - _SENTIMENT_CACHE.get("ts", 0)) < _SENTIMENT_TTL:
         return cached
     data = await _gen_sentiment_data()
     STATE.last_sentiment = data
     _SENTIMENT_CACHE["data"] = data
-    _SENTIMENT_CACHE["ts"] = _t.time()
+    _SENTIMENT_CACHE["ts"] = time.time()
     return data
 
 
@@ -3691,61 +288,9 @@ async def get_correlation():
     return real if real else _gen_correlation_matrix_demo()
 
 
-_MARKET_DEMO = [
-    # Crypto
-    ("BTC-USD",  "Bitcoin",       "crypto",     95_420.0,   2.14),
-    ("ETH-USD",  "Ethereum",      "crypto",      3_512.5,   1.87),
-    ("SOL-USD",  "Solana",        "crypto",       178.40,   4.31),
-    ("BNB-USD",  "BNB",           "crypto",       612.00,   1.05),
-    ("XRP-USD",  "XRP",           "crypto",         0.62,   3.20),
-    ("ADA-USD",  "Cardano",       "crypto",         0.45,  -1.10),
-    ("DOGE-USD", "Dogecoin",      "crypto",         0.082,  5.40),
-    ("AVAX-USD", "Avalanche",     "crypto",        38.50,   2.80),
-    ("DOT-USD",  "Polkadot",      "crypto",         7.20,  -0.95),
-    ("LINK-USD", "Chainlink",     "crypto",        15.80,   1.65),
-    ("MATIC-USD","Polygon",       "crypto",         0.72,  -1.40),
-    ("ATOM-USD", "Cosmos",        "crypto",         9.10,   0.85),
-    ("LTC-USD",  "Litecoin",      "crypto",        85.40,   0.52),
-    ("UNI-USD",  "Uniswap",       "crypto",         7.90,   2.10),
-    ("NEAR-USD", "NEAR",          "crypto",         5.60,   3.15),
-    # ASX
-    ("^AXJO",    "ASX 200",       "index",       7_985.0,   0.42),
-    ("CBA.AX",   "CommBank",      "asx",          145.20,   0.72),
-    ("BHP.AX",   "BHP Group",     "asx",           42.80,  -0.33),
-    ("CSL.AX",   "CSL Ltd",       "asx",          285.60,   1.15),
-    ("NAB.AX",   "NAB",           "asx",           38.50,   0.45),
-    ("WBC.AX",   "Westpac",       "asx",           28.90,  -0.18),
-    ("ANZ.AX",   "ANZ Bank",      "asx",           30.15,   0.62),
-    ("FMG.AX",   "Fortescue",     "asx",           18.40,  -1.80),
-    ("RIO.AX",   "Rio Tinto",     "asx",          115.30,  -0.55),
-    ("WDS.AX",   "Woodside",      "asx",           26.70,   0.90),
-    ("WES.AX",   "Wesfarmers",    "asx",           72.40,   0.35),
-    ("MQG.AX",   "Macquarie",     "asx",          198.50,   1.20),
-    ("TLS.AX",   "Telstra",       "asx",            3.95,  -0.25),
-    # Indices
-    ("^GSPC",    "S&P 500",       "index",       5_674.0,  -0.31),
-    ("^DJI",     "Dow Jones",     "index",      42_150.0,   0.18),
-    ("^IXIC",    "Nasdaq",        "index",      18_320.0,  -0.45),
-    ("^N225",    "Nikkei 225",    "index",      38_750.0,   0.55),
-    ("^FTSE",    "FTSE 100",      "index",       8_210.0,  -0.22),
-    ("^VIX",     "VIX Fear",      "index",         18.4,   -3.20),
-    # FX
-    ("AUD=X",    "AUD/USD",       "fx",            0.6312,  0.18),
-    ("EURUSD=X", "EUR/USD",       "fx",            1.0845,  0.12),
-    # Commodities
-    ("GC=F",     "Gold Futures",  "commodity",   2_380.0,   0.48),
-    ("SI=F",     "Silver Futures","commodity",      28.60,   0.92),
-    ("CL=F",     "Crude Oil WTI", "commodity",     78.50,  -0.65),
-    ("NG=F",     "Natural Gas",   "commodity",      2.15,  -2.30),
-    ("GLD",      "Gold ETF",      "commodity",    241.30,   0.65),
-    ("SLV",      "Silver ETF",    "commodity",     28.40,   0.88),
-    ("USO",      "Oil ETF",       "commodity",     74.85,  -0.55),
-    ("PPLT",     "Platinum ETF",  "commodity",     92.30,   0.40),
-    ("COPX",     "Copper Miners", "commodity",     38.70,   1.10),
-    ("URA",      "Uranium ETF",   "commodity",     28.90,   2.35),
-    ("WEAT",     "Wheat ETF",     "commodity",      5.80,  -0.70),
-    ("DBA",      "Agriculture ETF","commodity",    25.40,   0.15),
-]
+# ─────────────────────────────────────────────
+# Routes -- Market Summary & Scanner
+# ─────────────────────────────────────────────
 
 @app.get("/api/market_summary")
 async def market_summary():
@@ -3813,7 +358,6 @@ async def market_summary():
     tickers = [t for t, _, _ in watchlist]
     prices_map = await _get_prices(tickers, "5d")
 
-    # Parallel: CoinGecko for crypto + yfinance for indices/commodities
     cg_task  = asyncio.create_task(_get_crypto_coingecko())
     idx_tickers = [t for t, _, c in watchlist if c != "crypto"]
     yf_task  = asyncio.create_task(_get_prices(idx_tickers, "5d"))
@@ -3866,85 +410,6 @@ async def get_alerts():
     return {"alerts": STATE.alert_log}
 
 
-# ── Asset universe metadata ────────────────────────────────
-_ASSET_META = {
-    # ASX
-    "CBA.AX":  {"name": "Commonwealth Bank",       "cat": "ASX", "sector": "Banking"},
-    "ANZ.AX":  {"name": "ANZ Bank",                "cat": "ASX", "sector": "Banking"},
-    "NAB.AX":  {"name": "National Australia Bank", "cat": "ASX", "sector": "Banking"},
-    "WBC.AX":  {"name": "Westpac Banking",         "cat": "ASX", "sector": "Banking"},
-    "BHP.AX":  {"name": "BHP Group",               "cat": "ASX", "sector": "Mining"},
-    "RIO.AX":  {"name": "Rio Tinto",               "cat": "ASX", "sector": "Mining"},
-    "FMG.AX":  {"name": "Fortescue Metals",        "cat": "ASX", "sector": "Mining"},
-    "S32.AX":  {"name": "South32",                 "cat": "ASX", "sector": "Mining"},
-    "MIN.AX":  {"name": "Mineral Resources",       "cat": "ASX", "sector": "Mining"},
-    "LYC.AX":  {"name": "Lynas Rare Earths",       "cat": "ASX", "sector": "Materials"},
-    "WDS.AX":  {"name": "Woodside Energy",         "cat": "ASX", "sector": "Energy"},
-    "STO.AX":  {"name": "Santos",                  "cat": "ASX", "sector": "Energy"},
-    "BPT.AX":  {"name": "Beach Energy",            "cat": "ASX", "sector": "Energy"},
-    "AGL.AX":  {"name": "AGL Energy",              "cat": "ASX", "sector": "Utilities"},
-    "ORG.AX":  {"name": "Origin Energy",           "cat": "ASX", "sector": "Energy"},
-    "MQG.AX":  {"name": "Macquarie Group",         "cat": "ASX", "sector": "Finance"},
-    "SUN.AX":  {"name": "Suncorp Group",           "cat": "ASX", "sector": "Insurance"},
-    "QBE.AX":  {"name": "QBE Insurance",           "cat": "ASX", "sector": "Insurance"},
-    "AMP.AX":  {"name": "AMP Limited",             "cat": "ASX", "sector": "Finance"},
-    "CSL.AX":  {"name": "CSL Limited",             "cat": "ASX", "sector": "Healthcare"},
-    "COH.AX":  {"name": "Cochlear",                "cat": "ASX", "sector": "Healthcare"},
-    "RMD.AX":  {"name": "ResMed",                  "cat": "ASX", "sector": "Healthcare"},
-    "PME.AX":  {"name": "Pro Medicus",             "cat": "ASX", "sector": "Healthcare"},
-    "WES.AX":  {"name": "Wesfarmers",              "cat": "ASX", "sector": "Consumer"},
-    "WOW.AX":  {"name": "Woolworths Group",        "cat": "ASX", "sector": "Consumer"},
-    "COL.AX":  {"name": "Coles Group",             "cat": "ASX", "sector": "Consumer"},
-    "JBH.AX":  {"name": "JB Hi-Fi",               "cat": "ASX", "sector": "Consumer"},
-    "TWE.AX":  {"name": "Treasury Wine Estates",   "cat": "ASX", "sector": "Consumer"},
-    "REA.AX":  {"name": "REA Group",               "cat": "ASX", "sector": "Technology"},
-    "XRO.AX":  {"name": "Xero",                    "cat": "ASX", "sector": "Technology"},
-    "WTC.AX":  {"name": "WiseTech Global",         "cat": "ASX", "sector": "Technology"},
-    "ALU.AX":  {"name": "Altium",                  "cat": "ASX", "sector": "Technology"},
-    "GMG.AX":  {"name": "Goodman Group",           "cat": "ASX", "sector": "REIT"},
-    "SCG.AX":  {"name": "Scentre Group",           "cat": "ASX", "sector": "REIT"},
-    "GPT.AX":  {"name": "GPT Group",               "cat": "ASX", "sector": "REIT"},
-    "QAN.AX":  {"name": "Qantas Airways",          "cat": "ASX", "sector": "Transport"},
-    "TCL.AX":  {"name": "Transurban Group",        "cat": "ASX", "sector": "Infrastructure"},
-    "TLS.AX":  {"name": "Telstra",                 "cat": "ASX", "sector": "Telecom"},
-    "NCM.AX":  {"name": "Newcrest Mining",         "cat": "ASX", "sector": "Gold"},
-    "EVN.AX":  {"name": "Evolution Mining",        "cat": "ASX", "sector": "Gold"},
-    "NST.AX":  {"name": "Northern Star Resources", "cat": "ASX", "sector": "Gold"},
-    # Crypto
-    "BTC-USD":  {"name": "Bitcoin",         "cat": "Crypto", "sector": "Layer 1"},
-    "ETH-USD":  {"name": "Ethereum",        "cat": "Crypto", "sector": "Layer 1"},
-    "BNB-USD":  {"name": "BNB",             "cat": "Crypto", "sector": "Exchange"},
-    "SOL-USD":  {"name": "Solana",          "cat": "Crypto", "sector": "Layer 1"},
-    "XRP-USD":  {"name": "XRP",             "cat": "Crypto", "sector": "Payments"},
-    "ADA-USD":  {"name": "Cardano",         "cat": "Crypto", "sector": "Layer 1"},
-    "AVAX-USD": {"name": "Avalanche",       "cat": "Crypto", "sector": "Layer 1"},
-    "DOT-USD":  {"name": "Polkadot",        "cat": "Crypto", "sector": "Layer 0"},
-    "LINK-USD": {"name": "Chainlink",       "cat": "Crypto", "sector": "Oracle"},
-    "MATIC-USD":{"name": "Polygon",         "cat": "Crypto", "sector": "Layer 2"},
-    "DOGE-USD": {"name": "Dogecoin",        "cat": "Crypto", "sector": "Meme"},
-    "LTC-USD":  {"name": "Litecoin",        "cat": "Crypto", "sector": "Payments"},
-    "UNI-USD":  {"name": "Uniswap",         "cat": "Crypto", "sector": "DeFi"},
-    "ATOM-USD": {"name": "Cosmos",          "cat": "Crypto", "sector": "Interop"},
-    "NEAR-USD": {"name": "NEAR Protocol",   "cat": "Crypto", "sector": "Layer 1"},
-    "FTM-USD":  {"name": "Fantom",          "cat": "Crypto", "sector": "Layer 1"},
-    "ALGO-USD": {"name": "Algorand",        "cat": "Crypto", "sector": "Layer 1"},
-    "XLM-USD":  {"name": "Stellar",         "cat": "Crypto", "sector": "Payments"},
-    "AAVE-USD": {"name": "Aave",            "cat": "Crypto", "sector": "DeFi"},
-    "SNX-USD":  {"name": "Synthetix",       "cat": "Crypto", "sector": "DeFi"},
-    # Commodities
-    "GLD":  {"name": "Gold ETF (SPDR)",     "cat": "Commodity", "sector": "Precious Metals"},
-    "SLV":  {"name": "Silver ETF (iShares)","cat": "Commodity", "sector": "Precious Metals"},
-    "USO":  {"name": "Crude Oil Fund",      "cat": "Commodity", "sector": "Energy"},
-    "UNG":  {"name": "Natural Gas Fund",    "cat": "Commodity", "sector": "Energy"},
-    "COPX": {"name": "Copper Miners ETF",   "cat": "Commodity", "sector": "Industrial"},
-    "WEAT": {"name": "Wheat ETF (Teucrium)","cat": "Commodity", "sector": "Agriculture"},
-    "DBA":  {"name": "Agriculture ETF",     "cat": "Commodity", "sector": "Agriculture"},
-    "PALL": {"name": "Palladium ETF",       "cat": "Commodity", "sector": "Precious Metals"},
-    "XOM":  {"name": "ExxonMobil (Oil)",    "cat": "Commodity", "sector": "Energy"},
-    "CVX":  {"name": "Chevron (Oil)",       "cat": "Commodity", "sector": "Energy"},
-}
-
-
 @app.get("/api/assets")
 async def get_assets():
     """Return full asset universe with metadata and last known prices."""
@@ -3969,1390 +434,9 @@ async def get_assets():
     return {"assets": assets, "total": len(assets)}
 
 
-# ─────────────────────────────────────────────
-# Paper Trading Endpoints
-# ─────────────────────────────────────────────
-
-_BINANCE_PRICE_CACHE: dict = {}
-_BINANCE_PRICE_TS:    float = 0.0
-_BINANCE_PRICE_TTL:   float = 20.0   # 20-second cache
-
-async def _fetch_binance_prices() -> dict:
-    """Fetch all USDT spot prices from Binance public REST — no API key needed.
-    Returns {yfinance_ticker: price} e.g. {"BTC-USD": 65432.1}
-    """
-    global _BINANCE_PRICE_CACHE, _BINANCE_PRICE_TS
-    import time as _t
-    import aiohttp
-    now = _t.time()
-    if now - _BINANCE_PRICE_TS < _BINANCE_PRICE_TTL and _BINANCE_PRICE_CACHE:
-        return _BINANCE_PRICE_CACHE
-
-    try:
-        timeout = aiohttp.ClientTimeout(total=8)
-        async with aiohttp.ClientSession(timeout=timeout) as sess:
-            async with sess.get("https://api.binance.com/api/v3/ticker/price") as resp:
-                if resp.status != 200:
-                    return _BINANCE_PRICE_CACHE
-                data = await resp.json(content_type=None)
-        result = {}
-        for item in data:
-            sym = item["symbol"]  # e.g. "BTCUSDT"
-            if sym.endswith("USDT"):
-                base = sym[:-4]   # "BTC"
-                result[f"{base}-USD"] = float(item["price"])
-        _BINANCE_PRICE_CACHE = result
-        _BINANCE_PRICE_TS    = now
-        logger.debug(f"Binance price feed: {len(result)} USDT pairs cached")
-        return result
-    except Exception as e:
-        logger.warning(f"Binance price feed failed: {e}")
-        return _BINANCE_PRICE_CACHE
-
-
-def _normalize_ticker(ticker: str) -> str:
-    """Normalise user-entered tickers to yfinance format.
-    BTC → BTC-USD, ETH → ETH-USD, bhp → BHP.AX (if known), etc.
-    Also converts -AUD pairs to -USD for data lookups (CoinSpot → yfinance).
-    """
-    t = ticker.upper().strip()
-    # -AUD pairs → convert to -USD for data fetching
-    if t.endswith("-AUD"):
-        return t.replace("-AUD", "-USD")
-    # Already correct format — pass through
-    if t.endswith("-USD") or t.endswith(".AX") or "-" in t or "." in t:
-        return t
-    # Known crypto base symbols → append -USD
-    _crypto_bases = {c.replace("-USD", "") for c in CRYPTO_TICKERS}
-    if t in _crypto_bases:
-        return f"{t}-USD"
-    # Check if it matches an ASX ticker without suffix
-    _asx_bases = {c.replace(".AX", "") for c in ASX_TICKERS}
-    if t in _asx_bases:
-        return f"{t}.AX"
-    return t
-
-
-async def _live_price(ticker: str) -> Optional[float]:
-    """Get the most recent price for a ticker.
-    Priority: scanner cache → Binance (crypto) → yfinance → demo seed.
-    """
-    # 1. Scanner cache (fastest — already in memory)
-    cached_ms = _cache_get("market_summary")
-    if cached_ms:
-        for item in cached_ms:
-            if item.get("ticker") == ticker and item.get("price") is not None:
-                return float(item["price"])
-
-    # 2. Binance public API for crypto (fast, real-time, no auth needed)
-    if ticker.endswith("-USD"):
-        bn_prices = await _fetch_binance_prices()
-        if ticker in bn_prices:
-            return bn_prices[ticker]
-
-    # 3. yfinance fallback
-    prices = await _get_prices([ticker], "5d")
-    if prices and ticker in prices and prices[ticker]:
-        return float(prices[ticker][-1])
-
-    # 4. Demo seed (never None — prevents order failure on unknown tickers)
-    seed = abs(hash(ticker)) % 10000
-    rng  = random.Random(seed)
-    return round(rng.uniform(10, 300), 2)
-
-
-async def _prices_for_positions(tickers: list) -> dict:
-    """Return {ticker: price} for all open position tickers.
-    Batch-fetches from Binance (crypto) and yfinance (others) first,
-    then falls back to individual lookups for any that failed.
-    """
-    if not tickers:
-        return {}
-    result = {}
-
-    # 1. Batch-fetch crypto prices from Binance
-    crypto_tickers = [t for t in tickers if t.endswith("-USD") or t.endswith("-AUD")]
-    if crypto_tickers:
-        bn_prices = await _fetch_binance_prices()
-        for t in crypto_tickers:
-            lookup = t.replace("-AUD", "-USD") if t.endswith("-AUD") else t
-            if lookup in bn_prices:
-                result[t] = bn_prices[lookup]
-
-    # 2. Batch-fetch remaining tickers via yfinance download
-    remaining = [t for t in tickers if t not in result]
-    if remaining and YF_AVAILABLE:
-        try:
-            loop = asyncio.get_running_loop()
-
-            def _batch_yf():
-                import yfinance as _yf_batch
-                try:
-                    raw = _yf_batch.download(
-                        remaining if len(remaining) > 1 else remaining[0],
-                        period="5d", auto_adjust=True, progress=False,
-                        threads=True, timeout=10,
-                    )
-                    if raw is None or raw.empty:
-                        return {}
-                    import pandas as _pd_batch
-                    if isinstance(raw.columns, _pd_batch.MultiIndex):
-                        close = raw["Close"] if "Close" in raw.columns.get_level_values(0) else None
-                    elif "Close" in raw.columns:
-                        close = _pd_batch.DataFrame({remaining[0]: raw["Close"]})
-                    else:
-                        return {}
-                    if close is None or close.empty:
-                        return {}
-                    prices = {}
-                    for t in remaining:
-                        if t in close.columns:
-                            col = close[t].dropna()
-                            if not col.empty:
-                                prices[t] = float(col.iloc[-1])
-                    return prices
-                except Exception:
-                    return {}
-
-            batch_prices = await asyncio.wait_for(
-                loop.run_in_executor(_EXECUTOR, _batch_yf), timeout=12.0)
-            result.update(batch_prices)
-        except (asyncio.TimeoutError, Exception):
-            pass
-
-    # 3. Individual fallback for any tickers still missing
-    still_missing = [t for t in tickers if t not in result]
-    for t in still_missing:
-        p = await _live_price(t)
-        if p is not None:
-            result[t] = p
-    return result
-
-
-# ─────────────────────────────────────────────
-# Dalio AI Analysis Engine
-# ─────────────────────────────────────────────
-
-import re as _re
-
-ASSET_CLASS_MAP: dict = {
-    # Crypto (USD — used for yfinance data fetching)
-    "BTC-USD":"crypto","ETH-USD":"crypto","BNB-USD":"crypto","SOL-USD":"crypto","XRP-USD":"crypto",
-    "ADA-USD":"crypto","AVAX-USD":"crypto","DOT-USD":"crypto","LINK-USD":"crypto","MATIC-USD":"crypto",
-    "DOGE-USD":"crypto","LTC-USD":"crypto","UNI-USD":"crypto","ATOM-USD":"crypto","NEAR-USD":"crypto",
-    # Crypto (AUD — used for CoinSpot positions and trading)
-    "BTC-AUD":"crypto","ETH-AUD":"crypto","BNB-AUD":"crypto","SOL-AUD":"crypto","XRP-AUD":"crypto",
-    "ADA-AUD":"crypto","AVAX-AUD":"crypto","DOT-AUD":"crypto","LINK-AUD":"crypto","MATIC-AUD":"crypto",
-    "DOGE-AUD":"crypto","LTC-AUD":"crypto","UNI-AUD":"crypto","ATOM-AUD":"crypto","NEAR-AUD":"crypto",
-    "SHIB-AUD":"crypto",
-    # Gold / Precious metals
-    "GLD":"gold","SLV":"gold","PALL":"gold","NCM.AX":"gold","EVN.AX":"gold","NST.AX":"gold",
-    # Commodities
-    "USO":"commodities","UNG":"commodities","COPX":"commodities","WEAT":"commodities",
-    "DBA":"commodities","XOM":"commodities","CVX":"commodities","WDS.AX":"commodities",
-    "STO.AX":"commodities","BPT.AX":"commodities","BHP.AX":"commodities","RIO.AX":"commodities","FMG.AX":"commodities",
-    # Long Bonds
-    "TLT":"long_bonds","IEF":"long_bonds","AGG":"long_bonds","BND":"long_bonds",
-    # TIPS / Inflation-linked
-    "TIP":"tips","VTIP":"tips","SCHP":"tips",
-    # Corporate bonds
-    "LQD":"corporate_bonds","HYG":"corporate_bonds",
-    # Real assets / REIT
-    "GMG.AX":"real_assets","TCL.AX":"real_assets","SCG.AX":"real_assets","VNQ":"real_assets",
-    # ASX Equities
-    "CBA.AX":"equities","ANZ.AX":"equities","NAB.AX":"equities","WBC.AX":"equities",
-    "MQG.AX":"equities","CSL.AX":"equities","COH.AX":"equities","RMD.AX":"equities",
-    "WES.AX":"equities","WOW.AX":"equities","COL.AX":"equities","TLS.AX":"equities",
-    "XRO.AX":"equities","WTC.AX":"equities","ALU.AX":"equities","REA.AX":"equities",
-    "S32.AX":"equities","MIN.AX":"equities","AGL.AX":"equities","ORG.AX":"equities",
-    "QAN.AX":"equities","SUN.AX":"equities","QBE.AX":"equities","AMP.AX":"equities",
-    # US / Global ETFs
-    "SPY":"equities","QQQ":"growth_stocks","VTI":"equities","IWLD":"equities","EEM":"equities",
-}
-
-QUADRANT_PLAYBOOK: dict = {
-    "rising_growth": {
-        "strong_buy": ["equities","commodities"],
-        "buy":        ["crypto","real_assets","corporate_bonds"],
-        "avoid":      ["long_bonds","gold","tips"],
-        "narrative":  (
-            "Rising Growth: economic expansion lifts earnings and risk appetite. "
-            "Dalio tilts heavily toward equities and commodities -- cyclicals, EM equities, "
-            "and industrial metals outperform. Duration risk in nominal bonds rises. "
-            "Crypto can participate as a high-beta risk asset."
-        ),
-    },
-    "falling_growth": {
-        "strong_buy": ["long_bonds","gold"],
-        "buy":        ["tips","real_assets"],
-        "avoid":      ["equities","commodities","crypto"],
-        "narrative":  (
-            "Falling Growth: recessionary pressure compresses corporate earnings. "
-            "Safe havens dominate -- long-duration Treasuries rally as yields fall. "
-            "Gold preserves wealth as central banks ease. "
-            "Reduce cyclicals, commodities, and speculative crypto aggressively."
-        ),
-    },
-    "rising_inflation": {
-        "strong_buy": ["gold","commodities","tips"],
-        "buy":        ["real_assets","equities"],
-        "avoid":      ["long_bonds","crypto"],
-        "narrative":  (
-            "Rising Inflation: purchasing power erosion favours hard assets. "
-            "Gold is the primary hedge -- Dalio's cornerstone in this quadrant. "
-            "Energy, agriculture, and industrial commodities benefit directly. "
-            "TIPS provide real yield protection. Nominal bonds are the loser here."
-        ),
-    },
-    "falling_inflation": {
-        "strong_buy": ["equities","long_bonds"],
-        "buy":        ["real_assets","corporate_bonds"],
-        "avoid":      ["commodities","gold","tips"],
-        "narrative":  (
-            "Falling Inflation (disinflation): central banks ease, real rates decline. "
-            "Growth equities and nominal bonds rally in tandem. "
-            "Historically the most favourable quadrant for balanced All Weather portfolios."
-        ),
-    },
-}
-
-
-def dalio_analyse_trade(ticker: str, side: str, quadrant: str,
-                        cash: float, positions: dict, current_signals: list) -> dict:
-    ticker = ticker.upper().strip()
-    side   = side.upper().strip()
-    asset_class = ASSET_CLASS_MAP.get(ticker, "equities")
-    playbook    = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
-
-    # Fit score
-    if side == "BUY":
-        if   asset_class in playbook["strong_buy"]: raw_score = random.randint(82, 97); fit_label = "STRONG FIT"
-        elif asset_class in playbook["buy"]:         raw_score = random.randint(62, 81); fit_label = "MODERATE FIT"
-        elif asset_class in playbook["avoid"]:       raw_score = random.randint(10, 35); fit_label = "COUNTER-TREND"
-        else:                                        raw_score = random.randint(40, 61); fit_label = "NEUTRAL"
-    else:
-        if   asset_class in playbook["avoid"]:       raw_score = random.randint(75, 93); fit_label = "STRONG FIT"
-        elif asset_class not in playbook["strong_buy"]: raw_score = random.randint(55, 74); fit_label = "MODERATE FIT"
-        else:                                        raw_score = random.randint(20, 45); fit_label = "COUNTER-TREND"
-    fit_score = max(0, min(100, raw_score))
-
-    # Risk flags
-    risk_flags: list = []
-    total_pv = cash + sum(p.get("qty", 0) * p.get("entry_price", 0) for p in positions.values())
-    n_pos = len(positions)
-    existing_classes = [ASSET_CLASS_MAP.get(t, "equities") for t in positions]
-    class_count = existing_classes.count(asset_class)
-    if class_count >= 4: risk_flags.append(f"High concentration: {class_count} existing {asset_class} positions")
-    if n_pos >= 15: risk_flags.append("Portfolio at 15-position Holy Grail limit")
-    if asset_class in playbook["avoid"] and side == "BUY":
-        risk_flags.append(f"{asset_class.replace('_',' ').title()} is on the avoid list for {quadrant.replace('_',' ').title()}")
-    if total_pv > 0 and cash / total_pv < 0.05: risk_flags.append("Cash below 5% of portfolio -- liquidity risk")
-    if asset_class == "crypto" and side == "BUY": risk_flags.append("Crypto: high volatility and regulatory risk")
-    sig = next((s for s in current_signals if s.get("ticker") == ticker), None)
-    if sig and sig.get("action") in ("SELL","SHORT") and side == "BUY":
-        risk_flags.append(f"Signal engine recommends {sig['action']} on {ticker}")
-
-    # Reasoning
-    quadrant_label = quadrant.replace("_"," ").title()
-    asset_label    = asset_class.replace("_"," ").title()
-    reasoning = [
-        f"Quadrant is {quadrant_label} -- Dalio favours {', '.join((playbook['strong_buy']+playbook['buy'])[:3]).replace('_',' ')}.",
-        f"{ticker} classified as {asset_label} -- {'aligned' if asset_class in playbook['strong_buy']+playbook['buy'] else 'not aligned'} with {quadrant_label} playbook.",
-        f"Portfolio has {n_pos} positions across {len(set(existing_classes))} asset class(es) -- {'diversified' if len(set(existing_classes))>=4 else 'needs more diversification'}.",
-    ]
-    if sig:
-        reasoning.append(f"Signal engine: {sig.get('action','HOLD')} {ticker} with {sig.get('confidence',0):.0f}% confidence, RSI {sig.get('rsi',50)}.")
-    reasoning.append(f"Avoid list for {quadrant_label}: {', '.join(playbook['avoid']).replace('_',' ')}. {'This trade is on the avoid list.' if asset_class in playbook['avoid'] else 'This trade is not on the avoid list.'}")
-
-    # All Weather score
-    _AW = {"equities":0.30,"long_bonds":0.40,"gold":0.15,"commodities":0.075,"tips":0.075}
-    cc  = {c: existing_classes.count(c) for c in set(existing_classes)}
-    if side == "BUY": cc[asset_class] = cc.get(asset_class, 0) + 1
-    tot = sum(cc.values()) or 1
-    dev = sum(abs(cc.get(c,0)/tot - ideal) for c, ideal in _AW.items())
-    all_weather_score = max(0, min(100, int(100 - dev * 50)))
-
-    # Recommendation
-    if fit_label == "STRONG FIT":
-        rec = f"PROCEED -- {ticker} strongly aligned with {quadrant_label} regime. Size within risk budget."
-    elif fit_label == "MODERATE FIT":
-        rec = f"CONSIDER -- Moderate alignment. Reduce size 30-50% vs a strong-fit signal."
-    elif fit_label == "COUNTER-TREND":
-        rec = f"CAUTION -- {ticker} ({asset_label}) counters Dalio's {quadrant_label} playbook. Keep size <2% if high conviction."
-    else:
-        rec = f"NEUTRAL -- No strong quadrant signal. Assess diversification value before committing."
-
-    return {"fit_score": fit_score, "fit_label": fit_label, "quadrant_narrative": playbook["narrative"],
-            "asset_class": asset_class, "reasoning": reasoning, "recommendation": rec,
-            "risk_flags": risk_flags, "all_weather_score": all_weather_score,
-            "quadrant": quadrant, "quadrant_label": quadrant_label, "ticker": ticker, "side": side,
-            "timestamp": datetime.utcnow().isoformat()}
-
-
-@app.post("/api/ai/analyse")
-async def ai_analyse(payload: dict):
-    ticker   = payload.get("ticker", "").upper().strip()
-    side     = payload.get("side", "BUY").upper()
-    if not ticker: raise HTTPException(400, "ticker required")
-    qdata    = STATE.last_quadrant or _gen_quadrant_data()
-    quadrant = qdata.get("quadrant", "rising_growth")
-    signals  = await _gen_signals(12)
-    return dalio_analyse_trade(ticker, side, quadrant, PAPER.cash, PAPER.positions, signals)
-
-
-async def _run_cmd(message: str) -> dict:
-    """Core command dispatcher — shared by /api/ai/chat and /api/cmd."""
-    global PAPER_STARTING_CASH
-    msg_lower = message.strip().lower()
-
-    # ── help ──────────────────────────────────────────────────────────────
-    if msg_lower in ("help", "?", "commands"):
-        return {"type":"help","message":(
-            "Dalios CLI Commands\n"
-            "-------------------\n"
-            "  buy <qty> <ticker>              -- Paper buy  (e.g. buy 10 BTC)\n"
-            "  sell <qty> <ticker>             -- Paper sell (e.g. sell 5 ETH)\n"
-            "  close <ticker>                  -- Close open position\n"
-            "  portfolio                       -- Full portfolio summary\n"
-            "  positions                       -- Open positions detail\n"
-            "  history [n]                     -- Last N trades (default 10)\n"
-            "  quote <ticker>                  -- Live price lookup\n"
-            "  watchlist                       -- Show watchlist\n"
-            "  watchlist add <ticker>          -- Add to watchlist\n"
-            "  watchlist remove <ticker>       -- Remove from watchlist\n"
-            "  scanner asx                     -- ASX scanner data\n"
-            "  scanner crypto                  -- Crypto scanner data\n"
-            "  scanner commodities             -- Commodities scanner data\n"
-            "  suggest [n]                     -- Top N trade opportunities (all markets)\n"
-            "  signals                         -- Top 5 active signals\n"
-            "  analyse <ticker>                -- Dalio All Weather analysis\n"
-            "  risk                            -- Portfolio risk assessment\n"
-            "  quadrant                        -- Current economic regime\n"
-            "  reset [<cash>]                  -- Reset paper portfolio\n"
-            "  set cash <amount>               -- Update starting cash\n"
-            "  help                            -- This list")}
-
-    # ── portfolio / positions ──────────────────────────────────────────────
-    if msg_lower in ("portfolio","portfolio summary","show portfolio"):
-        tickers = list(PAPER.positions.keys())
-        prices  = await _prices_for_positions(tickers) if tickers else {}
-        total   = PAPER.total_value(prices)
-        pnl     = total - PAPER_STARTING_CASH
-        pnl_pct = (pnl / PAPER_STARTING_CASH) * 100 if PAPER_STARTING_CASH else 0
-        pos_lines = [
-            f"  {t}: {p['side']} {p['qty']} @ ${p['entry_price']:.4f}  |  "
-            f"now ${prices.get(t, p['entry_price']):.4f}  |  "
-            f"P&L {((prices.get(t,p['entry_price'])-p['entry_price'])/p['entry_price']*100):+.2f}%"
-            for t,p in PAPER.positions.items()
-        ]
-        return {"type":"portfolio","message":(
-            f"Paper Portfolio\n"
-            f"  Cash:        ${PAPER.cash:,.2f}\n"
-            f"  Total NAV:   ${total:,.2f}\n"
-            f"  P&L:         ${pnl:+,.2f} ({pnl_pct:+.2f}%)\n"
-            f"  Positions ({len(PAPER.positions)}):\n" +
-            ("\n".join(pos_lines) if pos_lines else "  None")),
-            "data":{"cash":round(PAPER.cash,2),"total_value":round(total,2),"pnl":round(pnl,2),
-                    "pnl_pct":round(pnl_pct,2),"positions":[
-                        {"ticker":t,"side":p["side"],"qty":p["qty"],
-                         "entry_price":p["entry_price"],"current_price":prices.get(t,p["entry_price"])}
-                        for t,p in PAPER.positions.items()]}}
-
-    if msg_lower == "positions":
-        tickers = list(PAPER.positions.keys())
-        if not tickers:
-            return {"type":"positions","message":"No open positions.","data":{"positions":[]}}
-        prices  = await _prices_for_positions(tickers)
-        rows = []
-        for t,p in PAPER.positions.items():
-            cur = prices.get(t, p["entry_price"])
-            pnl = (cur - p["entry_price"]) * p["qty"] * (1 if p["side"] in ("BUY","LONG") else -1)
-            rows.append({"ticker":t,"side":p["side"],"qty":p["qty"],
-                         "entry_price":p["entry_price"],"current_price":cur,"pnl":round(pnl,2)})
-        lines = [f"  {r['ticker']}: {r['side']} {r['qty']} entry ${r['entry_price']:.4f} cur ${r['current_price']:.4f} P&L ${r['pnl']:+,.2f}" for r in rows]
-        return {"type":"positions","message":"Open Positions:\n"+"\n".join(lines),"data":{"positions":rows}}
-
-    # ── history [n] ───────────────────────────────────────────────────────
-    hist_m = _re.match(r"^history(?:\s+(\d+))?$", msg_lower)
-    if hist_m:
-        n    = int(hist_m.group(1) or 10)
-        recent = PAPER.history[-n:][::-1]
-        if not recent:
-            return {"type":"history","message":"No trade history yet.","data":{"trades":[]}}
-        lines = [f"  #{t.get('id','?')} {t['side']} {t['qty']} {t['ticker']} @ ${t.get('entry_price', t.get('exit_price',0)):.4f}" for t in recent]
-        return {"type":"history","message":f"Last {len(recent)} trades:\n"+"\n".join(lines),"data":{"trades":recent}}
-
-    # ── quote <ticker> ────────────────────────────────────────────────────
-    quote_m = _re.match(r"^quote\s+(\S+)$", msg_lower)
-    if quote_m:
-        tkr   = quote_m.group(1).upper()
-        price = await _live_price(tkr)
-        if price is None:
-            return {"type":"error","message":f"Cannot fetch price for {tkr}. Check the ticker symbol."}
-        return {"type":"quote","message":f"{tkr}: ${float(price):,.4f}","data":{"ticker":tkr,"price":float(price)}}
-
-    # ── close <ticker> ────────────────────────────────────────────────────
-    close_m = _re.match(r"^close\s+(\S+)$", msg_lower)
-    if close_m:
-        tkr = close_m.group(1).upper()
-        if tkr not in PAPER.positions:
-            return {"type":"error","message":f"No open position for {tkr}."}
-        price = await _live_price(tkr)
-        if price is None:
-            return {"type":"error","message":f"Cannot fetch price for {tkr} to close position."}
-        async with _PAPER_LOCK:
-            qty = PAPER.positions[tkr]["qty"]
-            result = PAPER.place_order(tkr, "SELL", qty, float(price))
-            _save_paper_state()
-            # DB: persist trade
-            if PAPER.history:
-                _db_save_trade(PAPER.history[0])
-        await WS_MANAGER.broadcast({"type":"PAPER_CLOSE","data":result})
-        pnl = result.get("pnl", PAPER.history[0]["pnl"] if PAPER.history else 0)
-        return {"type":"close","message":(
-            f"Closed {tkr}  {qty} @ ${float(price):.4f}\n  Cash: ${PAPER.cash:,.2f}"),
-            "data":result}
-
-    # ── watchlist ─────────────────────────────────────────────────────────
-    if msg_lower == "watchlist":
-        if not WATCHLIST:
-            return {"type":"watchlist","message":"Watchlist is empty.","data":{"tickers":[]}}
-        return {"type":"watchlist","message":"Watchlist:\n  "+"\n  ".join(WATCHLIST),"data":{"tickers":list(WATCHLIST)}}
-
-    wl_add_m = _re.match(r"^watchlist add\s+(\S+)$", msg_lower)
-    if wl_add_m:
-        tkr = wl_add_m.group(1).upper()
-        async with _WATCHLIST_LOCK:
-            if tkr not in WATCHLIST:
-                WATCHLIST.append(tkr)
-                _save_watchlist(WATCHLIST)
-        return {"type":"watchlist","message":f"Added {tkr} to watchlist.","data":{"tickers":list(WATCHLIST)}}
-
-    wl_rem_m = _re.match(r"^watchlist remove\s+(\S+)$", msg_lower)
-    if wl_rem_m:
-        tkr = wl_rem_m.group(1).upper()
-        async with _WATCHLIST_LOCK:
-            if tkr in WATCHLIST:
-                WATCHLIST.remove(tkr)
-                _save_watchlist(WATCHLIST)
-                return {"type":"watchlist","message":f"Removed {tkr} from watchlist.","data":{"tickers":list(WATCHLIST)}}
-        return {"type":"watchlist","message":f"{tkr} not in watchlist.","data":{"tickers":list(WATCHLIST)}}
-
-    # ── scanner <market> ──────────────────────────────────────────────────
-    scanner_m = _re.match(r"^scanner\s+(asx|crypto|commodities)$", msg_lower)
-    if scanner_m:
-        import time as _time
-        market = scanner_m.group(1)
-        ticker_map = {"asx": ASX_TICKERS, "crypto": CRYPTO_TICKERS, "commodities": COMMODITY_TICKERS}
-        cached = _scanner_cache.get(market)
-        if cached and (_time.time() - cached["ts"]) < _CACHE_TTL:
-            all_rows = cached["rows"]
-        else:
-            tickers = ticker_map[market]
-            if market == "crypto":
-                all_rows = await _scan_coingecko(tickers)
-            else:
-                all_rows = await _scan_yfinance(tickers, market)
-            good = [r for r in all_rows if r["price"] > 0]
-            if good: all_rows = good
-            _scanner_cache[market] = {"ts": _time.time(), "rows": all_rows}
-        top    = all_rows[:10]
-        gainers = sorted(top, key=lambda r: r.get("change_pct",0), reverse=True)[:5]
-        losers  = sorted(top, key=lambda r: r.get("change_pct",0))[:3]
-        def _fmt_row(r):
-            chg = r.get("change_pct",0)
-            sign = "+" if chg >= 0 else ""
-            return f"  {r['ticker']:<12} ${r.get('price',0):>10,.4f}  {sign}{chg:.2f}%"
-        lines = (["Top Gainers:"] + [_fmt_row(r) for r in gainers] +
-                 ["\nTop Losers:"]  + [_fmt_row(r) for r in losers])
-        return {"type":"scanner","market":market,"message":f"{market.upper()} Scanner (top 10):\n"+"\n".join(lines),"data":{"rows":top}}
-
-    # ── set cash <amount> ─────────────────────────────────────────────────
-    set_cash_m = _re.match(r"^set cash\s+([\d,]+(?:\.\d+)?)$", msg_lower)
-    if set_cash_m:
-        amount = float(set_cash_m.group(1).replace(",",""))
-        if amount < 1:
-            return {"type":"error","message":"Starting cash must be at least $1."}
-        PAPER_STARTING_CASH = amount
-        _save_paper_config()
-        return {"type":"config","message":f"Starting cash set to ${amount:,.2f}. Reset portfolio to apply.",
-                "data":{"starting_cash":amount}}
-
-    # ── reset [<cash>] ────────────────────────────────────────────────────
-    reset_m = _re.match(r"^reset(?:\s+([\d,]+(?:\.\d+)?))?$", msg_lower)
-    if reset_m:
-        if reset_m.group(1):
-            PAPER_STARTING_CASH = float(reset_m.group(1).replace(",",""))
-            _save_paper_config()
-        async with _PAPER_LOCK:
-            PAPER.cash       = PAPER_STARTING_CASH
-            PAPER.positions  = {}
-            PAPER.history    = []
-            PAPER.equity_history = []
-            PAPER.order_id   = 0
-            _save_paper_state()
-        STATE.add_alert("PAPER", f"Portfolio reset to ${PAPER_STARTING_CASH:,.2f} via CLI", "INFO")
-        await WS_MANAGER.broadcast({"type":"PAPER_RESET","data":{"starting_cash":PAPER_STARTING_CASH}})
-        return {"type":"reset","message":f"Portfolio reset to ${PAPER_STARTING_CASH:,.2f} starting cash.",
-                "data":{"starting_cash":PAPER_STARTING_CASH}}
-
-    # ── quadrant ──────────────────────────────────────────────────────────
-    if msg_lower in ("quadrant","regime","macro","current quadrant"):
-        qdata    = STATE.last_quadrant or _gen_quadrant_data()
-        quadrant = qdata.get("quadrant","rising_growth")
-        pb       = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
-        return {"type":"quadrant","message":(
-            f"Quadrant: {qdata.get('label','').upper()}\n\n{pb['narrative']}\n\n"
-            f"  Favour: {', '.join((pb['strong_buy']+pb['buy'])[:4]).replace('_',' ')}\n"
-            f"  Avoid:  {', '.join(pb['avoid']).replace('_',' ')}"),
-            "data": qdata}
-
-    # ── suggest / opportunities ───────────────────────────────────────────
-    suggest_m = _re.match(r"^(suggest|opportunities?|opps?)(?:\s+(\d+))?$", msg_lower)
-    if suggest_m:
-        n    = int(suggest_m.group(2) or 8)
-        opps = await _gen_opportunities(n)
-        if not opps:
-            return {"type":"suggest","message":"No opportunities found. Try loading the scanner tabs first to populate the data cache.","data":{"opportunities":[]}}
-        lines = []
-        for i, o in enumerate(opps, 1):
-            sign = "+" if o["change_pct"] >= 0 else ""
-            lines.append(
-                f"{i:>2}. [{o['action']:<5}] {o['ticker']:<14} ${o['price']:>12,.4f}  "
-                f"{sign}{o['change_pct']:.2f}%  RSI:{o['rsi']:.0f}  "
-                f"Score:{o['score']:.0f}  Fit:{o['quadrant_fit'].upper()}\n"
-                f"      {o['reasoning'][0]}\n"
-                f"      SL ${o['stop_loss']:,.4f}  TP ${o['take_profit']:,.4f}  R:R {o['rr_ratio']:.1f}x"
-            )
-        header = (f"Top {len(opps)} Opportunities — Regime: {opps[0].get('regime_label','').upper()}\n"
-                  f"{'─'*72}\n")
-        return {"type":"suggest","message": header + "\n\n".join(lines),
-                "data":{"opportunities": opps, "quadrant": opps[0].get("quadrant","")}}
-
-    # ── signals ───────────────────────────────────────────────────────────
-    if msg_lower in ("signals","top signals","best signals"):
-        sigs = await _gen_signals(12)
-        top5 = sigs[:5]
-        lines = [f"  {s['ticker']}: {s['action']} | conf {s['confidence']:.0f}% | RSI {s['rsi']}" for s in top5]
-        return {"type":"signals","message":"Top 5 Signals:\n"+"\n".join(lines),"data":top5}
-
-    # ── risk ──────────────────────────────────────────────────────────────
-    if msg_lower in ("risk","risk assessment","portfolio risk","how am i doing"):
-        tickers = list(PAPER.positions.keys())
-        prices  = await _prices_for_positions(tickers) if tickers else {}
-        total   = PAPER.total_value(prices)
-        exc     = [ASSET_CLASS_MAP.get(t,"equities") for t in PAPER.positions]
-        n_pos   = len(PAPER.positions)
-        cash_pct = (PAPER.cash / total * 100) if total > 0 else 100.0
-        _AW = {"equities":0.30,"long_bonds":0.40,"gold":0.15,"commodities":0.075,"tips":0.075}
-        cc = {c: exc.count(c) for c in set(exc)}; tot = n_pos or 1
-        dev = sum(abs(cc.get(c,0)/tot - v) for c,v in _AW.items())
-        aw  = max(0, min(100, int(100 - dev*50)))
-        return {"type":"risk","message":(
-            f"Dalio Risk Assessment\n"
-            f"  Positions:         {n_pos}/15 (Holy Grail target)\n"
-            f"  Asset classes:     {len(set(exc))} ({', '.join(set(exc)).replace('_',' ')})\n"
-            f"  Cash reserve:      {cash_pct:.1f}%\n"
-            f"  All Weather Score: {aw}/100\n"
-            f"  Holy Grail met:    {'YES' if n_pos>=12 else 'NO -- add uncorrelated assets'}\n\n"
-            f"Rule: 15 uncorrelated streams reduce risk without reducing return."),
-            "data":{"n_positions":n_pos,"all_weather_score":aw,"cash_pct":round(cash_pct,1)}}
-
-    # ── analyse <ticker> ──────────────────────────────────────────────────
-    analyse_m = _re.match(r"^(analyse|analyze|analysis)\s+(\S+)$", msg_lower)
-    if analyse_m:
-        tkr   = analyse_m.group(2).upper()
-        qdata = STATE.last_quadrant or _gen_quadrant_data()
-        res   = dalio_analyse_trade(tkr,"BUY",qdata.get("quadrant","rising_growth"),PAPER.cash,PAPER.positions,await _gen_signals(12))
-        return {"type":"analyse","message":(
-            f"Dalio Analysis: {tkr}\n  Fit: {res['fit_score']}/100 -- {res['fit_label']}\n"
-            f"  Asset Class: {res['asset_class'].replace('_',' ').title()}\n"
-            f"  All Weather: {res['all_weather_score']}/100\n"
-            f"  {res['recommendation']}\n"
-            f"  Risks: {', '.join(res['risk_flags']) if res['risk_flags'] else 'None'}\n"
-            f"\n" + "\n".join(f"  * {r}" for r in res["reasoning"])),"data":res}
-
-    # ── buy / sell ────────────────────────────────────────────────────────
-    order_m = _re.match(r"^(buy|sell)\s+([\d.]+)\s+(\S+)", msg_lower)
-    if order_m:
-        side  = order_m.group(1).upper()
-        qty   = float(order_m.group(2))
-        tkr   = order_m.group(3).upper()
-        try:
-            price = await _live_price(tkr)
-            if price is None: raise ValueError(f"Cannot determine price for {tkr}")
-            # Auto-compute SL/TP for BUY orders (ATR-based defaults)
-            _sl_val = None
-            _tp_val = None
-            if side == "BUY":
-                _sl_offset = float(price) * 0.025  # 2.5% default stop
-                _tp_offset = float(price) * 0.05   # 5% default target
-                _sl_val = round(float(price) - _sl_offset, 4)
-                _tp_val = round(float(price) + _tp_offset, 4)
-            async with _PAPER_LOCK:
-                # ── Position sizing enforcement ──
-                _tks_pre = list(set(list(PAPER.positions.keys()) + [tkr]))
-                _prc_pre = await _prices_for_positions(_tks_pre) if _tks_pre else {}
-                _prc_pre[tkr] = float(price)
-                sizing = _calculate_position_size(tkr, float(price), side, PAPER, _prc_pre)
-                max_allowed = sizing["max_allowed_qty"]
-                original_qty = qty
-                cap_msg = ""
-                if side == "BUY" and qty > max_allowed:
-                    if max_allowed <= 0:
-                        raise ValueError(
-                            f"Position sizing blocked: max allowed qty is 0 "
-                            f"(max {_RISK_MAX_POS_SIZE_PCT}% per position)")
-                    qty = max_allowed
-                    cap_msg = f"\n  [RISK] Qty capped from {original_qty} to {qty:.8g} (max {_RISK_MAX_POS_SIZE_PCT}% per position)"
-
-                result = PAPER.place_order(tkr, side, qty, float(price),
-                                           stop_loss=_sl_val, take_profit=_tp_val)
-                _tks = list(PAPER.positions.keys())
-                _prc = await _prices_for_positions(_tks) if _tks else {}
-                _eq_val_cli = PAPER.total_value(_prc)
-                PAPER.equity_history.append({"t":datetime.utcnow().isoformat(),"v":_eq_val_cli})
-                PAPER.equity_history = PAPER.equity_history[-2000:]
-                _save_paper_state()
-                # DB: persist trade (SELL) + equity snapshot
-                if side == "SELL" and PAPER.history:
-                    _db_save_trade(PAPER.history[0])
-                _db_save_equity_snapshot(_eq_val_cli)
-            await WS_MANAGER.broadcast({"type":"PAPER_ORDER","data":result})
-            return {"type":"order","message":(
-                f"Order placed: {side} {qty} {tkr} @ ${price:.4f}\n"
-                f"  ID: #{result['order_id']} | Cost: ${qty*price:,.2f} | Cash left: ${PAPER.cash:,.2f}"
-                f"{cap_msg}"),
-                "data":result}
-        except ValueError as exc:
-            return {"type":"error","message":f"Order failed: {exc}"}
-
-    # ── free-form fallback ─────────────────────────────────────────────────
-    qdata = STATE.last_quadrant or _gen_quadrant_data()
-    pb    = QUADRANT_PLAYBOOK.get(qdata.get("quadrant","rising_growth"), QUADRANT_PLAYBOOK["rising_growth"])
-    tks   = list(PAPER.positions.keys())
-    prc   = await _prices_for_positions(tks) if tks else {}
-    total = PAPER.total_value(prc)
-    return {"type":"freeform","message":(
-        f"Dalios AI (type 'help' for commands)\n\n"
-        f"You said: \"{message.strip()}\"\n\n"
-        f"Current regime: {qdata.get('label','').upper()}\n"
-        f"Portfolio: ${total:,.2f} | Cash: ${PAPER.cash:,.2f} | Positions: {len(PAPER.positions)}\n\n"
-        f"Dalio says: {pb['narrative'][:160]}...")}
-
-
-@app.post("/api/ai/chat")
-async def ai_chat(payload: dict):
-    message = (payload.get("message") or "").strip()
-    if not message: raise HTTPException(400, "message required")
-    return await _run_cmd(message)
-
-
-@app.post("/api/cmd")
-async def api_cmd(payload: dict):
-    """AI-agent CLI endpoint — same as /api/ai/chat but always returns structured JSON.
-
-    POST /api/cmd
-    Body: {"cmd": "buy 10 BTC"}  or  {"message": "portfolio"}
-
-    Response always has:
-      type    -- command type (order, portfolio, positions, history, quote,
-                 close, watchlist, scanner, signals, analyse, risk, quadrant,
-                 config, reset, help, error, freeform)
-      message -- human-readable string
-      data    -- structured result (when available)
-    """
-    cmd = (payload.get("cmd") or payload.get("message") or "").strip()
-    if not cmd: raise HTTPException(400, "cmd or message required")
-    return await _run_cmd(cmd)
-
-
-@app.get("/api/paper/portfolio")
-async def get_paper_portfolio():
-    """Return full paper portfolio state with live P&L."""
-    tickers = list(PAPER.positions.keys())
-    prices  = await _prices_for_positions(tickers) if tickers else {}
-
-    positions_out = []
-    for t, pos in PAPER.positions.items():
-        cur = prices.get(t, pos["entry_price"])
-        if pos["side"] == "LONG":
-            pnl     = (cur - pos["entry_price"]) * pos["qty"]
-            pnl_pct = (cur / pos["entry_price"] - 1) * 100 if pos["entry_price"] else 0
-        else:
-            pnl     = (pos["entry_price"] - cur) * pos["qty"]
-            pnl_pct = (pos["entry_price"] / cur - 1) * 100 if cur else 0
-        market_val = cur * pos["qty"]
-        positions_out.append({
-            "ticker":      t,
-            "side":        pos["side"],
-            "qty":         pos["qty"],
-            "entry_price": pos["entry_price"],
-            "current_price": round(cur, 4),
-            "market_value":  round(market_val, 2),
-            "cost_basis":    pos.get("cost_basis", round(pos["entry_price"] * pos["qty"], 2)),
-            "pnl":           round(pnl, 2),
-            "pnl_pct":       round(pnl_pct, 2),
-            "entry_time":    pos["entry_time"],
-            "name":          _ASSET_META.get(t, {}).get("name", t),
-        })
-
-    total_val  = PAPER.cash + sum(p["market_value"] for p in positions_out)
-    total_pnl  = total_val - PAPER_STARTING_CASH
-    total_pnl_pct = (total_pnl / PAPER_STARTING_CASH) * 100
-    invested   = sum(p["market_value"] for p in positions_out)
-
-    # Compute drawdown from equity history
-    eq_vals = [e["v"] for e in PAPER.equity_history] if PAPER.equity_history else []
-    if len(eq_vals) >= 2:
-        peak = max(eq_vals)
-        drawdown_val = round((peak - eq_vals[-1]) / peak, 4) if peak > 0 else 0.0
-    else:
-        drawdown_val = 0.0
-
-    # Compute annualised Sharpe from equity history daily returns
-    sharpe_val = None  # Optional[float]
-    if len(eq_vals) >= 10:
-        try:
-            import numpy as np
-            eq_arr = np.array(eq_vals, dtype=float)
-            rets   = np.diff(eq_arr) / eq_arr[:-1]
-            if rets.std() > 0:
-                sharpe_val = round(float((rets.mean() / rets.std()) * (252 ** 0.5)), 2)
-        except Exception:
-            pass
-
-    return {
-        "cash":           round(PAPER.cash, 2),
-        "invested":       round(invested, 2),
-        "total_value":    round(total_val, 2),
-        "total_pnl":      round(total_pnl, 2),
-        "total_pnl_pct":  round(total_pnl_pct, 2),
-        "starting_cash":  PAPER_STARTING_CASH,
-        "positions":      positions_out,
-        "open_count":     len(positions_out),
-        "drawdown":       drawdown_val,
-        "sharpe":         sharpe_val,
-        "cycles":         PAPER.order_id,
-    }
-
-
-@app.get("/api/paper/live-pnl")
-async def get_paper_live_pnl():
-    """Lightweight live P&L endpoint — only fetches current prices and computes
-    unrealised P&L per position. No heavy Sharpe/drawdown calculations."""
-    tickers = list(PAPER.positions.keys())
-    prices  = await _prices_for_positions(tickers) if tickers else {}
-
-    positions_out = []
-    for t, pos in PAPER.positions.items():
-        cur = prices.get(t, pos["entry_price"])
-        if pos["side"] == "LONG":
-            pnl     = (cur - pos["entry_price"]) * pos["qty"]
-            pnl_pct = (cur / pos["entry_price"] - 1) * 100 if pos["entry_price"] else 0
-        else:
-            pnl     = (pos["entry_price"] - cur) * pos["qty"]
-            pnl_pct = (pos["entry_price"] / cur - 1) * 100 if cur else 0
-        market_val = cur * pos["qty"]
-        positions_out.append({
-            "ticker":        t,
-            "side":          pos["side"],
-            "qty":           pos["qty"],
-            "entry_price":   pos["entry_price"],
-            "current_price": round(cur, 4),
-            "market_value":  round(market_val, 2),
-            "cost_basis":    pos.get("cost_basis", round(pos["entry_price"] * pos["qty"], 2)),
-            "pnl":           round(pnl, 2),
-            "pnl_pct":       round(pnl_pct, 2),
-            "name":          _ASSET_META.get(t, {}).get("name", t),
-        })
-
-    total_unrealised = round(sum(p["pnl"] for p in positions_out), 2)
-    return {
-        "positions":          positions_out,
-        "total_unrealised_pnl": total_unrealised,
-        "open_count":         len(positions_out),
-        "timestamp":          datetime.utcnow().isoformat(),
-    }
-
-
-@app.post("/api/paper/order")
-async def place_paper_order(payload: dict):
-    """Place a paper trade. payload: {ticker, side, qty, price (optional)}."""
-    # ── Circuit breaker gate ──
-    if CIRCUIT_BREAKER is not None and CIRCUIT_BREAKER._trading_halted:
-        raise HTTPException(403, f"Trading halted by circuit breaker: {CIRCUIT_BREAKER._halt_reason}")
-
-    ticker = _normalize_ticker(payload.get("ticker", "").strip())
-    side   = payload.get("side", "BUY").upper()
-    try:
-        qty = float(payload.get("qty", 1))
-    except (TypeError, ValueError):
-        raise HTTPException(400, "Invalid qty")
-    if not ticker:
-        raise HTTPException(400, "ticker required")
-    if side not in ("BUY", "SELL"):
-        raise HTTPException(400, "side must be BUY or SELL")
-    if qty <= 0:
-        raise HTTPException(400, "qty must be positive")
-
-    # Get current price
-    price = payload.get("price")
-    if price is None:
-        price = await _live_price(ticker)
-    if price is None:
-        raise HTTPException(400, f"Cannot determine price for {ticker}")
-    price = float(price)
-
-    # Extract optional SL/TP from payload
-    sl = payload.get("stop_loss")
-    tp = payload.get("take_profit")
-    if sl is not None:
-        sl = float(sl)
-    if tp is not None:
-        tp = float(tp)
-
-    async with _PAPER_LOCK:
-        # ── Position sizing enforcement ──
-        _tickers_pre = list(set(list(PAPER.positions.keys()) + [ticker]))
-        _prices_pre  = await _prices_for_positions(_tickers_pre) if _tickers_pre else {}
-        _prices_pre[ticker] = price  # ensure current ticker price is available
-
-        try:
-            sizing = _calculate_position_size(ticker, price, side, PAPER, _prices_pre)
-        except ValueError as e:
-            raise HTTPException(400, f"Position sizing blocked: {e}")
-
-        max_allowed_qty = sizing["max_allowed_qty"]
-        position_pct    = sizing["position_pct"]
-
-        # Cap qty to max allowed for BUY orders
-        original_qty = qty
-        if side == "BUY" and qty > max_allowed_qty:
-            qty = max_allowed_qty
-            if qty <= 0:
-                raise HTTPException(400,
-                    f"Position sizing: requested {original_qty} but max allowed is 0 "
-                    f"(max {_RISK_MAX_POS_SIZE_PCT}% of portfolio per position)")
-
-        try:
-            result = PAPER.place_order(ticker, side, qty, price,
-                                       stop_loss=sl, take_profit=tp)
-        except ValueError as e:
-            raise HTTPException(400, str(e))
-
-        # Add position sizing info to result
-        result["max_allowed_qty"] = max_allowed_qty
-        result["position_pct"]    = position_pct
-        if side == "BUY" and original_qty > max_allowed_qty:
-            result["qty_capped"]     = True
-            result["requested_qty"]  = original_qty
-            result["cap_reason"]     = (
-                f"Capped from {original_qty} to {qty:.8g} "
-                f"(max {_RISK_MAX_POS_SIZE_PCT}% of portfolio per position)"
-            )
-
-        # Equity snapshot + persist
-        _tickers = list(PAPER.positions.keys())
-        _prices  = await _prices_for_positions(_tickers) if _tickers else {}
-        current_equity = PAPER.total_value(_prices)
-        PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
-        PAPER.equity_history = PAPER.equity_history[-2000:]
-        _save_paper_state()
-        # DB: persist trade (SELL) + equity snapshot
-        if side == "SELL" and PAPER.history:
-            _db_save_trade(PAPER.history[0])
-        _db_save_equity_snapshot(current_equity)
-
-    # ── Update circuit breaker with new equity ──
-    if CIRCUIT_BREAKER is not None:
-        CIRCUIT_BREAKER.state.current_equity = current_equity
-        if current_equity > CIRCUIT_BREAKER.state.peak_equity:
-            CIRCUIT_BREAKER.state.peak_equity = current_equity
-
-    # ── Send notification if configured ──
-    if NOTIFIER is not None:
-        try:
-            NOTIFIER.send({"type": "TRADE", "ticker": ticker, "side": side,
-                           "qty": qty, "price": price, "mode": "paper"})
-        except Exception:
-            pass  # don't block trades on notification failure
-
-    await WS_MANAGER.broadcast({"type": "PAPER_ORDER", "data": result})
-    return result
-
-
-@app.get("/api/paper/history")
-async def get_paper_history():
-    # Try DB first, fall back to in-memory JSON
-    db_trades = _db_get_trades(limit=100)
-    if db_trades:
-        return {"trades": db_trades, "total": len(db_trades), "source": "db"}
-    return {"trades": PAPER.history[:100], "total": len(PAPER.history), "source": "json"}
-
-
-@app.get("/api/paper/analytics")
-async def get_paper_analytics():
-    """Compute trade performance metrics from actual closed-trade history."""
-    trades = PAPER.history
-    total_trades = len(trades)
-
-    if total_trades == 0:
-        return {
-            "total_trades": 0, "winning_trades": 0, "losing_trades": 0,
-            "win_rate": 0.0, "avg_win": 0.0, "avg_loss": 0.0,
-            "profit_factor": 0.0, "avg_holding_period_hours": 0.0,
-            "largest_win": 0.0, "largest_loss": 0.0,
-            "total_pnl": 0.0, "total_fees": 0.0, "expectancy": 0.0,
-            "max_consecutive_wins": 0, "max_consecutive_losses": 0,
-        }
-
-    wins  = [t for t in trades if t["pnl"] > 0]
-    losses = [t for t in trades if t["pnl"] < 0]
-
-    winning_trades = len(wins)
-    losing_trades  = len(losses)
-    win_rate       = round(winning_trades / total_trades * 100, 2)
-
-    avg_win  = round(sum(t["pnl"] for t in wins) / winning_trades, 2) if winning_trades else 0.0
-    avg_loss = round(sum(t["pnl"] for t in losses) / losing_trades, 2) if losing_trades else 0.0
-
-    sum_wins   = sum(t["pnl"] for t in wins)
-    sum_losses = abs(sum(t["pnl"] for t in losses))
-    if sum_losses > 0:
-        profit_factor = round(sum_wins / sum_losses, 2)
-    else:
-        profit_factor = 999.0 if sum_wins > 0 else 0.0
-
-    # Average holding period
-    holding_hours = []
-    for t in trades:
-        entry_t = t.get("entry_time")
-        exit_t  = t.get("timestamp")
-        if entry_t and exit_t:
-            try:
-                dt_entry = datetime.fromisoformat(entry_t)
-                dt_exit  = datetime.fromisoformat(exit_t)
-                holding_hours.append((dt_exit - dt_entry).total_seconds() / 3600)
-            except (ValueError, TypeError):
-                pass
-    avg_holding_period_hours = round(sum(holding_hours) / len(holding_hours), 2) if holding_hours else 0.0
-
-    largest_win  = round(max((t["pnl"] for t in trades), default=0.0), 2)
-    largest_loss = round(min((t["pnl"] for t in trades), default=0.0), 2)
-
-    total_pnl  = round(sum(t["pnl"] for t in trades), 2)
-    total_fees = round(sum(t.get("fees", 0) for t in trades), 2)
-
-    # Expectancy: (win_rate_frac * avg_win) - ((1 - win_rate_frac) * abs(avg_loss))
-    wr_frac    = winning_trades / total_trades
-    expectancy = round((wr_frac * avg_win) - ((1 - wr_frac) * abs(avg_loss)), 2)
-
-    # Consecutive streaks (history is newest-first, reverse for chronological order)
-    sorted_trades = list(reversed(trades))
-    max_con_wins = max_con_losses = cur_wins = cur_losses = 0
-    for t in sorted_trades:
-        if t["pnl"] > 0:
-            cur_wins += 1
-            cur_losses = 0
-        elif t["pnl"] < 0:
-            cur_losses += 1
-            cur_wins = 0
-        else:
-            cur_wins = cur_losses = 0
-        max_con_wins   = max(max_con_wins, cur_wins)
-        max_con_losses = max(max_con_losses, cur_losses)
-
-    return {
-        "total_trades": total_trades,
-        "winning_trades": winning_trades,
-        "losing_trades": losing_trades,
-        "win_rate": win_rate,
-        "avg_win": avg_win,
-        "avg_loss": avg_loss,
-        "profit_factor": profit_factor,
-        "avg_holding_period_hours": avg_holding_period_hours,
-        "largest_win": largest_win,
-        "largest_loss": largest_loss,
-        "total_pnl": total_pnl,
-        "total_fees": total_fees,
-        "expectancy": expectancy,
-        "max_consecutive_wins": max_con_wins,
-        "max_consecutive_losses": max_con_losses,
-    }
-
-
-@app.post("/api/paper/close")
-async def close_paper_position(payload: dict):
-    """Close entire position in a ticker at market price."""
-    ticker = _normalize_ticker(payload.get("ticker", "").strip())
-    async with _PAPER_LOCK:
-        if ticker not in PAPER.positions:
-            raise HTTPException(404, f"No open position in {ticker}")
-        qty   = PAPER.positions[ticker]["qty"]
-        price = await _live_price(ticker)
-        if price is None:
-            raise HTTPException(400, f"Cannot determine price for {ticker}")
-        result = PAPER.place_order(ticker, "SELL", qty, float(price))
-
-        _tickers = list(PAPER.positions.keys())
-        _prices  = await _prices_for_positions(_tickers) if _tickers else {}
-        _eq_val = PAPER.total_value(_prices)
-        PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": _eq_val})
-        PAPER.equity_history = PAPER.equity_history[-2000:]
-        _save_paper_state()
-        # DB: persist trade + equity snapshot
-        if PAPER.history:
-            _db_save_trade(PAPER.history[0])
-        _db_save_equity_snapshot(_eq_val)
-
-    await WS_MANAGER.broadcast({"type": "PAPER_CLOSE", "data": result})
-    return result
-
-
-@app.post("/api/paper/reset")
-async def reset_paper_portfolio():
-    global PAPER_STARTING_CASH
-    async with _PAPER_LOCK:
-        PAPER.cash = PAPER_STARTING_CASH
-        PAPER.positions = {}
-        PAPER.history = []
-        PAPER.equity_history = []
-        PAPER.order_id = 0
-        _save_paper_state()
-    return {"status": "reset", "cash": PAPER_STARTING_CASH}
-
-
-@app.get("/api/paper/config")
-async def get_paper_config():
-    return {"starting_cash": PAPER_STARTING_CASH}
-
-
-@app.post("/api/paper/config")
-async def set_paper_config(payload: dict):
-    global PAPER_STARTING_CASH
-    cash = float(payload.get("starting_cash", PAPER_STARTING_CASH))
-    if cash < 1:
-        raise HTTPException(400, "starting_cash must be >= 1")
-    PAPER_STARTING_CASH = cash
-    _save_paper_config()
-    # If no open positions, apply new cash immediately and persist
-    applied = False
-    async with _PAPER_LOCK:
-        if not PAPER.positions:
-            PAPER.cash           = cash
-            PAPER.history        = []
-            PAPER.equity_history = []
-            PAPER.order_id       = 0
-            _save_paper_state()
-            applied = True
-    return {"status": "ok", "starting_cash": PAPER_STARTING_CASH, "applied": applied}
-
-
-# ─────────────────────────────────────────────
-# Watchlist endpoints
-# ─────────────────────────────────────────────
-
-@app.get("/api/watchlist")
-async def get_watchlist():
-    return {"watchlist": WATCHLIST}
-
-
-@app.post("/api/watchlist/add")
-async def watchlist_add(payload: dict):
-    ticker = payload.get("ticker", "").upper().strip()
-    if not ticker:
-        raise HTTPException(400, "ticker required")
-    async with _WATCHLIST_LOCK:
-        if ticker not in WATCHLIST:
-            WATCHLIST.append(ticker)
-            _save_watchlist(WATCHLIST)
-    return {"watchlist": WATCHLIST}
-
-
-@app.post("/api/watchlist/remove")
-async def watchlist_remove(payload: dict):
-    ticker = payload.get("ticker", "").upper().strip()
-    async with _WATCHLIST_LOCK:
-        if ticker in WATCHLIST:
-            WATCHLIST.remove(ticker)
-            _save_watchlist(WATCHLIST)
-    return {"watchlist": WATCHLIST}
-
-
-# ─────────────────────────────────────────────
-# Market Scanner endpoints  (fast bulk fetch)
-# ─────────────────────────────────────────────
-
-# Simple in-memory cache so the UI doesn't hammer APIs
-_scanner_cache: dict = {}   # market -> {"ts": float, "rows": list}
-_CACHE_TTL = 90             # seconds
-
-
-def _fmt_vol(v) -> str:
-    if not v: return "--"
-    v = float(v)
-    if v >= 1e9: return f"{v/1e9:.2f}B"
-    if v >= 1e6: return f"{v/1e6:.1f}M"
-    if v >= 1e3: return f"{v/1e3:.0f}K"
-    return str(int(v))
-
-
-async def _scan_yfinance(tickers: list, market: str) -> list:
-    """
-    Fetch OHLCV for non-crypto markets.
-    Strategy: bulk yf.download first (fast), then individual Ticker.history() fallback
-    for any ticker that bulk missed — handles new yfinance multi-index DataFrame format.
-    """
-    if not YF_AVAILABLE:
-        return []
-    import yfinance as yf
-    loop = asyncio.get_running_loop()
-    results: dict = {}   # ticker -> (price, change_pct, volume)
-
-    # ── 1. Bulk download attempt ──────────────────────────────────────────
-    def _bulk():
-        try:
-            raw = yf.download(
-                tickers, period="5d", interval="1d",
-                group_by="ticker", auto_adjust=True,
-                progress=False, threads=True,
-            )
-            return raw
-        except Exception as exc:
-            logger.warning(f"yfinance bulk failed [{market}]: {exc}")
-            return None
-
-    raw = await loop.run_in_executor(None, _bulk)
-
-    if raw is not None and not raw.empty:
-        multi = len(tickers) > 1
-        for ticker in tickers:
-            try:
-                if multi:
-                    # yfinance ≥0.2 uses MultiIndex columns: (field, ticker)
-                    if hasattr(raw.columns, "levels"):
-                        if ticker in raw.columns.get_level_values(1):
-                            df = raw.xs(ticker, axis=1, level=1).dropna(subset=["Close"])
-                        elif ticker in raw.columns.get_level_values(0):
-                            df = raw[ticker].dropna(subset=["Close"])
-                        else:
-                            continue
-                    else:
-                        df = raw[ticker].dropna(subset=["Close"])
-                else:
-                    df = raw.dropna(subset=["Close"])
-
-                if len(df) < 2:
-                    continue
-                price   = float(df["Close"].iloc[-1])
-                prev    = float(df["Close"].iloc[-2])
-                chg_pct = (price - prev) / prev * 100 if prev else 0
-                vol     = float(df["Volume"].iloc[-1]) if "Volume" in df.columns else 0
-                results[ticker] = (price, chg_pct, vol)
-            except Exception as exc:
-                logger.debug(f"Bulk parse [{ticker}]: {exc}")
-
-    # ── 2. Individual fallback for tickers bulk missed ────────────────────
-    missing = [t for t in tickers if t not in results]
-    if missing:
-        logger.info(f"[{market}] individual fallback for {len(missing)} tickers")
-
-        def _fetch_one(tkr):
-            try:
-                hist = yf.Ticker(tkr).history(period="5d", interval="1d", auto_adjust=True)
-                hist = hist.dropna(subset=["Close"])
-                if len(hist) < 2:
-                    return None
-                price   = float(hist["Close"].iloc[-1])
-                prev    = float(hist["Close"].iloc[-2])
-                chg_pct = (price - prev) / prev * 100 if prev else 0
-                vol     = float(hist["Volume"].iloc[-1]) if "Volume" in hist.columns else 0
-                return (price, chg_pct, vol)
-            except Exception:
-                return None
-
-        futures = [loop.run_in_executor(None, _fetch_one, t) for t in missing]
-        ind_results = await asyncio.gather(*futures)
-        for ticker, val in zip(missing, ind_results):
-            if val is not None:
-                results[ticker] = val
-
-    # ── 3. Build rows ─────────────────────────────────────────────────────
-    rows = []
-    for ticker in tickers:
-        meta = _ASSET_META.get(ticker, {"name": ticker, "sector": "--"})
-        if ticker not in results:
-            continue   # skip tickers with no data at all
-        price, chg_pct, vol = results[ticker]
-        rows.append({
-            "ticker":       ticker,
-            "name":         meta.get("name", ticker),
-            "sector":       meta.get("sector", "--"),
-            "price":        round(price, 4),
-            "change":       round(price * chg_pct / 100, 4),
-            "change_pct":   round(chg_pct, 2),
-            "volume_fmt":   _fmt_vol(vol),
-            "volume":       int(vol),
-            "in_watchlist": ticker in WATCHLIST,
-        })
-
-    logger.info(f"yfinance [{market}]: {len(rows)}/{len(tickers)} tickers")
-    return rows
-
-
-# CoinGecko ID map for the tickers we care about
-_CG_SYMBOL_MAP: dict = {
-    "BTC-USD":"bitcoin","ETH-USD":"ethereum","BNB-USD":"binancecoin",
-    "SOL-USD":"solana","XRP-USD":"ripple","ADA-USD":"cardano",
-    "AVAX-USD":"avalanche-2","DOT-USD":"polkadot","TRX-USD":"tron",
-    "LTC-USD":"litecoin","ATOM-USD":"cosmos","NEAR-USD":"near",
-    "ALGO-USD":"algorand","XLM-USD":"stellar","VET-USD":"vechain",
-    "ICP-USD":"internet-computer","HBAR-USD":"hedera-hashgraph",
-    "FIL-USD":"filecoin","EOS-USD":"eos","XTZ-USD":"tezos",
-    "NEO-USD":"neo","IOTA-USD":"iota","XMR-USD":"monero",
-    "ZEC-USD":"zcash","DASH-USD":"dash","WAVES-USD":"waves",
-    "MATIC-USD":"matic-network","ARB-USD":"arbitrum","OP-USD":"optimism",
-    "IMX-USD":"immutable-x","LRC-USD":"loopring","APT-USD":"aptos",
-    "SUI-USD":"sui","INJ-USD":"injective-protocol","SEI-USD":"sei-network",
-    "TIA-USD":"celestia","PYTH-USD":"pyth-network","JUP-USD":"jupiter-exchange-solana",
-    "UNI-USD":"uniswap","AAVE-USD":"aave","MKR-USD":"maker",
-    "COMP-USD":"compound-governance-token","YFI-USD":"yearn-finance",
-    "SUSHI-USD":"sushi","1INCH-USD":"1inch","CRV-USD":"curve-dao-token",
-    "BAL-USD":"balancer","DYDX-USD":"dydx","GMX-USD":"gmx",
-    "SNX-USD":"synthetix-network-token","PENDLE-USD":"pendle",
-    "CAKE-USD":"pancakeswap-token","CVX-USD":"convex-finance",
-    "FXS-USD":"frax-share","LDO-USD":"lido-dao","RPL-USD":"rocket-pool",
-    "ANKR-USD":"ankr","SAND-USD":"the-sandbox","MANA-USD":"decentraland",
-    "ENJ-USD":"enjincoin","AXS-USD":"axie-infinity","GALA-USD":"gala",
-    "FLOW-USD":"flow","BEAM-USD":"beam-2","RONIN-USD":"ronin",
-    "DOGE-USD":"dogecoin","SHIB-USD":"shiba-inu","PEPE-USD":"pepe",
-    "FLOKI-USD":"floki","BONK-USD":"bonk","WIF-USD":"dogwifcoin",
-    "LINK-USD":"chainlink","BAND-USD":"band-protocol","TRB-USD":"tellor",
-    "AR-USD":"arweave","STORJ-USD":"storj","SCRT-USD":"secret",
-    "ROSE-USD":"oasis-network","RUNE-USD":"thorchain","AXL-USD":"axelar",
-    "FET-USD":"fetch-ai","AGIX-USD":"singularitynet","OCEAN-USD":"ocean-protocol",
-    "NMR-USD":"numeraire","TAO-USD":"bittensor","RNDR-USD":"render-token",
-    "WLD-USD":"worldcoin-wld","CRO-USD":"crypto-com-chain",
-    "KCS-USD":"kucoin-shares","BAT-USD":"basic-attention-token",
-    "ZRX-USD":"0x","GRT-USD":"the-graph","LPT-USD":"livepeer",
-    "ONDO-USD":"ondo-finance","THETA-USD":"theta-token","CHZ-USD":"chiliz",
-    "MINA-USD":"mina-protocol","KAVA-USD":"kava","CFX-USD":"conflux-token",
-    "FTM-USD":"fantom","OMG-USD":"omisego","METIS-USD":"metis-token",
-    "SKL-USD":"skale","ICX-USD":"icon","ONT-USD":"ontology",
-    "QTUM-USD":"qtum","ZIL-USD":"zilliqa","VET-USD":"vechain",
-    "HOT-USD":"holotoken","WIN-USD":"wink","REEF-USD":"reef",
-    "JASMY-USD":"jasmycoin","API3-USD":"api3","CELR-USD":"celer-network",
-}
-
-
-async def _scan_coingecko(tickers: list) -> list:
-    """
-    Fetch crypto prices: CoinGecko free API first, yfinance fallback for missed tickers.
-    Uses aiohttp for proper async HTTP (no blocking urllib on the event loop).
-    """
-    import aiohttp
-
-    cg_ids: list = []
-    id_to_ticker: dict = {}
-    for t in tickers:
-        cg_id = _CG_SYMBOL_MAP.get(t)
-        if cg_id:
-            cg_ids.append(cg_id)
-            id_to_ticker[cg_id] = t
-
-    all_coin_data: dict = {}
-
-    # ── CoinGecko API (async aiohttp) ─────────────────────────────────────
-    if cg_ids:
-        try:
-            connector = aiohttp.TCPConnector(ssl=True, limit=5)
-            timeout   = aiohttp.ClientTimeout(total=20)
-            headers   = {"User-Agent": "DALIOS/1.0", "Accept": "application/json"}
-            async with aiohttp.ClientSession(connector=connector, timeout=timeout, headers=headers) as session:
-                chunk_size = 100
-                for i in range(0, len(cg_ids), chunk_size):
-                    chunk = cg_ids[i:i + chunk_size]
-                    url = (
-                        "https://api.coingecko.com/api/v3/coins/markets"
-                        f"?vs_currency=usd&ids={','.join(chunk)}"
-                        "&order=market_cap_desc&per_page=250&page=1"
-                        "&price_change_percentage=24h&sparkline=false"
-                    )
-                    try:
-                        async with session.get(url) as resp:
-                            if resp.status == 200:
-                                data = await resp.json(content_type=None)
-                                for coin in data:
-                                    all_coin_data[coin["id"]] = coin
-                            elif resp.status == 429:
-                                logger.warning("CoinGecko rate-limited (429) — using yfinance fallback")
-                                break
-                            else:
-                                logger.warning(f"CoinGecko HTTP {resp.status}")
-                    except Exception as exc:
-                        logger.warning(f"CoinGecko chunk error: {exc}")
-        except Exception as exc:
-            logger.warning(f"CoinGecko session error: {exc}")
-
-    # ── Build rows from CoinGecko ─────────────────────────────────────────
-    rows = []
-    found_tickers: set = set()
-
-    for cg_id, ticker in id_to_ticker.items():
-        coin = all_coin_data.get(cg_id, {})
-        price = float(coin.get("current_price") or 0)
-        if price <= 0:
-            continue
-        found_tickers.add(ticker)
-        chg_pct  = float(coin.get("price_change_percentage_24h") or 0)
-        vol      = float(coin.get("total_volume") or 0)
-        mkt_cap  = float(coin.get("market_cap") or 0)
-        rows.append({
-            "ticker":          ticker,
-            "name":            coin.get("name", ticker.replace("-USD", "")),
-            "sector":          "Crypto",
-            "price":           round(price, 6) if price < 1 else round(price, 2),
-            "change":          round(price * chg_pct / 100, 6),
-            "change_pct":      round(chg_pct, 2),
-            "volume_fmt":      _fmt_vol(vol),
-            "volume":          int(vol),
-            "market_cap_fmt":  _fmt_vol(mkt_cap),
-            "in_watchlist":    ticker in WATCHLIST,
-        })
-
-    # ── yfinance fallback for tickers CoinGecko missed ────────────────────
-    missing = [t for t in tickers if t not in found_tickers]
-    if missing:
-        logger.info(f"CoinGecko missed {len(missing)} tickers — yfinance fallback")
-        yf_rows = await _scan_yfinance(missing, "crypto")
-        for r in yf_rows:
-            r.setdefault("market_cap_fmt", "--")
-            r["sector"] = "Crypto"
-            rows.append(r)
-
-    logger.info(f"Crypto scan: {len(found_tickers)} CoinGecko + {len(missing)} yfinance = {len(rows)} rows")
-    return rows
-
-
 @app.get("/api/suggest")
 async def suggest_trades(n: int = 8):
-    """
-    Return top-N trade opportunities synthesised from:
-      - All cached scanner data (ASX, crypto, commodities)
-      - 3-month price history (RSI, trend, SMA20, 52w range)
-      - Dalio All-Weather quadrant playbook
-      - Current portfolio diversification state
-
-    Query param: n (default 8, max 20)
-
-    Example: GET /api/suggest?n=10
-    Response fields per opportunity:
-      ticker, market, action, price, change_pct, rsi, trend, above_sma20,
-      hi_52w, lo_52w, pct_from_hi, pct_from_lo, sma20, stop_loss,
-      take_profit, rr_ratio, score, asset_class, quadrant_fit,
-      data_source, reasoning[], volume_fmt, sector, quadrant, regime_label
-    """
+    """Return top-N trade opportunities."""
     n = min(max(1, n), 20)
     opps = await _gen_opportunities(n)
     qdata = STATE.last_quadrant or _gen_quadrant_data()
@@ -5371,15 +455,9 @@ async def suggest_trades(n: int = 8):
 
 @app.get("/api/recommendations")
 async def get_recommendations(n: int = 6):
-    """
-    Top N trade recommendations with full Dalio AI analysis.
-    Each recommendation includes:
-      - opportunity data (from _gen_opportunities)
-      - full dalio_analyse_trade() analysis
-      - per-trade reasoning bullets
-    """
+    """Top N trade recommendations with full Dalio AI analysis."""
     n = min(max(1, n), 12)
-    opps = await _gen_opportunities(n * 4)  # larger pool to filter for >65% conviction
+    opps = await _gen_opportunities(n * 4)
     qdata = STATE.last_quadrant or _gen_quadrant_data()
     quadrant = qdata.get("quadrant", "rising_growth")
     sigs = await _gen_signals(12)
@@ -5453,7 +531,6 @@ async def chart_data(ticker: str, period: str = "6mo", interval: str = "1d"):
                     "c": round(float(row["Close"]), 4),
                     "v": int(row.get("Volume", 0)),
                 })
-            # Compute SMA20, SMA50, RSI
             closes = [c["c"] for c in candles]
             sma20 = []
             sma50 = []
@@ -5461,7 +538,6 @@ async def chart_data(ticker: str, period: str = "6mo", interval: str = "1d"):
                 sma20.append(round(sum(closes[max(0,i-19):i+1]) / min(i+1, 20), 4) if i >= 19 else None)
                 sma50.append(round(sum(closes[max(0,i-49):i+1]) / min(i+1, 50), 4) if i >= 49 else None)
 
-            # RSI 14
             rsi_vals = [None] * len(closes)
             if len(closes) >= 15:
                 gains, losses = [], []
@@ -5478,7 +554,6 @@ async def chart_data(ticker: str, period: str = "6mo", interval: str = "1d"):
                     rs = avg_gain / avg_loss if avg_loss > 0 else 100
                     rsi_vals[j] = round(100 - 100 / (1 + rs), 1)
 
-            # Prediction (30-period forward from mean return + volatility)
             prediction = {"dates": [], "mid": [], "upper": [], "lower": []}
             if len(closes) >= 10:
                 rets = [(closes[i] - closes[i-1]) / closes[i-1] for i in range(1, len(closes))]
@@ -5530,8 +605,6 @@ async def market_scanner(market: str):
     if market not in ticker_map:
         raise HTTPException(400, f"Unknown market '{market}'. Use: asx, crypto, commodities")
 
-    # Check cache
-    import time
     cached = _scanner_cache.get(market)
     if cached and (time.time() - cached["ts"]) < _CACHE_TTL:
         return {"market": market, "rows": cached["rows"],
@@ -5544,12 +617,10 @@ async def market_scanner(market: str):
     else:
         rows = await _scan_yfinance(tickers, market)
 
-    # Filter out zero-price rows only if we got real data
     good = [r for r in rows if r["price"] > 0]
     if good:
         rows = good
 
-    # Sort: crypto by market cap (if available), others by abs change
     if market == "crypto":
         rows = sorted(rows, key=lambda r: r.get("volume", 0), reverse=True)
     else:
@@ -5557,6 +628,390 @@ async def market_scanner(market: str):
 
     _scanner_cache[market] = {"ts": time.time(), "rows": rows}
     return {"market": market, "rows": rows, "count": len(rows), "cached": False}
+
+
+# ─────────────────────────────────────────────
+# Routes -- AI Chat & CLI
+# ─────────────────────────────────────────────
+
+@app.post("/api/ai/chat")
+async def ai_chat(payload: dict):
+    message = (payload.get("message") or "").strip()
+    if not message: raise HTTPException(400, "message required")
+    return await _run_cmd(message)
+
+
+@app.post("/api/cmd")
+async def api_cmd(payload: dict):
+    """AI-agent CLI endpoint -- same as /api/ai/chat but always returns structured JSON."""
+    cmd = (payload.get("cmd") or payload.get("message") or "").strip()
+    if not cmd: raise HTTPException(400, "cmd or message required")
+    return await _run_cmd(cmd)
+
+
+# ─────────────────────────────────────────────
+# Routes -- Paper Trading
+# ─────────────────────────────────────────────
+
+@app.get("/api/paper/portfolio")
+async def get_paper_portfolio():
+    """Return full paper portfolio state with live P&L."""
+    tickers = list(PAPER.positions.keys())
+    prices  = await _prices_for_positions(tickers) if tickers else {}
+
+    positions_out = []
+    for t, pos in PAPER.positions.items():
+        cur = prices.get(t, pos["entry_price"])
+        if pos["side"] == "LONG":
+            pnl     = (cur - pos["entry_price"]) * pos["qty"]
+            pnl_pct = (cur / pos["entry_price"] - 1) * 100 if pos["entry_price"] else 0
+        else:
+            pnl     = (pos["entry_price"] - cur) * pos["qty"]
+            pnl_pct = (pos["entry_price"] / cur - 1) * 100 if cur else 0
+        market_val = cur * pos["qty"]
+        positions_out.append({
+            "ticker":      t,
+            "side":        pos["side"],
+            "qty":         pos["qty"],
+            "entry_price": pos["entry_price"],
+            "current_price": round(cur, 4),
+            "market_value":  round(market_val, 2),
+            "cost_basis":    pos.get("cost_basis", round(pos["entry_price"] * pos["qty"], 2)),
+            "pnl":           round(pnl, 2),
+            "pnl_pct":       round(pnl_pct, 2),
+            "entry_time":    pos["entry_time"],
+            "name":          _ASSET_META.get(t, {}).get("name", t),
+        })
+
+    total_val  = PAPER.cash + sum(p["market_value"] for p in positions_out)
+    total_pnl  = total_val - PAPER_STARTING_CASH
+    total_pnl_pct = (total_pnl / PAPER_STARTING_CASH) * 100
+    invested   = sum(p["market_value"] for p in positions_out)
+
+    eq_vals = [e["v"] for e in PAPER.equity_history] if PAPER.equity_history else []
+    if len(eq_vals) >= 2:
+        peak = max(eq_vals)
+        drawdown_val = round((peak - eq_vals[-1]) / peak, 4) if peak > 0 else 0.0
+    else:
+        drawdown_val = 0.0
+
+    sharpe_val = None
+    if len(eq_vals) >= 10:
+        try:
+            eq_arr = np.array(eq_vals, dtype=float)
+            rets   = np.diff(eq_arr) / eq_arr[:-1]
+            if rets.std() > 0:
+                sharpe_val = round(float((rets.mean() / rets.std()) * (252 ** 0.5)), 2)
+        except Exception:
+            pass
+
+    return {
+        "cash":           round(PAPER.cash, 2),
+        "invested":       round(invested, 2),
+        "total_value":    round(total_val, 2),
+        "total_pnl":      round(total_pnl, 2),
+        "total_pnl_pct":  round(total_pnl_pct, 2),
+        "starting_cash":  PAPER_STARTING_CASH,
+        "positions":      positions_out,
+        "open_count":     len(positions_out),
+        "drawdown":       drawdown_val,
+        "sharpe":         sharpe_val,
+        "cycles":         PAPER.order_id,
+    }
+
+
+@app.get("/api/paper/live-pnl")
+async def get_paper_live_pnl():
+    """Lightweight live P&L endpoint."""
+    tickers = list(PAPER.positions.keys())
+    prices  = await _prices_for_positions(tickers) if tickers else {}
+
+    positions_out = []
+    for t, pos in PAPER.positions.items():
+        cur = prices.get(t, pos["entry_price"])
+        if pos["side"] == "LONG":
+            pnl     = (cur - pos["entry_price"]) * pos["qty"]
+            pnl_pct = (cur / pos["entry_price"] - 1) * 100 if pos["entry_price"] else 0
+        else:
+            pnl     = (pos["entry_price"] - cur) * pos["qty"]
+            pnl_pct = (pos["entry_price"] / cur - 1) * 100 if cur else 0
+        market_val = cur * pos["qty"]
+        positions_out.append({
+            "ticker":        t,
+            "side":          pos["side"],
+            "qty":           pos["qty"],
+            "entry_price":   pos["entry_price"],
+            "current_price": round(cur, 4),
+            "market_value":  round(market_val, 2),
+            "cost_basis":    pos.get("cost_basis", round(pos["entry_price"] * pos["qty"], 2)),
+            "pnl":           round(pnl, 2),
+            "pnl_pct":       round(pnl_pct, 2),
+            "name":          _ASSET_META.get(t, {}).get("name", t),
+        })
+
+    total_unrealised = round(sum(p["pnl"] for p in positions_out), 2)
+    return {
+        "positions":          positions_out,
+        "total_unrealised_pnl": total_unrealised,
+        "open_count":         len(positions_out),
+        "timestamp":          datetime.utcnow().isoformat(),
+    }
+
+
+@app.post("/api/paper/order")
+async def place_paper_order(payload: dict):
+    """Place a paper trade."""
+    if CIRCUIT_BREAKER is not None and CIRCUIT_BREAKER._trading_halted:
+        raise HTTPException(403, f"Trading halted by circuit breaker: {CIRCUIT_BREAKER._halt_reason}")
+
+    ticker = _normalize_ticker(payload.get("ticker", "").strip())
+    side   = payload.get("side", "BUY").upper()
+    try:
+        qty = float(payload.get("qty", 1))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Invalid qty")
+    if not ticker:
+        raise HTTPException(400, "ticker required")
+    if side not in ("BUY", "SELL"):
+        raise HTTPException(400, "side must be BUY or SELL")
+    if qty <= 0:
+        raise HTTPException(400, "qty must be positive")
+
+    price = payload.get("price")
+    if price is None:
+        price = await _live_price(ticker)
+    if price is None:
+        raise HTTPException(400, f"Cannot determine price for {ticker}")
+    price = float(price)
+
+    sl = payload.get("stop_loss")
+    tp = payload.get("take_profit")
+    if sl is not None:
+        sl = float(sl)
+    if tp is not None:
+        tp = float(tp)
+
+    async with _PAPER_LOCK:
+        _tickers_pre = list(set(list(PAPER.positions.keys()) + [ticker]))
+        _prices_pre  = await _prices_for_positions(_tickers_pre) if _tickers_pre else {}
+        _prices_pre[ticker] = price
+
+        try:
+            sizing = _calculate_position_size(ticker, price, side, PAPER, _prices_pre)
+        except ValueError as e:
+            raise HTTPException(400, f"Position sizing blocked: {e}")
+
+        max_allowed_qty = sizing["max_allowed_qty"]
+        position_pct    = sizing["position_pct"]
+
+        original_qty = qty
+        if side == "BUY" and qty > max_allowed_qty:
+            qty = max_allowed_qty
+            if qty <= 0:
+                raise HTTPException(400,
+                    f"Position sizing: requested {original_qty} but max allowed is 0 "
+                    f"(max {_RISK_MAX_POS_SIZE_PCT}% of portfolio per position)")
+
+        try:
+            result = PAPER.place_order(ticker, side, qty, price,
+                                       stop_loss=sl, take_profit=tp)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+
+        result["max_allowed_qty"] = max_allowed_qty
+        result["position_pct"]    = position_pct
+        if side == "BUY" and original_qty > max_allowed_qty:
+            result["qty_capped"]     = True
+            result["requested_qty"]  = original_qty
+            result["cap_reason"]     = (
+                f"Capped from {original_qty} to {qty:.8g} "
+                f"(max {_RISK_MAX_POS_SIZE_PCT}% of portfolio per position)"
+            )
+
+        _tickers = list(PAPER.positions.keys())
+        _prices  = await _prices_for_positions(_tickers) if _tickers else {}
+        current_equity = PAPER.total_value(_prices)
+        PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
+        PAPER.equity_history = PAPER.equity_history[-2000:]
+        _save_paper_state()
+        if side == "SELL" and PAPER.history:
+            _db_save_trade(PAPER.history[0])
+        _db_save_equity_snapshot(current_equity)
+
+    if CIRCUIT_BREAKER is not None:
+        CIRCUIT_BREAKER.state.current_equity = current_equity
+        if current_equity > CIRCUIT_BREAKER.state.peak_equity:
+            CIRCUIT_BREAKER.state.peak_equity = current_equity
+
+    if NOTIFIER is not None:
+        try:
+            NOTIFIER.send({"type": "TRADE", "ticker": ticker, "side": side,
+                           "qty": qty, "price": price, "mode": "paper"})
+        except Exception:
+            pass
+
+    await WS_MANAGER.broadcast({"type": "PAPER_ORDER", "data": result})
+    return result
+
+
+@app.get("/api/paper/history")
+async def get_paper_history():
+    db_trades = _db_get_trades(limit=100)
+    if db_trades:
+        return {"trades": db_trades, "total": len(db_trades), "source": "db"}
+    return {"trades": PAPER.history[:100], "total": len(PAPER.history), "source": "json"}
+
+
+@app.get("/api/paper/analytics")
+async def get_paper_analytics():
+    """Compute trade performance metrics from actual closed-trade history."""
+    trades = PAPER.history
+    total_trades = len(trades)
+
+    if total_trades == 0:
+        return {
+            "total_trades": 0, "winning_trades": 0, "losing_trades": 0,
+            "win_rate": 0.0, "avg_win": 0.0, "avg_loss": 0.0,
+            "profit_factor": 0.0, "avg_holding_period_hours": 0.0,
+            "largest_win": 0.0, "largest_loss": 0.0,
+            "total_pnl": 0.0, "total_fees": 0.0, "expectancy": 0.0,
+            "max_consecutive_wins": 0, "max_consecutive_losses": 0,
+        }
+
+    wins  = [t for t in trades if t["pnl"] > 0]
+    losses = [t for t in trades if t["pnl"] < 0]
+
+    winning_trades = len(wins)
+    losing_trades  = len(losses)
+    win_rate       = round(winning_trades / total_trades * 100, 2)
+
+    avg_win  = round(sum(t["pnl"] for t in wins) / winning_trades, 2) if winning_trades else 0.0
+    avg_loss = round(sum(t["pnl"] for t in losses) / losing_trades, 2) if losing_trades else 0.0
+
+    sum_wins   = sum(t["pnl"] for t in wins)
+    sum_losses = abs(sum(t["pnl"] for t in losses))
+    if sum_losses > 0:
+        profit_factor = round(sum_wins / sum_losses, 2)
+    else:
+        profit_factor = 999.0 if sum_wins > 0 else 0.0
+
+    holding_hours = []
+    for t in trades:
+        entry_t = t.get("entry_time")
+        exit_t  = t.get("timestamp")
+        if entry_t and exit_t:
+            try:
+                dt_entry = datetime.fromisoformat(entry_t)
+                dt_exit  = datetime.fromisoformat(exit_t)
+                holding_hours.append((dt_exit - dt_entry).total_seconds() / 3600)
+            except (ValueError, TypeError):
+                pass
+    avg_holding_period_hours = round(sum(holding_hours) / len(holding_hours), 2) if holding_hours else 0.0
+
+    largest_win  = round(max((t["pnl"] for t in trades), default=0.0), 2)
+    largest_loss = round(min((t["pnl"] for t in trades), default=0.0), 2)
+
+    total_pnl  = round(sum(t["pnl"] for t in trades), 2)
+    total_fees = round(sum(t.get("fees", 0) for t in trades), 2)
+
+    wr_frac    = winning_trades / total_trades
+    expectancy = round((wr_frac * avg_win) - ((1 - wr_frac) * abs(avg_loss)), 2)
+
+    sorted_trades = list(reversed(trades))
+    max_con_wins = max_con_losses = cur_wins = cur_losses = 0
+    for t in sorted_trades:
+        if t["pnl"] > 0:
+            cur_wins += 1
+            cur_losses = 0
+        elif t["pnl"] < 0:
+            cur_losses += 1
+            cur_wins = 0
+        else:
+            cur_wins = cur_losses = 0
+        max_con_wins   = max(max_con_wins, cur_wins)
+        max_con_losses = max(max_con_losses, cur_losses)
+
+    return {
+        "total_trades": total_trades,
+        "winning_trades": winning_trades,
+        "losing_trades": losing_trades,
+        "win_rate": win_rate,
+        "avg_win": avg_win,
+        "avg_loss": avg_loss,
+        "profit_factor": profit_factor,
+        "avg_holding_period_hours": avg_holding_period_hours,
+        "largest_win": largest_win,
+        "largest_loss": largest_loss,
+        "total_pnl": total_pnl,
+        "total_fees": total_fees,
+        "expectancy": expectancy,
+        "max_consecutive_wins": max_con_wins,
+        "max_consecutive_losses": max_con_losses,
+    }
+
+
+@app.post("/api/paper/close")
+async def close_paper_position(payload: dict):
+    """Close entire position in a ticker at market price."""
+    ticker = _normalize_ticker(payload.get("ticker", "").strip())
+    async with _PAPER_LOCK:
+        if ticker not in PAPER.positions:
+            raise HTTPException(404, f"No open position in {ticker}")
+        qty   = PAPER.positions[ticker]["qty"]
+        price = await _live_price(ticker)
+        if price is None:
+            raise HTTPException(400, f"Cannot determine price for {ticker}")
+        result = PAPER.place_order(ticker, "SELL", qty, float(price))
+
+        _tickers = list(PAPER.positions.keys())
+        _prices  = await _prices_for_positions(_tickers) if _tickers else {}
+        _eq_val = PAPER.total_value(_prices)
+        PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": _eq_val})
+        PAPER.equity_history = PAPER.equity_history[-2000:]
+        _save_paper_state()
+        if PAPER.history:
+            _db_save_trade(PAPER.history[0])
+        _db_save_equity_snapshot(_eq_val)
+
+    await WS_MANAGER.broadcast({"type": "PAPER_CLOSE", "data": result})
+    return result
+
+
+@app.post("/api/paper/reset")
+async def reset_paper_portfolio():
+    async with _PAPER_LOCK:
+        PAPER.cash = PAPER_STARTING_CASH
+        PAPER.positions = {}
+        PAPER.history = []
+        PAPER.equity_history = []
+        PAPER.order_id = 0
+        _save_paper_state()
+    return {"status": "reset", "cash": PAPER_STARTING_CASH}
+
+
+@app.get("/api/paper/config")
+async def get_paper_config():
+    return {"starting_cash": PAPER_STARTING_CASH}
+
+
+@app.post("/api/paper/config")
+async def set_paper_config(payload: dict):
+    import api.portfolio as _portfolio_mod
+    cash = float(payload.get("starting_cash", PAPER_STARTING_CASH))
+    if cash < 1:
+        raise HTTPException(400, "starting_cash must be >= 1")
+    _portfolio_mod.PAPER_STARTING_CASH = cash
+    _save_paper_config()
+    applied = False
+    async with _PAPER_LOCK:
+        if not PAPER.positions:
+            PAPER.cash           = cash
+            PAPER.history        = []
+            PAPER.equity_history = []
+            PAPER.order_id       = 0
+            _save_paper_state()
+            applied = True
+    return {"status": "ok", "starting_cash": _portfolio_mod.PAPER_STARTING_CASH, "applied": applied}
 
 
 @app.get("/api/paper/quote")
@@ -5576,7 +1031,6 @@ async def get_quote(ticker: str):
 
 @app.get("/api/paper/equity_curve")
 async def get_paper_equity_curve():
-    # Per-position price performance (last 60 bars, normalized to % return from entry)
     pos_perf: dict = {}
     if PAPER.positions:
         tickers = list(PAPER.positions.keys())
@@ -5588,7 +1042,6 @@ async def get_paper_equity_curve():
                 last60 = closes[-60:]
                 pos_perf[tkr] = [round((p / entry - 1) * 100, 2) for p in last60]
 
-    # Use DB equity curve if available, fall back to in-memory JSON
     db_curve = _db_get_equity_curve(limit=2000)
     curve = db_curve if db_curve else PAPER.equity_history
     return {
@@ -5601,7 +1054,38 @@ async def get_paper_equity_curve():
 
 
 # ─────────────────────────────────────────────
-# Trading mode + broker endpoints
+# Routes -- Watchlist
+# ─────────────────────────────────────────────
+
+@app.get("/api/watchlist")
+async def get_watchlist():
+    return {"watchlist": WATCHLIST}
+
+
+@app.post("/api/watchlist/add")
+async def watchlist_add(payload: dict):
+    ticker = payload.get("ticker", "").upper().strip()
+    if not ticker:
+        raise HTTPException(400, "ticker required")
+    async with _WATCHLIST_LOCK:
+        if ticker not in WATCHLIST:
+            WATCHLIST.append(ticker)
+            _save_watchlist(WATCHLIST)
+    return {"watchlist": WATCHLIST}
+
+
+@app.post("/api/watchlist/remove")
+async def watchlist_remove(payload: dict):
+    ticker = payload.get("ticker", "").upper().strip()
+    async with _WATCHLIST_LOCK:
+        if ticker in WATCHLIST:
+            WATCHLIST.remove(ticker)
+            _save_watchlist(WATCHLIST)
+    return {"watchlist": WATCHLIST}
+
+
+# ─────────────────────────────────────────────
+# Routes -- Trading Mode & Broker
 # ─────────────────────────────────────────────
 
 @app.get("/api/mode")
@@ -5615,40 +1099,31 @@ async def get_trading_mode():
 
 @app.post("/api/mode")
 async def set_trading_mode(payload: dict):
-    global TRADING_MODE
+    import api.state as _state_mod
     new_mode = payload.get("mode", "").lower()
     if new_mode not in ("paper", "live"):
         raise HTTPException(400, "mode must be 'paper' or 'live'")
     broker_connected = ACTIVE_BROKER is not None and ACTIVE_BROKER.is_connected()
     async with _MODE_LOCK:
-        TRADING_MODE = new_mode
+        _state_mod.TRADING_MODE = new_mode
         _save_trading_mode(new_mode)
     if new_mode == "live" and not broker_connected:
-        STATE.add_alert("SYSTEM", "⚠ LIVE MODE — No broker configured. Trading halted until broker connected.", "WARNING")
+        STATE.add_alert("SYSTEM", "LIVE MODE -- No broker configured. Trading halted until broker connected.", "WARNING")
     else:
-        STATE.add_alert("SYSTEM", f"Trading mode → {new_mode.upper()}", "INFO")
+        STATE.add_alert("SYSTEM", f"Trading mode -> {new_mode.upper()}", "INFO")
     await WS_MANAGER.broadcast({"type": "MODE_CHANGE", "data": {"mode": new_mode, "broker_connected": broker_connected}})
-    return {"mode": TRADING_MODE, "broker_connected": broker_connected}
+    return {"mode": new_mode, "broker_connected": broker_connected}
 
 
 @app.post("/api/broker/connect")
 async def broker_connect(payload: dict):
-    global ACTIVE_BROKER
+    import api.brokers as _brokers_mod
     broker_name = payload.get("broker", "").lower()
-    _BROKER_MAP = {"ibkr": IBKRBroker, "alpaca": AlpacaBroker, "binance": BinanceBroker,
-                   "coinbase": CoinbaseBroker, "coinspot": CoinSpotBroker,
-                   "kraken": KrakenBroker, "bybit": BybitBroker, "okx": OKXBroker,
-                   "kucoin": KuCoinBroker, "bitget": BitgetBroker,
-                   "independentreserve": IndependentReserveBroker, "stake": StakeBroker,
-                   "ig": IGBroker, "cmc": CMCBroker, "schwab": SchwabBroker,
-                   "moomoo": MomooBroker,
-                   "robinhood": RobinhoodBroker, "webull": WebullBroker}
-    if broker_name not in _BROKER_MAP:
-        raise HTTPException(400, f"broker must be one of: {', '.join(_BROKER_MAP)}")
-    broker: BrokerBase = _BROKER_MAP[broker_name]()
+    if broker_name not in BROKER_MAP:
+        raise HTTPException(400, f"broker must be one of: {', '.join(BROKER_MAP)}")
+    broker: BrokerBase = BROKER_MAP[broker_name]()
     try:
         kwargs = {k: v for k, v in payload.items() if k != "broker"}
-        # Auto-load saved credentials if not provided
         if not kwargs:
             creds = _load_broker_creds()
             if broker_name in creds:
@@ -5660,7 +1135,7 @@ async def broker_connect(payload: dict):
         raise HTTPException(422, str(e))
     except Exception as e:
         raise HTTPException(502, f"Broker connection failed: {e}")
-    ACTIVE_BROKER = broker
+    _brokers_mod.ACTIVE_BROKER = broker
     STATE.add_alert("BROKER", f"{broker_name.upper()} connected", "INFO")
     return {"status": "connected", "broker": broker_name}
 
@@ -5678,24 +1153,6 @@ async def broker_status():
         return {"broker": ACTIVE_BROKER.name, "connected": True, "error": str(e)}
 
 
-_BROKER_CREDS_FILE = DATA_DIR / "broker_credentials.json"
-
-
-def _load_broker_creds() -> dict:
-    if _BROKER_CREDS_FILE.exists():
-        try:
-            raw = json.loads(_BROKER_CREDS_FILE.read_text())
-            return _decrypt_creds(raw)
-        except Exception:
-            return {}
-    return {}
-
-
-def _save_broker_creds(creds: dict):
-    encrypted = _encrypt_creds(creds)
-    _BROKER_CREDS_FILE.write_text(json.dumps(encrypted, indent=2))
-
-
 @app.post("/api/broker/save")
 async def broker_save(payload: dict):
     broker_name = payload.get("broker", "").lower()
@@ -5711,13 +1168,12 @@ async def broker_save(payload: dict):
 @app.get("/api/broker/saved")
 async def broker_saved():
     creds = _load_broker_creds()
-    # Return broker names with masked keys (don't expose full secrets)
     result = {}
     for name, data in creds.items():
         masked = {}
         for k, v in data.items():
             if isinstance(v, str) and len(v) > 6 and any(s in k.lower() for s in ("secret", "key", "pass", "private")):
-                masked[k] = v[:4] + "•" * (len(v) - 8) + v[-4:]
+                masked[k] = v[:4] + "\u2022" * (len(v) - 8) + v[-4:]
             else:
                 masked[k] = v
         result[name] = masked
@@ -5725,7 +1181,7 @@ async def broker_saved():
 
 
 # ─────────────────────────────────────────────
-# Real trading endpoints
+# Routes -- Real Trading
 # ─────────────────────────────────────────────
 
 def _require_live():
@@ -5752,8 +1208,6 @@ async def get_real_portfolio():
 @app.post("/api/real/order")
 async def place_real_order(payload: dict):
     _require_live()
-
-    # ── Circuit breaker gate ──
     if CIRCUIT_BREAKER is not None and CIRCUIT_BREAKER._trading_halted:
         raise HTTPException(403, f"Trading halted by circuit breaker: {CIRCUIT_BREAKER._halt_reason}")
 
@@ -5776,12 +1230,13 @@ async def place_real_order(payload: dict):
         result = await ACTIVE_BROKER.place_order(ticker, side, qty, price)
     except Exception as e:
         raise HTTPException(502, f"Broker order failed: {e}")
+
+    import api.state as _state_mod
     try:
         acct = await ACTIVE_BROKER.get_account()
         current_equity = acct.get("account_value", 0)
-        REAL_EQUITY_CURVE.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
-        _save_real_equity(REAL_EQUITY_CURVE[-2000:])
-        # ── Update circuit breaker ──
+        _state_mod.REAL_EQUITY_CURVE.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
+        _save_real_equity(_state_mod.REAL_EQUITY_CURVE[-2000:])
         if CIRCUIT_BREAKER is not None:
             CIRCUIT_BREAKER.state.current_equity = current_equity
             if current_equity > CIRCUIT_BREAKER.state.peak_equity:
@@ -5789,7 +1244,6 @@ async def place_real_order(payload: dict):
     except Exception:
         pass
 
-    # ── Send notification ──
     if NOTIFIER is not None:
         try:
             NOTIFIER.send({"type": "TRADE", "ticker": ticker, "side": side,
@@ -5823,10 +1277,12 @@ async def close_real_position(payload: dict):
         raise HTTPException(404, str(e))
     except Exception as e:
         raise HTTPException(502, f"Broker error: {e}")
+
+    import api.state as _state_mod
     try:
         acct = await ACTIVE_BROKER.get_account()
-        REAL_EQUITY_CURVE.append({"t": datetime.utcnow().isoformat(), "v": acct.get("account_value", 0)})
-        _save_real_equity(REAL_EQUITY_CURVE[-2000:])
+        _state_mod.REAL_EQUITY_CURVE.append({"t": datetime.utcnow().isoformat(), "v": acct.get("account_value", 0)})
+        _save_real_equity(_state_mod.REAL_EQUITY_CURVE[-2000:])
     except Exception:
         pass
     STATE.add_alert("LIVE", f"Closed {ticker}", "INFO")
@@ -5836,8 +1292,13 @@ async def close_real_position(payload: dict):
 
 @app.get("/api/real/equity_curve")
 async def get_real_equity_curve():
-    return {"equity_curve": REAL_EQUITY_CURVE, "count": len(REAL_EQUITY_CURVE)}
+    import api.state as _state_mod
+    return {"equity_curve": _state_mod.REAL_EQUITY_CURVE, "count": len(_state_mod.REAL_EQUITY_CURVE)}
 
+
+# ─────────────────────────────────────────────
+# Routes -- Agent
+# ─────────────────────────────────────────────
 
 @app.post("/api/agent/cycle")
 async def trigger_cycle(background_tasks: BackgroundTasks):
@@ -5870,14 +1331,15 @@ async def boot_agent():
 
 @app.get("/api/agent/status")
 async def agent_status():
-    """Return autonomous agent status: enabled, interval, last/next cycle times."""
+    """Return autonomous agent status."""
+    import api.agent as _agent_mod
     interval = AGENT_CONFIG.get("interval_seconds", 300)
     return {
         "enabled": AGENT_CONFIG.get("enabled", False),
         "interval_seconds": interval,
         "min_confidence": AGENT_CONFIG.get("min_confidence", 60),
-        "last_cycle_time": _agent_last_cycle_time,
-        "next_cycle_time": _agent_next_cycle_time,
+        "last_cycle_time": _agent_mod._agent_last_cycle_time,
+        "next_cycle_time": _agent_mod._agent_next_cycle_time,
         "cycle_count": STATE.cycle_count,
         "trading_mode": TRADING_MODE,
         "auto_execute": TRADING_MODE.upper() != "LIVE",
@@ -5887,11 +1349,7 @@ async def agent_status():
 
 @app.post("/api/agent/toggle")
 async def agent_toggle(payload: dict = None):
-    """Enable or disable autonomous auto-trading. Persisted to data/agent_config.json.
-
-    Body (optional): {"enabled": true/false}
-    If no body, toggles current state.
-    """
+    """Enable or disable autonomous auto-trading."""
     if payload and "enabled" in payload:
         new_state = bool(payload["enabled"])
     else:
@@ -5917,11 +1375,7 @@ async def agent_toggle(payload: dict = None):
 
 @app.post("/api/agent/interval")
 async def agent_interval(payload: dict):
-    """Change the autonomous cycle interval.
-
-    Body: {"interval_seconds": 300}
-    Min 60s, max 3600s.
-    """
+    """Change the autonomous cycle interval."""
     try:
         new_interval = int(payload.get("interval_seconds", 300))
     except (TypeError, ValueError):
@@ -5945,15 +1399,15 @@ async def agent_interval(payload: dict):
     }
 
 
+# ─────────────────────────────────────────────
+# Routes -- Notifications, Risk, FX
+# ─────────────────────────────────────────────
+
 @app.post("/api/notifications/test")
 async def test_notification(payload: dict):
     STATE.add_alert("TEST", f"Test notification sent to {payload.get('channel', 'unknown')}", "INFO")
     return {"status": "sent", "channel": payload.get("channel")}
 
-
-# ─────────────────────────────────────────────
-# Circuit Breaker & Risk Management
-# ─────────────────────────────────────────────
 
 @app.get("/api/risk/status")
 async def risk_status():
@@ -6010,11 +1464,10 @@ async def websocket_endpoint(ws: WebSocket):
         heartbeat = 0
         while True:
             await asyncio.sleep(15)
-            # Detect client disconnect early
             try:
                 await asyncio.wait_for(ws.receive_text(), timeout=0.1)
             except asyncio.TimeoutError:
-                pass  # No message from client -- expected
+                pass
             heartbeat += 1
             await ws.send_json({
                 "type": "HEARTBEAT",
@@ -6023,7 +1476,6 @@ async def websocket_endpoint(ws: WebSocket):
                 "uptime": STATE.uptime_seconds(),
                 "timestamp": datetime.utcnow().isoformat(),
             })
-            # Push live health update every 4 heartbeats (60s)
             if heartbeat % 4 == 0:
                 health = _gen_portfolio_health()
                 await ws.send_json({"type": "HEALTH_UPDATE", "data": health})

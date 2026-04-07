@@ -1,0 +1,1341 @@
+"""
+Dalios -- Signal Generation and Analysis
+Signal engine, opportunities, justification, quadrant classification, sentiment, correlation.
+"""
+
+import asyncio
+import random
+import numpy as np
+from collections import defaultdict
+from datetime import datetime
+from typing import Optional
+
+from loguru import logger
+
+from api.utils import (
+    _cache_get, _cache_set, _get_prices, _EXECUTOR,
+    _calc_rsi, _calc_trend, _calc_atr, _calc_macd, _calc_bollinger,
+    YF_AVAILABLE, _is_crypto, _to_trade_ticker, _usd_to_aud,
+)
+from api.state import STATE
+from api.scanners import (
+    ASX_TICKERS, CRYPTO_TICKERS, COMMODITY_TICKERS, CORR_TICKERS,
+    _scanner_cache, _ASSET_META, _live_price,
+)
+from api.portfolio import PAPER, PAPER_STARTING_CASH, _get_fee_pct
+
+
+# ── Quadrant metadata ──────────────────────────────────
+QUADRANT_META = {
+    "rising_growth": {
+        "label": "RISING GROWTH",
+        "color": "#00ff41",
+        "icon": "▲",
+        "description": "Economy expanding. Favour equities, commodities, corporate bonds. Reduce nominal bonds.",
+        "favoured": ["Equities", "Commodities", "Corporate Bonds", "EM Debt"],
+        "avoid": ["Nominal Bonds", "Defensive Cash"],
+    },
+    "falling_growth": {
+        "label": "FALLING GROWTH",
+        "color": "#ff4444",
+        "icon": "▼",
+        "description": "Recessionary pressure. Favour long-duration bonds, defensive equities. Reduce cyclicals.",
+        "favoured": ["Long Bonds", "Defensive Equities", "Gold", "Cash"],
+        "avoid": ["Cyclicals", "Commodities", "EM"],
+    },
+    "rising_inflation": {
+        "label": "RISING INFLATION",
+        "color": "#ffb300",
+        "icon": "↑",
+        "description": "Prices rising faster than growth. Favour gold, inflation-linked bonds, energy, real assets.",
+        "favoured": ["Gold", "Energy", "TIPS", "Commodities", "Real Assets"],
+        "avoid": ["Nominal Bonds", "Growth Equities"],
+    },
+    "falling_inflation": {
+        "label": "FALLING INFLATION",
+        "color": "#00e5ff",
+        "icon": "↓",
+        "description": "Disinflation / deflation. Favour equities, nominal bonds, consumer staples.",
+        "favoured": ["Equities", "Nominal Bonds", "Consumer Staples"],
+        "avoid": ["Commodities", "Gold", "Energy"],
+    },
+}
+
+ASSET_CLASS_MAP: dict = {
+    # Crypto (USD)
+    "BTC-USD":"crypto","ETH-USD":"crypto","BNB-USD":"crypto","SOL-USD":"crypto","XRP-USD":"crypto",
+    "ADA-USD":"crypto","AVAX-USD":"crypto","DOT-USD":"crypto","LINK-USD":"crypto","MATIC-USD":"crypto",
+    "DOGE-USD":"crypto","LTC-USD":"crypto","UNI-USD":"crypto","ATOM-USD":"crypto","NEAR-USD":"crypto",
+    # Crypto (AUD)
+    "BTC-AUD":"crypto","ETH-AUD":"crypto","BNB-AUD":"crypto","SOL-AUD":"crypto","XRP-AUD":"crypto",
+    "ADA-AUD":"crypto","AVAX-AUD":"crypto","DOT-AUD":"crypto","LINK-AUD":"crypto","MATIC-AUD":"crypto",
+    "DOGE-AUD":"crypto","LTC-AUD":"crypto","UNI-AUD":"crypto","ATOM-AUD":"crypto","NEAR-AUD":"crypto",
+    "SHIB-AUD":"crypto",
+    # Gold / Precious metals
+    "GLD":"gold","SLV":"gold","PALL":"gold","NCM.AX":"gold","EVN.AX":"gold","NST.AX":"gold",
+    # Commodities
+    "USO":"commodities","UNG":"commodities","COPX":"commodities","WEAT":"commodities",
+    "DBA":"commodities","XOM":"commodities","CVX":"commodities","WDS.AX":"commodities",
+    "STO.AX":"commodities","BPT.AX":"commodities","BHP.AX":"commodities","RIO.AX":"commodities","FMG.AX":"commodities",
+    # Long Bonds
+    "TLT":"long_bonds","IEF":"long_bonds","AGG":"long_bonds","BND":"long_bonds",
+    # TIPS / Inflation-linked
+    "TIP":"tips","VTIP":"tips","SCHP":"tips",
+    # Corporate bonds
+    "LQD":"corporate_bonds","HYG":"corporate_bonds",
+    # Real assets / REIT
+    "GMG.AX":"real_assets","TCL.AX":"real_assets","SCG.AX":"real_assets","VNQ":"real_assets",
+    # ASX Equities
+    "CBA.AX":"equities","ANZ.AX":"equities","NAB.AX":"equities","WBC.AX":"equities",
+    "MQG.AX":"equities","CSL.AX":"equities","COH.AX":"equities","RMD.AX":"equities",
+    "WES.AX":"equities","WOW.AX":"equities","COL.AX":"equities","TLS.AX":"equities",
+    "XRO.AX":"equities","WTC.AX":"equities","ALU.AX":"equities","REA.AX":"equities",
+    "S32.AX":"equities","MIN.AX":"equities","AGL.AX":"equities","ORG.AX":"equities",
+    "QAN.AX":"equities","SUN.AX":"equities","QBE.AX":"equities","AMP.AX":"equities",
+    # US / Global ETFs
+    "SPY":"equities","QQQ":"growth_stocks","VTI":"equities","IWLD":"equities","EEM":"equities",
+}
+
+QUADRANT_PLAYBOOK: dict = {
+    "rising_growth": {
+        "strong_buy": ["equities","commodities"],
+        "buy":        ["crypto","real_assets","corporate_bonds"],
+        "avoid":      ["long_bonds","gold","tips"],
+        "narrative":  (
+            "Rising Growth: economic expansion lifts earnings and risk appetite. "
+            "Dalio tilts heavily toward equities and commodities -- cyclicals, EM equities, "
+            "and industrial metals outperform. Duration risk in nominal bonds rises. "
+            "Crypto can participate as a high-beta risk asset."
+        ),
+    },
+    "falling_growth": {
+        "strong_buy": ["long_bonds","gold"],
+        "buy":        ["tips","real_assets"],
+        "avoid":      ["equities","commodities","crypto"],
+        "narrative":  (
+            "Falling Growth: recessionary pressure compresses corporate earnings. "
+            "Safe havens dominate -- long-duration Treasuries rally as yields fall. "
+            "Gold preserves wealth as central banks ease. "
+            "Reduce cyclicals, commodities, and speculative crypto aggressively."
+        ),
+    },
+    "rising_inflation": {
+        "strong_buy": ["gold","commodities","tips"],
+        "buy":        ["real_assets","equities"],
+        "avoid":      ["long_bonds","crypto"],
+        "narrative":  (
+            "Rising Inflation: purchasing power erosion favours hard assets. "
+            "Gold is the primary hedge -- Dalio's cornerstone in this quadrant. "
+            "Energy, agriculture, and industrial commodities benefit directly. "
+            "TIPS provide real yield protection. Nominal bonds are the loser here."
+        ),
+    },
+    "falling_inflation": {
+        "strong_buy": ["equities","long_bonds"],
+        "buy":        ["real_assets","corporate_bonds"],
+        "avoid":      ["commodities","gold","tips"],
+        "narrative":  (
+            "Falling Inflation (disinflation): central banks ease, real rates decline. "
+            "Growth equities and nominal bonds rally in tandem. "
+            "Historically the most favourable quadrant for balanced All Weather portfolios."
+        ),
+    },
+}
+
+
+def _gen_price_history_demo(price: float, trend: str, n_points: int = 30) -> list:
+    """Seeded random-walk ending at `price`, shaped by trend direction."""
+    drift = 0.003 if trend == "uptrend" else -0.003 if trend == "downtrend" else 0.0
+    pts = []
+    p = price * (1 - drift * n_points)
+    for _ in range(n_points):
+        p = p * (1 + drift + random.gauss(0, 0.012))
+        pts.append(round(p, 4))
+    pts[-1] = price
+    return pts
+
+
+async def _gen_signals(n: int = 12) -> list[dict]:
+    """Generate trade signals from real price data."""
+    cache_key = f"signals_{n}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    cached_by_market: dict = {"asx": [], "crypto": [], "commodities": []}
+    for mkt in ("asx", "crypto", "commodities"):
+        sc = _scanner_cache.get(mkt)
+        if sc:
+            rows = sorted(sc["rows"], key=lambda r: abs(r.get("change_pct", 0)), reverse=True)
+            cached_by_market[mkt] = [r["ticker"] for r in rows if r.get("price", 0) > 0][:n]
+
+    n_each = max(4, (n * 2) // 3)
+    fresh = {
+        "asx":         random.sample(ASX_TICKERS,        min(n_each, len(ASX_TICKERS))),
+        "crypto":      random.sample(CRYPTO_TICKERS,     min(n_each, len(CRYPTO_TICKERS))),
+        "commodities": random.sample(COMMODITY_TICKERS,  min(n_each, len(COMMODITY_TICKERS))),
+    }
+
+    market_candidates = {}
+    for mkt in ("asx", "crypto", "commodities"):
+        market_candidates[mkt] = list(dict.fromkeys(
+            cached_by_market[mkt] + fresh[mkt]
+        ))[:n_each]
+
+    prices_map: dict = {}
+
+    asx_cands = market_candidates["asx"][:10]
+    if asx_cands:
+        asx_prices = await _get_prices(asx_cands, "3mo")
+        if asx_prices:
+            prices_map.update(asx_prices)
+
+    comm_cands = market_candidates["commodities"][:10]
+    if comm_cands:
+        comm_prices = await _get_prices(comm_cands, "3mo")
+        if comm_prices:
+            prices_map.update(comm_prices)
+
+    crypto_cands = market_candidates["crypto"][:10]
+    if crypto_cands:
+        crypto_prices = await _get_prices(crypto_cands, "3mo")
+        if crypto_prices:
+            prices_map.update(crypto_prices)
+
+    crypto_missing = [t for t in crypto_cands if t not in prices_map]
+    if crypto_missing and YF_AVAILABLE:
+        logger.info(f"Crypto signal fallback: fetching {len(crypto_missing)} tickers individually")
+        loop = asyncio.get_running_loop()
+        import yfinance as _yf_sig
+
+        def _fetch_single_crypto(tkr):
+            try:
+                hist = _yf_sig.Ticker(tkr).history(period="3mo", interval="1d", auto_adjust=True)
+                if hist is not None and not hist.empty and "Close" in hist.columns:
+                    closes = hist["Close"].dropna().tolist()
+                    if len(closes) >= 10:
+                        return (tkr, [float(c) for c in closes[-90:]])
+            except Exception:
+                pass
+            return None
+
+        tasks = [loop.run_in_executor(_EXECUTOR, _fetch_single_crypto, t) for t in crypto_missing[:8]]
+        results = await asyncio.gather(*tasks)
+        for res in results:
+            if res:
+                prices_map[res[0]] = res[1]
+
+    candidates = list(dict.fromkeys(
+        market_candidates["asx"] + market_candidates["crypto"] + market_candidates["commodities"]
+    ))
+
+    cache_prices: dict = {}
+    for mkt in ("asx", "crypto", "commodities"):
+        sc = _scanner_cache.get(mkt)
+        if sc:
+            for r in sc["rows"]:
+                if r.get("price", 0) > 0:
+                    cache_prices[r["ticker"]] = r["price"]
+
+    signals = []
+    for ticker in candidates:
+        closes = prices_map.get(ticker)
+        if not closes or len(closes) < 10:
+            continue
+
+        is_crypto_ticker = ticker in CRYPTO_TICKERS or _is_crypto(ticker)
+        price  = round(closes[-1], 4 if "USD" in ticker else 2)
+        rsi    = _calc_rsi(closes)
+        trend  = _calc_trend(closes)
+        atr    = _calc_atr(closes)
+        macd_data = _calc_macd(closes)
+        bb_data   = _calc_bollinger(closes)
+
+        score = 0.0
+        signal_reasons = []
+
+        if is_crypto_ticker:
+            rsi_oversold, rsi_overbought = 38, 62
+        else:
+            rsi_oversold, rsi_overbought = 32, 68
+
+        if rsi < rsi_oversold:
+            score += 2.0
+            signal_reasons.append(f"RSI oversold ({rsi:.0f})")
+        elif rsi > rsi_overbought:
+            score -= 2.0
+            signal_reasons.append(f"RSI overbought ({rsi:.0f})")
+        elif rsi < 45:
+            score += 0.5
+        elif rsi > 55:
+            score -= 0.5
+
+        if macd_data["macd_signal"] == "bullish":
+            score += 1.5
+            signal_reasons.append("MACD bullish")
+        else:
+            score -= 1.5
+            signal_reasons.append("MACD bearish")
+        if macd_data["macd_crossover"]:
+            score += 1.0
+            signal_reasons.append("Fresh MACD crossover")
+
+        if bb_data["bb_position"] == "below_lower":
+            score += 1.5
+            signal_reasons.append("Below lower Bollinger Band")
+        elif bb_data["bb_position"] == "above_upper":
+            score -= 1.5
+            signal_reasons.append("Above upper Bollinger Band")
+
+        if trend == "uptrend":
+            score += 2.0
+            signal_reasons.append("Confirmed uptrend")
+        elif trend == "downtrend":
+            score -= 2.0
+            signal_reasons.append("Confirmed downtrend")
+
+        if len(closes) >= 10:
+            roc = (closes[-1] / closes[-10] - 1) * 100
+            if roc > 5:
+                score += 0.5
+            elif roc < -5:
+                score -= 0.5
+
+        if score >= 3.0:
+            action = "BUY"
+        elif score <= -3.0:
+            action = "SHORT"
+        elif score >= 1.5:
+            action = "LONG"
+        elif score <= -1.5:
+            action = "SELL"
+        else:
+            action = "HOLD"
+
+        price_history = [round(c, 4 if "USD" in ticker else 2) for c in closes[-30:]]
+
+        sl_offset = max(atr * 1.5, price * 0.025)
+        tp_offset = atr * 2.5
+
+        conf_floor = 40.0 if is_crypto_ticker else 50.0
+        conf = round(min(95, max(conf_floor, abs(score) / 10.0 * 100)), 1)
+
+        qdata = STATE.last_quadrant or {}
+        quadrant = qdata.get("quadrant", "rising_growth")
+        pb = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
+        ac = ASSET_CLASS_MAP.get(ticker, "equities")
+        if ac in pb["strong_buy"]:   q_fit = "strong"
+        elif ac in pb["buy"]:         q_fit = "moderate"
+        elif ac in pb["avoid"]:       q_fit = "avoid"
+        else:                          q_fit = "neutral"
+
+        predicted_days = max(3, min(60, int(tp_offset / max(price * 0.008, 0.01))))
+        pos_size_pct = round(min(5.0, max(1.0, (conf - 50) / 9)), 1)
+
+        if is_crypto_ticker:
+            sig_market = "crypto"
+        elif ticker in COMMODITY_TICKERS:
+            sig_market = "commodities"
+        else:
+            sig_market = "asx"
+
+        rr_ratio = round(tp_offset / sl_offset, 2)
+        sig = {
+            "ticker": ticker,
+            "trade_ticker": _to_trade_ticker(ticker) if is_crypto_ticker else ticker,
+            "currency": "AUD" if is_crypto_ticker else "USD",
+            "market": sig_market,
+            "action": action,
+            "confidence": conf,
+            "price": price,
+            "data_source": "LIVE",
+            "quadrant_fit": q_fit,
+            "rsi": rsi,
+            "trend": trend,
+            "macd_signal": macd_data["macd_signal"],
+            "macd_value": macd_data["macd"],
+            "macd_crossover": macd_data["macd_crossover"],
+            "bb_position": bb_data["bb_position"],
+            "bb_pct": bb_data["bb_pct"],
+            "signal_score": round(score, 2),
+            "signal_reasons": signal_reasons,
+            "stop_loss":  round(price - sl_offset, 2) if action in ("SELL","SHORT") else round(price - sl_offset, 2),
+            "take_profit": round(price + tp_offset, 2) if action in ("BUY","LONG")  else round(price - tp_offset, 2),
+            "rr_ratio": rr_ratio,
+            "fee_pct": _get_fee_pct(ticker),
+            "round_trip_fee_pct": round(_get_fee_pct(ticker) * 2, 2),
+            "net_rr_ratio": round(max(0, (tp_offset - price * _get_fee_pct(ticker) * 2 / 100)) / sl_offset, 2),
+            "position_size_pct": pos_size_pct,
+            "dalio_justification": _gen_justification(
+                ticker, action, rsi=rsi, rr=rr_ratio,
+                macd_signal=macd_data["macd_signal"],
+                bb_position=bb_data["bb_position"],
+                trend=trend, q_fit=q_fit,
+            ),
+            "price_history": price_history,
+            "predicted_days": predicted_days,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        if is_crypto_ticker:
+            sig["price_aud"] = _usd_to_aud(price)
+            sig["stop_loss_aud"] = _usd_to_aud(sig["stop_loss"])
+            sig["take_profit_aud"] = _usd_to_aud(sig["take_profit"])
+
+        signals.append(sig)
+
+    active = [s for s in signals if s["action"] != "HOLD"]
+    if not active:
+        active = sorted(signals, key=lambda s: s["confidence"], reverse=True)
+
+    per_market = max(2, n // 3)
+    balanced = []
+    for mkt in ("asx", "crypto", "commodities"):
+        mkt_sigs = sorted(
+            [s for s in active if s.get("market") == mkt],
+            key=lambda s: s["confidence"], reverse=True
+        )
+        balanced.extend(mkt_sigs[:per_market])
+
+    seen = {s["ticker"] for s in balanced}
+    remaining = [s for s in active if s["ticker"] not in seen]
+    remaining.sort(key=lambda s: s["confidence"], reverse=True)
+    balanced.extend(remaining[:max(0, n - len(balanced))])
+
+    balanced.sort(key=lambda s: s["confidence"], reverse=True)
+    result = balanced[:n]
+    _cache_set(cache_key, result)
+    logger.info(f"Signals generated: {len(result)} total -- "
+                f"ASX:{sum(1 for s in result if s.get('market')=='asx')} "
+                f"Crypto:{sum(1 for s in result if s.get('market')=='crypto')} "
+                f"Commodities:{sum(1 for s in result if s.get('market')=='commodities')}")
+    return result
+
+
+def _opp_from_signal_fallback(sigs: list, quadrant: str, playbook: dict,
+                               qdata: dict, existing_classes: list, n: int) -> list:
+    """Fallback when no scanner cache exists."""
+    regime_label = qdata.get("label", quadrant.replace("_"," ").title())
+    results = []
+    for s in sigs:
+        if s["action"] in ("HOLD", "SELL", "SHORT"):
+            continue
+        ac    = ASSET_CLASS_MAP.get(s["ticker"], "equities")
+        q_fit = ("strong"   if ac in playbook["strong_buy"] else
+                 "moderate" if ac in playbook["buy"]        else
+                 "avoid"    if ac in playbook["avoid"]      else "neutral")
+        q_w   = {"strong": 1.4, "moderate": 1.0, "neutral": 0.6, "avoid": 0.2}[q_fit]
+        score = round(s["confidence"] * q_w, 1)
+        jus   = s.get("dalio_justification", {})
+        reason_0 = (f"Regime: {regime_label} -- {ac.replace('_',' ').title()} is "
+                    f"{'favoured' if q_fit in ('strong','moderate') else 'on avoid list'}.")
+        reason_1 = f"RSI {s['rsi']:.0f} | trend: {s['trend']} | signal: {s['action']}"
+        reasoning = [reason_0, reason_1]
+        if isinstance(jus, dict):
+            for key in ("narrative", "recommendation"):
+                val = jus.get(key, "")
+                if val and isinstance(val, str):
+                    reasoning.append(val[:120])
+                    break
+        results.append({
+            "ticker": s["ticker"], "market": "signal", "action": s["action"],
+            "price": s["price"], "change_pct": 0, "rsi": s["rsi"],
+            "trend": s["trend"], "above_sma20": s["trend"] == "uptrend",
+            "hi_52w": s["take_profit"], "lo_52w": s["stop_loss"],
+            "pct_from_hi": 0, "pct_from_lo": 0, "sma20": s["price"],
+            "stop_loss": s["stop_loss"], "take_profit": s["take_profit"],
+            "rr_ratio": s["rr_ratio"], "score": score,
+            "asset_class": ac, "quadrant_fit": q_fit,
+            "data_source": s["data_source"],
+            "reasoning": reasoning,
+            "volume_fmt": "--", "sector": "--",
+            "quadrant": quadrant, "regime_label": regime_label,
+        })
+    results.sort(key=lambda o: o["score"], reverse=True)
+    return results[:n]
+
+
+async def _gen_opportunities(n: int = 8) -> list[dict]:
+    """Return the top-N trade opportunities."""
+    qdata    = STATE.last_quadrant or _gen_quadrant_data()
+    quadrant = qdata.get("quadrant", "rising_growth")
+    playbook = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
+    existing_classes = [ASSET_CLASS_MAP.get(t, "equities") for t in PAPER.positions]
+
+    all_rows: list[dict] = []
+    for mkt in ("crypto", "asx", "commodities"):
+        cached = _scanner_cache.get(mkt)
+        if cached:
+            for r in cached["rows"]:
+                row = dict(r)
+                row["_market"] = mkt
+                all_rows.append(row)
+
+    if not all_rows:
+        sigs = await _gen_signals(n * 2)
+        return _opp_from_signal_fallback(sigs, quadrant, playbook, qdata, existing_classes, n)
+
+    def _prescore(r: dict) -> float:
+        tkr = r["ticker"]
+        if tkr in PAPER.positions:
+            return -999.0
+        ac  = ASSET_CLASS_MAP.get(tkr, "equities")
+        chg = r.get("change_pct", 0.0)
+        q_s = (100 if ac in playbook["strong_buy"] else
+               70  if ac in playbook["buy"]        else
+               10  if ac in playbook["avoid"]      else 45)
+        mom = min(abs(chg) * 3.0, 30.0)
+        dir_b = (15 if ac in playbook["strong_buy"] and chg > 0 else
+                 10 if ac in playbook["avoid"] and chg < 0      else 0)
+        div_b = max(0.0, 20.0 - existing_classes.count(ac) * 5)
+        return q_s * 0.40 + mom * 0.25 + dir_b * 0.20 + div_b * 0.15
+
+    all_rows.sort(key=_prescore, reverse=True)
+    candidates = [r for r in all_rows if r["ticker"] not in PAPER.positions][:30]
+
+    cand_by_mkt: dict = {"asx": [], "crypto": [], "commodities": []}
+    for r in candidates[:24]:
+        mkt = r.get("_market", "asx")
+        cand_by_mkt[mkt].append(r["ticker"])
+
+    history_map: dict = {}
+    for mkt, tkrs in cand_by_mkt.items():
+        if not tkrs:
+            continue
+        chunk = await _get_prices(tkrs[:10], "3mo")
+        if chunk:
+            history_map.update(chunk)
+
+    crypto_missing = [t for t in cand_by_mkt.get("crypto", []) if t not in history_map]
+    if crypto_missing and YF_AVAILABLE:
+        loop = asyncio.get_running_loop()
+        import yfinance as _yf_opp
+
+        def _fetch_one_opp(tkr):
+            try:
+                hist = _yf_opp.Ticker(tkr).history(period="3mo", interval="1d", auto_adjust=True)
+                if hist is not None and not hist.empty and "Close" in hist.columns:
+                    closes = hist["Close"].dropna().tolist()
+                    if len(closes) >= 10:
+                        return (tkr, [float(c) for c in closes[-90:]])
+            except Exception:
+                pass
+            return None
+
+        tasks = [loop.run_in_executor(_EXECUTOR, _fetch_one_opp, t) for t in crypto_missing[:8]]
+        results = await asyncio.gather(*tasks)
+        for res in results:
+            if res:
+                history_map[res[0]] = res[1]
+
+    opportunities: list[dict] = []
+
+    for r in candidates:
+        tkr    = r["ticker"]
+        ac     = ASSET_CLASS_MAP.get(tkr, "equities")
+        closes = history_map.get(tkr)
+        chg    = r.get("change_pct", 0.0)
+        price  = r.get("price", 0.0)
+        if not price:
+            continue
+
+        if closes and len(closes) >= 14:
+            rsi        = _calc_rsi(closes)
+            trend      = _calc_trend(closes)
+            hi52       = float(max(closes))
+            lo52       = float(min(closes))
+            sma20      = float(np.mean(closes[-20:])) if len(closes) >= 20 else price
+            above_sma  = price > sma20
+            vol_d      = float(np.std(np.diff(closes)) / price) if len(closes) > 2 else 0.02
+            data_src   = "LIVE"
+        else:
+            rsi        = 50.0
+            trend      = "sideways"
+            hi52       = price * 1.20
+            lo52       = price * 0.80
+            sma20      = price
+            above_sma  = chg > 0
+            vol_d      = 0.025
+            data_src   = "SCANNER"
+
+        pct_from_hi = round((price / hi52 - 1) * 100, 1) if hi52 else 0
+        pct_from_lo = round((price / lo52 - 1) * 100, 1) if lo52 else 0
+
+        if   rsi < 32 and trend != "downtrend": action = "BUY"
+        elif rsi > 68 and trend != "uptrend":   action = "SELL"
+        elif trend == "uptrend" and rsi < 58:   action = "LONG"
+        elif trend == "downtrend" and rsi > 42: action = "SHORT"
+        else:                                   action = "WATCH"
+
+        is_short_signal = action in ("SELL", "SHORT")
+        is_avoid_class  = ac in playbook["avoid"]
+        if is_short_signal and not is_avoid_class:
+            continue
+
+        q_score = (100 if ac in playbook["strong_buy"] else
+                   70  if ac in playbook["buy"]        else
+                   10  if ac in playbook["avoid"]      else 45)
+        q_fit   = ("strong"   if ac in playbook["strong_buy"] else
+                   "moderate" if ac in playbook["buy"]        else
+                   "avoid"    if ac in playbook["avoid"]      else "neutral")
+
+        if not is_short_signal:
+            rsi_score = max(0.0, 50.0 - rsi) * 0.8
+        else:
+            rsi_score = max(0.0, rsi - 50.0) * 0.8
+
+        mom_score  = min(abs(chg) * 2.5, 25.0)
+        div_score  = max(0.0, 20.0 - existing_classes.count(ac) * 5.0)
+        composite  = round(
+            q_score   * 0.35 +
+            rsi_score * 0.30 +
+            mom_score * 0.20 +
+            div_score * 0.15,
+            1
+        )
+
+        atr = max(vol_d * price * 14, price * 0.01)
+        sl  = round(price - atr * 1.5, 4)
+        tp  = round(price + atr * 2.5, 4)
+        rr  = round((tp - price) / max(price - sl, 1e-6), 2)
+
+        reasons = [
+            f"Regime: {quadrant.replace('_',' ').title()} -- "
+            f"{ac.replace('_',' ').title()} is "
+            f"{'FAVOURED (strong buy)' if q_fit=='strong' else 'favoured' if q_fit=='moderate' else 'AVOID LIST' if q_fit=='avoid' else 'neutral'}.",
+            f"RSI {rsi:.0f} ({'oversold' if rsi<35 else 'overbought' if rsi>65 else 'neutral'}) | "
+            f"Trend: {trend} | {'Above' if above_sma else 'Below'} 20-day SMA.",
+            f"Today: {'+' if chg>=0 else ''}{chg:.2f}% | "
+            f"52w range: {pct_from_lo:+.1f}% from low, {pct_from_hi:+.1f}% from high.",
+            f"Stop ${sl:,.4f} -> Target ${tp:,.4f} | R:R {rr:.1f}x",
+        ]
+        if pct_from_lo < 10:
+            reasons.append("Near 52-week low -- potential high-reward entry zone.")
+        if above_sma and chg > 1:
+            reasons.append("Strong momentum: price above SMA and up today.")
+        if existing_classes.count(ac) == 0:
+            reasons.append(f"No current {ac.replace('_',' ')} exposure -- adds portfolio diversification.")
+
+        opportunities.append({
+            "ticker":       tkr,
+            "market":       r["_market"],
+            "action":       action,
+            "price":        price,
+            "change_pct":   round(chg, 2),
+            "rsi":          round(rsi, 1),
+            "trend":        trend,
+            "above_sma20":  above_sma,
+            "hi_52w":       round(hi52, 4),
+            "lo_52w":       round(lo52, 4),
+            "pct_from_hi":  pct_from_hi,
+            "pct_from_lo":  pct_from_lo,
+            "sma20":        round(sma20, 4),
+            "stop_loss":    sl,
+            "take_profit":  tp,
+            "rr_ratio":     rr,
+            "fee_pct":      _get_fee_pct(tkr),
+            "round_trip_fee_pct": round(_get_fee_pct(tkr) * 2, 2),
+            "net_profit_pct": round((tp - price) / price * 100 - _get_fee_pct(tkr) * 2, 2),
+            "score":        composite,
+            "asset_class":  ac,
+            "quadrant_fit": q_fit,
+            "data_source":  data_src,
+            "reasoning":    reasons,
+            "volume_fmt":   r.get("volume_fmt", "--"),
+            "sector":       r.get("sector", "--"),
+            "quadrant":     quadrant,
+            "regime_label": qdata.get("label", quadrant),
+        })
+
+    opportunities.sort(key=lambda o: o["score"], reverse=True)
+    return opportunities[:n]
+
+
+def _gen_justification(ticker: str, action: str, **kwargs) -> dict:
+    """Generate Dalio-framework justification using real signal data."""
+    qdata = STATE.last_quadrant or {}
+    quadrant = qdata.get("quadrant", "rising_growth")
+    meta = QUADRANT_META.get(quadrant, QUADRANT_META["rising_growth"])
+
+    rsi_val = kwargs.get("rsi", 50.0)
+    rr = kwargs.get("rr", 2.0)
+    macd_sig = kwargs.get("macd_signal", "neutral")
+    bb_pos = kwargs.get("bb_position", "mid")
+    trend = kwargs.get("trend", "sideways")
+    q_fit = kwargs.get("q_fit", "neutral")
+
+    sent_score = 0.0
+    sent_source = "keyword"
+    if STATE.last_sentiment:
+        qs = STATE.last_sentiment.get("quadrant_sentiment", {})
+        q_sent = qs.get(quadrant, {})
+        sent_score = q_sent.get("avg_score", 0.0)
+        sent_source = STATE.last_sentiment.get("sentiment_model", "keyword")
+
+    n_positions = len(PAPER.positions) + 1
+    corr_estimate = round(max(-0.15, min(0.1, 0.3 - 0.03 * n_positions)), 3)
+    sharpe_est = round(max(0.01, min(0.4, (rr - 1.0) * 0.1)), 3)
+    risk_contrib = round(100.0 / max(n_positions, 1), 2)
+
+    action_word = {
+        "BUY": "long", "LONG": "long",
+        "SELL": "exit", "SHORT": "short", "HOLD": "hold",
+    }.get(action, "enter")
+
+    sentiment_word = "positive" if sent_score > 0.1 else "negative" if sent_score < -0.1 else "neutral"
+    rsi_desc = "oversold" if rsi_val < 35 else "overbought" if rsi_val > 65 else "neutral"
+    quadrant_label = quadrant.replace("_", " ").title()
+
+    ai_overview = (
+        f"{ticker} presents a {action.lower()} opportunity under the current {quadrant_label} regime. "
+        f"Sentiment ({sent_source}) is {sentiment_word} (score {sent_score:+.3f}), "
+        f"RSI reads {rsi_val:.0f} ({rsi_desc}), MACD is {macd_sig}, "
+        f"BB position: {bb_pos}, trend: {trend}. "
+        f"Risk/reward ratio is {rr}:1. "
+        f"Estimated correlation delta {corr_estimate:+.3f} -- within Holy Grail threshold. "
+        f"Quadrant fit: {q_fit}. "
+        f"Dalio framework favours {', '.join(meta['favoured'][:3])} in this environment."
+    )
+
+    reasons = [
+        f"Asset has {q_fit} alignment with {quadrant_label} environment",
+        f"Sentiment ({sent_source}): {sentiment_word} ({sent_score:+.3f}) for {ticker}",
+        f"RSI {rsi_val:.0f} -- {rsi_desc} zone",
+        f"MACD {macd_sig} | Bollinger: {bb_pos} | Trend: {trend}",
+        f"Correlation delta {corr_estimate:+.3f} -- within Holy Grail threshold",
+    ]
+
+    return {
+        "quadrant": quadrant,
+        "quadrant_description": meta["description"],
+        "sentiment_score": sent_score,
+        "sentiment_model": sent_source,
+        "sharpe_improvement": sharpe_est,
+        "correlation_delta": corr_estimate,
+        "risk_contribution_pct": risk_contrib,
+        "ai_overview": ai_overview,
+        "reasons": reasons,
+        "data_source": "LIVE",
+    }
+
+
+def _gen_quadrant_data() -> dict:
+    """Classify economic quadrant from real market data when available."""
+    try:
+        return _classify_quadrant_from_market_data()
+    except Exception as exc:
+        logger.warning(f"Real quadrant classification failed ({exc}), using random fallback")
+        return _gen_quadrant_data_random()
+
+
+def _classify_quadrant_from_market_data() -> dict:
+    """Derive economic quadrant from cached scanner/price data."""
+    growth_score = 0.0
+    inflation_score = 0.0
+    confidence_factors = 0
+    data_sources = []
+
+    asx_cache = _scanner_cache.get("asx")
+    if asx_cache and asx_cache.get("rows"):
+        rows = asx_cache["rows"]
+        up_count = sum(1 for r in rows if r.get("change_pct", 0) > 0)
+        breadth = up_count / max(len(rows), 1)
+        growth_score += (breadth - 0.5) * 4.0
+        confidence_factors += 1
+        data_sources.append("ASX breadth")
+
+    comm_cache = _scanner_cache.get("commodities")
+    if comm_cache and comm_cache.get("rows"):
+        for r in comm_cache["rows"]:
+            tkr = r.get("ticker", "")
+            if "GC=F" in tkr or "GOLD" in tkr.upper():
+                chg = r.get("change_pct", 0)
+                if chg > 0.5:
+                    inflation_score += 1.5
+                elif chg < -0.5:
+                    inflation_score -= 1.0
+                confidence_factors += 1
+                data_sources.append("Gold price")
+                break
+            if "CL=F" in tkr or "OIL" in tkr.upper() or "BZ=F" in tkr:
+                chg = r.get("change_pct", 0)
+                if chg > 1.0:
+                    inflation_score += 1.0
+                elif chg < -1.0:
+                    inflation_score -= 0.5
+                confidence_factors += 1
+                data_sources.append("Oil price")
+                break
+
+    crypto_cache = _scanner_cache.get("crypto")
+    if crypto_cache and crypto_cache.get("rows"):
+        rows = crypto_cache["rows"]
+        avg_chg = np.mean([r.get("change_pct", 0) for r in rows[:5]])
+        growth_score += min(max(avg_chg * 0.3, -1.5), 1.5)
+        confidence_factors += 1
+        data_sources.append("Crypto sentiment")
+
+    if STATE.last_sentiment:
+        sent = STATE.last_sentiment
+        if sent.get("conflict_risk_elevated"):
+            inflation_score += 1.5
+            confidence_factors += 1
+            data_sources.append("Conflict risk")
+        dom_q = sent.get("dominant_quadrant", "")
+        if "inflation" in dom_q:
+            inflation_score += 0.8
+        elif "growth" in dom_q:
+            growth_score += 0.5 if "rising" in dom_q else -0.5
+
+    if confidence_factors == 0:
+        raise ValueError("No market data available for quadrant classification")
+
+    if growth_score > 0.3 and inflation_score <= 0.5:
+        q = "rising_growth"
+    elif growth_score <= -0.3 and inflation_score <= 0.5:
+        q = "falling_growth"
+    elif inflation_score > 0.5:
+        q = "rising_inflation"
+    else:
+        q = "falling_inflation"
+
+    meta = QUADRANT_META[q]
+    confidence = min(92, max(55, 50 + confidence_factors * 8 + abs(growth_score + inflation_score) * 5))
+
+    gdp_proxy = round(2.5 + growth_score * 0.8, 2)
+    cpi_proxy = round(3.0 + inflation_score * 1.2, 2)
+    gdp_trend = "rising" if growth_score > 0.3 else "falling" if growth_score < -0.3 else "stable"
+    cpi_trend = "rising" if inflation_score > 0.5 else "falling" if inflation_score < -0.3 else "stable"
+
+    conflict = False
+    if STATE.last_sentiment:
+        conflict = STATE.last_sentiment.get("conflict_risk_elevated", False)
+
+    return {
+        "quadrant": q,
+        "label": meta["label"],
+        "color": meta["color"],
+        "description": meta["description"],
+        "gdp_value": gdp_proxy,
+        "gdp_trend": gdp_trend,
+        "cpi_value": cpi_proxy,
+        "cpi_trend": cpi_trend,
+        "conflict_risk_elevated": conflict,
+        "favoured_assets": meta["favoured"],
+        "avoid_assets": meta["avoid"],
+        "confidence": round(confidence, 1),
+        "macro_source": f"Market-derived ({', '.join(data_sources)})",
+        "sentiment_source": "RSS keyword analysis",
+        "data_source": "LIVE" if confidence_factors >= 2 else "PARTIAL",
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+def _gen_quadrant_data_random() -> dict:
+    """Pure random fallback."""
+    q = random.choice(list(QUADRANT_META.keys()))
+    meta = QUADRANT_META[q]
+    return {
+        "quadrant": q,
+        "label": meta["label"],
+        "color": meta["color"],
+        "description": meta["description"],
+        "gdp_value": round(random.uniform(-1.5, 4.5), 2),
+        "gdp_trend": random.choice(["rising", "falling", "stable"]),
+        "cpi_value": round(random.uniform(1.5, 8.5), 2),
+        "cpi_trend": random.choice(["rising", "falling", "stable"]),
+        "conflict_risk_elevated": random.choices([False, True], weights=[75, 25])[0],
+        "favoured_assets": meta["favoured"],
+        "avoid_assets": meta["avoid"],
+        "confidence": round(random.uniform(65, 92), 1),
+        "macro_source": "DEMO (no market data available)",
+        "sentiment_source": "DEMO",
+        "data_source": "DEMO",
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+# ── Sentiment (news RSS + FinBERT) ─────────────────────
+
+_NEWS_RSS_FEEDS = [
+    ("Reuters Business",   "https://feeds.reuters.com/reuters/businessNews"),
+    ("Reuters Markets",    "https://feeds.reuters.com/reuters/UKmarkets"),
+    ("Reuters Top News",   "https://feeds.reuters.com/reuters/topNews"),
+    ("Reuters Tech",       "https://feeds.reuters.com/reuters/technologyNews"),
+    ("Yahoo Finance",      "https://finance.yahoo.com/news/rssindex"),
+    ("MarketWatch",        "https://feeds.marketwatch.com/marketwatch/topstories/"),
+    ("MarketWatch Stocks", "https://feeds.marketwatch.com/marketwatch/StockstoWatch/"),
+    ("MarketWatch Econ",   "https://feeds.marketwatch.com/marketwatch/economy/"),
+    ("CNBC Finance",       "https://www.cnbc.com/id/10000664/device/rss/rss.html"),
+    ("CNBC World",         "https://www.cnbc.com/id/100727362/device/rss/rss.html"),
+    ("CNBC Earnings",      "https://www.cnbc.com/id/15839135/device/rss/rss.html"),
+    ("Investing.com",      "https://www.investing.com/rss/news_25.rss"),
+    ("Investing Forex",    "https://www.investing.com/rss/news_1.rss"),
+    ("Investing Stocks",   "https://www.investing.com/rss/news_14.rss"),
+    ("Investing Commodities","https://www.investing.com/rss/news_11.rss"),
+    ("Seeking Alpha",      "https://seekingalpha.com/market_currents.xml"),
+    ("AFR",                "https://www.afr.com/rss/feed/latest"),
+    ("AFR Markets",        "https://www.afr.com/rss/feed/markets"),
+    ("ABC Finance AU",     "https://www.abc.net.au/news/feed/1399786/rss.xml"),
+    ("FT Markets",         "https://www.ft.com/rss/home/uk"),
+    ("Bloomberg Mkts",     "https://feeds.bloomberg.com/markets/news.rss"),
+    ("WSJ Markets",        "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"),
+    ("WSJ Business",       "https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml"),
+    ("WSJ World",          "https://feeds.a.dj.com/rss/RSSWorldNews.xml"),
+    ("Barrons",            "https://feeds.barrons.com/barrons/articles.rss"),
+    ("Motley Fool",        "https://www.fool.com/feeds/index.aspx"),
+    ("Benzinga",           "https://www.benzinga.com/feed"),
+    ("Zacks",              "https://www.zacks.com/feeds/"),
+    ("TheStreet",          "https://www.thestreet.com/feeds/rss"),
+    ("CoinDesk",           "https://www.coindesk.com/arc/outboundfeeds/rss/"),
+    ("CoinTelegraph",      "https://cointelegraph.com/rss"),
+    ("Decrypt",            "https://decrypt.co/feed"),
+    ("CryptoSlate",        "https://cryptoslate.com/feed/"),
+    ("Bitcoin Magazine",   "https://bitcoinmagazine.com/.rss/full/"),
+    ("The Block",          "https://www.theblock.co/rss.xml"),
+    ("CryptoPotato",       "https://cryptopotato.com/feed/"),
+    ("NewsBTC",            "https://www.newsbtc.com/feed/"),
+    ("AMBCrypto",          "https://ambcrypto.com/feed/"),
+    ("U.Today Crypto",     "https://u.today/rss"),
+    ("Kitco Gold",         "https://www.kitco.com/rss/kitconews.xml"),
+    ("OilPrice.com",       "https://oilprice.com/rss/main"),
+    ("Mining.com",         "https://www.mining.com/feed/"),
+    ("Platts",             "https://www.spglobal.com/commodityinsights/en/rss-feed/platts-metals"),
+    ("AgriCensus",         "https://www.agricensus.com/feed/"),
+    ("BBC Business",       "https://feeds.bbci.co.uk/news/business/rss.xml"),
+    ("BBC World",          "https://feeds.bbci.co.uk/news/world/rss.xml"),
+    ("Al Jazeera Business","https://www.aljazeera.com/xml/rss/all.xml"),
+    ("The Guardian Money", "https://www.theguardian.com/uk/money/rss"),
+    ("Guardian Business",  "https://www.theguardian.com/uk/business/rss"),
+    ("Guardian World",     "https://www.theguardian.com/world/rss"),
+    ("NPR Economy",        "https://feeds.npr.org/1006/rss.xml"),
+    ("NPR Business",       "https://feeds.npr.org/1006/rss.xml"),
+    ("Economist Finance",  "https://www.economist.com/finance-and-economics/rss.xml"),
+    ("AP Business",        "https://rsshub.app/apnews/topics/business"),
+    ("CNN Business",       "http://rss.cnn.com/rss/money_news_economy.rss"),
+    ("CNN Markets",        "http://rss.cnn.com/rss/money_markets.rss"),
+    ("ABC News US",        "https://abcnews.go.com/abcnews/moneyheadlines"),
+    ("Forbes",             "https://www.forbes.com/business/feed/"),
+    ("Forbes Investing",   "https://www.forbes.com/investing/feed/"),
+    ("Nikkei Asia",        "https://asia.nikkei.com/rss"),
+    ("SMH Business AU",    "https://www.smh.com.au/rss/business.xml"),
+    ("SMH Money AU",       "https://www.smh.com.au/rss/money.xml"),
+    ("LiveWire AU",        "https://www.livewiremarkets.com/rss"),
+    ("SCMP Economy",       "https://www.scmp.com/rss/5/feed"),
+    ("Channel News Asia",  "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511"),
+    ("Straits Times Biz",  "https://www.straitstimes.com/news/business/rss.xml"),
+    ("Economic Times IN",  "https://economictimes.indiatimes.com/rssfeedstopstories.cms"),
+    ("Mint India",         "https://www.livemint.com/rss/markets"),
+    ("DW Business",        "https://rss.dw.com/xml/rss-en-bus"),
+    ("Euronews Business",  "https://www.euronews.com/rss?level=tag&name=business"),
+    ("Irish Times Biz",    "https://www.irishtimes.com/cmlink/the-irish-times-business-1.920361"),
+    ("Telegraph Business", "https://www.telegraph.co.uk/business/rss.xml"),
+    ("GNews Crypto",       "https://news.google.com/rss/search?q=cryptocurrency+bitcoin+ethereum&hl=en&gl=US&ceid=US:en"),
+    ("GNews Commodities",  "https://news.google.com/rss/search?q=gold+oil+commodities+futures&hl=en&gl=US&ceid=US:en"),
+    ("GNews ASX",          "https://news.google.com/rss/search?q=ASX+Australian+stocks+market&hl=en-AU&gl=AU&ceid=AU:en"),
+    ("GNews Markets",      "https://news.google.com/rss/search?q=stock+market+interest+rates+inflation&hl=en&gl=US&ceid=US:en"),
+    ("GNews Geopolitics",  "https://news.google.com/rss/search?q=geopolitics+sanctions+trade+war&hl=en&gl=US&ceid=US:en"),
+    ("GNews Central Banks","https://news.google.com/rss/search?q=federal+reserve+ECB+RBA+interest+rates&hl=en&gl=US&ceid=US:en"),
+    ("GNews Forex",        "https://news.google.com/rss/search?q=forex+currency+USD+EUR+AUD&hl=en&gl=US&ceid=US:en"),
+    ("GNews Bonds",        "https://news.google.com/rss/search?q=treasury+bonds+yields+fixed+income&hl=en&gl=US&ceid=US:en"),
+    ("GNews Real Estate",  "https://news.google.com/rss/search?q=real+estate+housing+market+REIT&hl=en&gl=US&ceid=US:en"),
+    ("GNews ETF",          "https://news.google.com/rss/search?q=ETF+index+fund+passive+investing&hl=en&gl=US&ceid=US:en"),
+    ("GNews Energy",       "https://news.google.com/rss/search?q=energy+oil+gas+renewable+OPEC&hl=en&gl=US&ceid=US:en"),
+    ("GNews Tech Stocks",  "https://news.google.com/rss/search?q=tech+stocks+NASDAQ+AI+semiconductor&hl=en&gl=US&ceid=US:en"),
+    ("GNews Earnings",     "https://news.google.com/rss/search?q=earnings+report+quarterly+results+revenue&hl=en&gl=US&ceid=US:en"),
+    ("GNews IPO",          "https://news.google.com/rss/search?q=IPO+listing+SPAC+public+offering&hl=en&gl=US&ceid=US:en"),
+    ("GNews China Econ",   "https://news.google.com/rss/search?q=China+economy+trade+manufacturing&hl=en&gl=US&ceid=US:en"),
+    ("GNews Recession",    "https://news.google.com/rss/search?q=recession+downturn+economic+slowdown&hl=en&gl=US&ceid=US:en"),
+]
+
+_BULLISH_WORDS  = {"rally","surge","gain","high","record","beat","growth","rise","up","profit",
+                   "positive","strong","outperform","buy","upgrade","bullish","recovery","soar"}
+_BEARISH_WORDS  = {"fall","drop","crash","low","miss","recession","down","loss","negative","weak",
+                   "risk","warning","downgrade","sell","bearish","slump","plunge","cut","concern"}
+_CONFLICT_WORDS = {"war","conflict","military","sanctions","attack","threat","crisis","invasion",
+                   "strike","bomb","weapons","troops","geopolit"}
+_INFLATION_KW   = {"inflation","cpi","pce","rates","fed","rba","boe","ecb","oil","energy",
+                   "commodit","gold","silver","copper","wheat","supply"}
+_GROWTH_KW      = {"gdp","jobs","employment","payroll","earnings","revenue","ism","pmi",
+                   "retail","consumer","spending","trade","export","import"}
+_DEFLAT_KW      = {"deflation","disinflation","rate cut","pivot","quantitative","qe","stimulus"}
+
+
+def _score_headline(title: str, body: str = "") -> dict:
+    text = (title + " " + body).lower()
+    words = set(text.replace(",", " ").replace(".", " ").split())
+    bull  = len(words & _BULLISH_WORDS)
+    bear  = len(words & _BEARISH_WORDS)
+    conf  = len(words & _CONFLICT_WORDS)
+    infl  = len(words & _INFLATION_KW)
+    grow  = len(words & _GROWTH_KW)
+    defl  = len(words & _DEFLAT_KW)
+    if bull > bear + 1: sentiment = "positive"
+    elif bear > bull + 1: sentiment = "negative"
+    else: sentiment = "neutral"
+    if infl >= grow and infl >= defl:
+        quadrant = "rising_inflation" if bull >= bear else "falling_inflation"
+    elif defl > infl: quadrant = "falling_inflation"
+    elif grow > 0 and bull >= bear: quadrant = "rising_growth"
+    else: quadrant = "falling_growth"
+    return {"sentiment": sentiment, "quadrant": quadrant, "conflict_risk": conf > 0,
+            "bull_score": bull, "bear_score": bear}
+
+
+async def _fetch_real_news() -> list[dict]:
+    loop = asyncio.get_running_loop()
+    articles: list[dict] = []
+
+    def _parse_one_feed(feed_name: str, url: str) -> list[dict]:
+        try:
+            import feedparser
+            feed = feedparser.parse(url)
+            items = []
+            for entry in feed.entries:
+                title = (getattr(entry, "title", "") or "").strip()
+                if not title or len(title) < 15: continue
+                body = (getattr(entry, "summary", "") or "")[:400]
+                score = _score_headline(title, body)
+                items.append({"title": title, "source": feed_name, "sentiment": score["sentiment"],
+                    "quadrant": score["quadrant"], "conflict_risk": score["conflict_risk"],
+                    "bull_score": score["bull_score"], "bear_score": score["bear_score"],
+                    "timestamp": datetime.utcnow().isoformat()})
+            return items
+        except Exception as exc:
+            logger.debug(f"RSS [{feed_name}] failed: {exc}")
+            return []
+
+    futures = [loop.run_in_executor(None, _parse_one_feed, name, url) for name, url in _NEWS_RSS_FEEDS]
+    try:
+        results = await asyncio.wait_for(asyncio.gather(*futures, return_exceptions=True), timeout=30)
+    except asyncio.TimeoutError:
+        logger.warning("RSS aggregate fetch timed out after 30s")
+        results = []
+    for batch in results:
+        if isinstance(batch, list): articles.extend(batch)
+
+    if not articles:
+        logger.warning("All RSS feeds failed -- using static headline pool")
+        articles = _gen_static_headlines()
+
+    seen: set = set()
+    unique: list = []
+    for a in articles:
+        key = a["title"][:60].lower()
+        if key not in seen:
+            seen.add(key)
+            unique.append(a)
+    unique.sort(key=lambda h: (h["conflict_risk"], abs(h["bull_score"] - h["bear_score"])), reverse=True)
+    logger.info(f"News scan: {len(unique)} unique articles from {len(_NEWS_RSS_FEEDS)} feeds")
+    return unique
+
+
+_STATIC_HEADLINE_POOL = [
+    ("Fed signals pause in rate hikes amid cooling inflation",       "rising_growth",    "positive"),
+    ("RBA holds rates as Australian GDP surprises to upside",        "rising_growth",    "positive"),
+    ("Oil surges 4% on Middle East supply disruption fears",         "rising_inflation", "negative"),
+    ("BHP reports record iron ore shipments, ASX rallies",           "rising_growth",    "positive"),
+    ("China manufacturing PMI contracts for third straight month",   "falling_growth",   "negative"),
+    ("Gold hits 3-month high as USD weakens on jobs data miss",      "rising_inflation", "positive"),
+    ("Military conflict escalates in Eastern Europe, safe havens bid","rising_inflation","negative"),
+    ("US CPI drops to 2.4%, markets price in rate cuts",             "falling_inflation","positive"),
+    ("Tech layoffs accelerate, NASDAQ futures lower",                "falling_growth",   "negative"),
+    ("OPEC+ announces surprise production cut of 500k bpd",          "rising_inflation", "neutral"),
+    ("ASX 200 closes at 5-year high on earnings season beat",        "rising_growth",    "positive"),
+    ("Copper prices plunge on weak Chinese demand outlook",          "falling_growth",   "negative"),
+    ("Wheat prices spike amid Black Sea shipping disruptions",       "rising_inflation", "negative"),
+    ("Australian dollar rallies as trade surplus widens",            "rising_growth",    "positive"),
+    ("Silver ETF inflows surge as inflation expectations rise",      "rising_inflation", "positive"),
+    ("US 10-year yield falls as economic data disappoints",          "falling_growth",   "negative"),
+    ("Amazon, Alphabet earnings beat; tech sector rallies",         "rising_growth",    "positive"),
+    ("Iron ore falls on Chinese property sector concerns",           "falling_growth",   "negative"),
+    ("TIPS inflows accelerate as breakeven inflation widens",        "rising_inflation", "neutral"),
+    ("S&P 500 hits fresh record as rate cut hopes persist",         "rising_growth",    "positive"),
+]
+
+
+def _gen_static_headlines() -> list[dict]:
+    return [
+        {"title": h[0], "quadrant": h[1], "sentiment": h[2], "source": "Market Intelligence",
+         "timestamp": datetime.utcnow().isoformat(),
+         "conflict_risk": "military" in h[0].lower() or "conflict" in h[0].lower(),
+         "bull_score": 1 if h[2] == "positive" else 0,
+         "bear_score": 1 if h[2] == "negative" else 0}
+        for h in _STATIC_HEADLINE_POOL
+    ]
+
+
+# FinBERT lazy loader
+_FINBERT_MODEL = None
+_FINBERT_TOKENIZER = None
+_FINBERT_LOADED = False
+
+
+def _try_finbert_sentiment(articles: list[dict]) -> list[dict]:
+    global _FINBERT_MODEL, _FINBERT_TOKENIZER, _FINBERT_LOADED
+    if not articles: return articles
+    if not _FINBERT_LOADED:
+        _FINBERT_LOADED = True
+        try:
+            import torch
+            from transformers import AutoTokenizer, AutoModelForSequenceClassification
+            model_name = "ProsusAI/finbert"
+            logger.info(f"Loading FinBERT model: {model_name}")
+            _FINBERT_TOKENIZER = AutoTokenizer.from_pretrained(model_name)
+            _FINBERT_MODEL = AutoModelForSequenceClassification.from_pretrained(model_name)
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            _FINBERT_MODEL.to(device)
+            _FINBERT_MODEL.eval()
+            logger.info(f"FinBERT loaded on {device}")
+        except Exception as e:
+            logger.info(f"FinBERT not available ({e}), using keyword sentiment")
+            _FINBERT_MODEL = None
+            _FINBERT_TOKENIZER = None
+
+    if _FINBERT_MODEL is None or _FINBERT_TOKENIZER is None:
+        return articles
+
+    try:
+        import torch
+        device = next(_FINBERT_MODEL.parameters()).device
+        batch_size = 16
+        labels = ["positive", "negative", "neutral"]
+        for i in range(0, len(articles), batch_size):
+            batch = articles[i:i + batch_size]
+            texts = [a["title"][:512] for a in batch]
+            inputs = _FINBERT_TOKENIZER(texts, return_tensors="pt", truncation=True, max_length=512, padding=True).to(device)
+            with torch.no_grad():
+                outputs = _FINBERT_MODEL(**inputs)
+            probs = torch.softmax(outputs.logits, dim=1).cpu().numpy()
+            for j, a in enumerate(batch):
+                prob_dict = dict(zip(labels, probs[j].tolist()))
+                score = prob_dict["positive"] - prob_dict["negative"]
+                a["finbert_score"] = round(score, 4)
+                a["sentiment"] = labels[int(np.argmax(probs[j]))]
+                a["bull_score"] = round(prob_dict["positive"], 3)
+                a["bear_score"] = round(prob_dict["negative"], 3)
+        logger.info(f"FinBERT scored {len(articles)} articles")
+    except Exception as e:
+        logger.warning(f"FinBERT batch scoring failed ({e}), keeping keyword scores")
+    return articles
+
+
+async def _gen_sentiment_data() -> dict:
+    articles = await _fetch_real_news()
+    articles = _try_finbert_sentiment(articles)
+    total = len(articles)
+    conflict = sum(1 for a in articles if a["conflict_risk"])
+
+    q_counts: dict = defaultdict(lambda: {"count": 0, "bull": 0, "bear": 0, "scores": []})
+    for a in articles:
+        q = a["quadrant"]
+        q_counts[q]["count"] += 1
+        score = a.get("finbert_score", None)
+        if score is not None:
+            q_counts[q]["scores"].append(score)
+            if score > 0.1: q_counts[q]["bull"] += 1
+            elif score < -0.1: q_counts[q]["bear"] += 1
+        else:
+            if a["sentiment"] == "positive": q_counts[q]["bull"] += 1
+            elif a["sentiment"] == "negative": q_counts[q]["bear"] += 1
+
+    quadrant_sentiment: dict = {}
+    for q in QUADRANT_META:
+        s = q_counts[q]
+        c = max(s["count"], 1)
+        if s["scores"]:
+            avg_score = round(float(np.mean(s["scores"])), 3)
+        else:
+            avg_score = round((s["bull"] - s["bear"]) / c, 3)
+        quadrant_sentiment[q] = {"avg_score": avg_score, "article_count": s["count"],
+                                  "bullish_pct": round(s["bull"] / c * 100, 1)}
+
+    dominant = max(quadrant_sentiment, key=lambda q: quadrant_sentiment[q]["article_count"])
+    sentiment_model = "FinBERT" if articles and articles[0].get("finbert_score") is not None else "Keyword"
+
+    return {
+        "total_articles": total, "conflict_risk_articles": conflict,
+        "conflict_risk_elevated": conflict >= max(3, int(total * 0.08)),
+        "dominant_quadrant": dominant, "quadrant_sentiment": quadrant_sentiment,
+        "top_headlines": articles, "sentiment_model": sentiment_model,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+# ── Correlation matrix ─────────────────────────────────
+
+def _gen_correlation_matrix_demo() -> dict:
+    tickers = CORR_TICKERS
+    n = len(tickers)
+    mat = np.eye(n)
+    for i in range(n):
+        for j in range(i + 1, n):
+            r = round(random.uniform(-0.25, 0.55), 3)
+            mat[i][j] = r
+            mat[j][i] = r
+    upper = np.triu_indices(n, k=1)
+    return {
+        "tickers": tickers, "matrix": mat.tolist(),
+        "mean_correlation": round(float(np.mean(mat[upper])), 3),
+        "max_correlation": round(float(np.max(mat[upper])), 3),
+        "holy_grail_count": sum(1 for i in range(n) if np.mean(np.abs(mat[i][np.arange(n) != i])) < 0.35),
+        "threshold": 0.3, "data_source": "DEMO", "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+async def _real_correlation_matrix() -> Optional[dict]:
+    tickers = CORR_TICKERS
+    prices_map = await _get_prices(tickers, "3mo")
+    if not prices_map or len(prices_map) < 4: return None
+    valid = [t for t in tickers if t in prices_map and len(prices_map[t]) >= 20]
+    if len(valid) < 4: return None
+    min_len = min(len(prices_map[t]) for t in valid)
+    closes = np.array([prices_map[t][-min_len:] for t in valid], dtype=float)
+    returns = np.diff(closes, axis=1) / closes[:, :-1]
+    corr = np.round(np.corrcoef(returns), 3)
+    n = len(valid)
+    upper = np.triu_indices(n, k=1)
+    hg_count = sum(1 for i in range(n) if float(np.mean(np.abs(corr[i][np.arange(n) != i]))) < 0.35)
+    return {
+        "tickers": valid, "matrix": corr.tolist(),
+        "mean_correlation": round(float(np.mean(corr[upper])), 3),
+        "max_correlation": round(float(np.max(corr[upper])), 3),
+        "holy_grail_count": hg_count, "threshold": 0.3,
+        "data_source": "LIVE", "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+def _gen_portfolio_health() -> dict:
+    """Real portfolio health from PAPER state."""
+    initial = PAPER_STARTING_CASH
+    equity = PAPER.cash
+    if PAPER.equity_history:
+        equity = PAPER.equity_history[-1]["v"]
+    daily_pnl = 0.0
+    if len(PAPER.equity_history) >= 2:
+        daily_pnl = round(PAPER.equity_history[-1]["v"] - PAPER.equity_history[-2]["v"], 2)
+    drawdown = 0.0
+    if PAPER.equity_history:
+        peak = max(e["v"] for e in PAPER.equity_history)
+        drawdown = round((peak - equity) / peak * 100, 2) if peak > 0 else 0.0
+    sharpe = 0.0
+    if len(PAPER.equity_history) >= 10:
+        try:
+            eq_arr = np.array([e["v"] for e in PAPER.equity_history], dtype=float)
+            rets = np.diff(eq_arr) / eq_arr[:-1]
+            if rets.std() > 0:
+                sharpe = round(float((rets.mean() / rets.std()) * (252 ** 0.5)), 2)
+        except Exception:
+            pass
+    open_count = len(PAPER.positions)
+    positions_list = [
+        {"ticker": t, "side": pos.get("side", "LONG"),
+         "size_pct": round(pos["qty"] * pos["entry_price"] / max(equity, 1) * 100, 1),
+         "unrealised_pnl_pct": 0.0}
+        for t, pos in PAPER.positions.items()
+    ]
+    return {
+        "timestamp": datetime.utcnow().isoformat(), "equity": round(equity, 2),
+        "initial_equity": initial, "cash": round(PAPER.cash, 2),
+        "total_return_pct": round((equity / initial - 1) * 100, 2) if initial else 0.0,
+        "daily_pnl": daily_pnl,
+        "daily_pnl_pct": round(daily_pnl / equity * 100, 3) if equity else 0.0,
+        "drawdown_pct": drawdown, "open_positions": open_count,
+        "dalio_diversification_met": open_count >= 3,
+        "selected_portfolio_size": open_count,
+        "circuit_breaker_active": drawdown > 9.5,
+        "daily_limit_pct": 2.0, "max_drawdown_pct": 10.0,
+        "sharpe_ratio": sharpe, "positions": positions_list,
+    }
+
+
+def _gen_backtest_results() -> dict:
+    periods = []
+    cumulative = STATE.initial_equity
+    for i in range(8):
+        ret = round(random.gauss(3.5, 6.0), 2)
+        cumulative *= (1 + ret / 100)
+        periods.append({"period": i + 1, "train_start": f"202{2 + i // 4}-Q{(i % 4) + 1}",
+            "return_pct": ret, "sharpe": round(random.uniform(0.9, 2.8), 2),
+            "max_drawdown": round(random.uniform(-12, -1), 2),
+            "win_rate": round(random.uniform(50, 72), 1), "trades": random.randint(28, 85)})
+    return {
+        "status": "SIMULATED", "data_source": "simulated", "training_months": 12,
+        "test_months": 3, "periods": len(periods),
+        "total_return_pct": round((cumulative / STATE.initial_equity - 1) * 100, 2),
+        "annualised_return_pct": round(random.uniform(18, 42), 2),
+        "sharpe_ratio": round(random.uniform(1.6, 2.4), 2),
+        "sortino_ratio": round(random.uniform(2.0, 3.1), 2),
+        "calmar_ratio": round(random.uniform(1.8, 2.9), 2),
+        "max_drawdown_pct": round(random.uniform(-9, -5), 2),
+        "win_rate_pct": round(random.uniform(57, 68), 1),
+        "avg_trade_return_pct": round(random.uniform(1.5, 3.2), 2),
+        "period_results": periods, "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+def dalio_analyse_trade(ticker: str, side: str, quadrant: str,
+                        cash: float, positions: dict, current_signals: list) -> dict:
+    ticker = ticker.upper().strip()
+    side = side.upper().strip()
+    asset_class = ASSET_CLASS_MAP.get(ticker, "equities")
+    playbook = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
+
+    if side == "BUY":
+        if   asset_class in playbook["strong_buy"]: raw_score = random.randint(82, 97); fit_label = "STRONG FIT"
+        elif asset_class in playbook["buy"]:         raw_score = random.randint(62, 81); fit_label = "MODERATE FIT"
+        elif asset_class in playbook["avoid"]:       raw_score = random.randint(10, 35); fit_label = "COUNTER-TREND"
+        else:                                        raw_score = random.randint(40, 61); fit_label = "NEUTRAL"
+    else:
+        if   asset_class in playbook["avoid"]:       raw_score = random.randint(75, 93); fit_label = "STRONG FIT"
+        elif asset_class not in playbook["strong_buy"]: raw_score = random.randint(55, 74); fit_label = "MODERATE FIT"
+        else:                                        raw_score = random.randint(20, 45); fit_label = "COUNTER-TREND"
+    fit_score = max(0, min(100, raw_score))
+
+    risk_flags: list = []
+    total_pv = cash + sum(p.get("qty", 0) * p.get("entry_price", 0) for p in positions.values())
+    n_pos = len(positions)
+    existing_classes = [ASSET_CLASS_MAP.get(t, "equities") for t in positions]
+    class_count = existing_classes.count(asset_class)
+    if class_count >= 4: risk_flags.append(f"High concentration: {class_count} existing {asset_class} positions")
+    if n_pos >= 15: risk_flags.append("Portfolio at 15-position Holy Grail limit")
+    if asset_class in playbook["avoid"] and side == "BUY":
+        risk_flags.append(f"{asset_class.replace('_',' ').title()} is on the avoid list for {quadrant.replace('_',' ').title()}")
+    if total_pv > 0 and cash / total_pv < 0.05: risk_flags.append("Cash below 5% of portfolio -- liquidity risk")
+    if asset_class == "crypto" and side == "BUY": risk_flags.append("Crypto: high volatility and regulatory risk")
+    sig = next((s for s in current_signals if s.get("ticker") == ticker), None)
+    if sig and sig.get("action") in ("SELL","SHORT") and side == "BUY":
+        risk_flags.append(f"Signal engine recommends {sig['action']} on {ticker}")
+
+    quadrant_label = quadrant.replace("_"," ").title()
+    asset_label = asset_class.replace("_"," ").title()
+    reasoning = [
+        f"Quadrant is {quadrant_label} -- Dalio favours {', '.join((playbook['strong_buy']+playbook['buy'])[:3]).replace('_',' ')}.",
+        f"{ticker} classified as {asset_label} -- {'aligned' if asset_class in playbook['strong_buy']+playbook['buy'] else 'not aligned'} with {quadrant_label} playbook.",
+        f"Portfolio has {n_pos} positions across {len(set(existing_classes))} asset class(es) -- {'diversified' if len(set(existing_classes))>=4 else 'needs more diversification'}.",
+    ]
+    if sig:
+        reasoning.append(f"Signal engine: {sig.get('action','HOLD')} {ticker} with {sig.get('confidence',0):.0f}% confidence, RSI {sig.get('rsi',50)}.")
+    reasoning.append(f"Avoid list for {quadrant_label}: {', '.join(playbook['avoid']).replace('_',' ')}. {'This trade is on the avoid list.' if asset_class in playbook['avoid'] else 'This trade is not on the avoid list.'}")
+
+    _AW = {"equities":0.30,"long_bonds":0.40,"gold":0.15,"commodities":0.075,"tips":0.075}
+    cc = {c: existing_classes.count(c) for c in set(existing_classes)}
+    if side == "BUY": cc[asset_class] = cc.get(asset_class, 0) + 1
+    tot = sum(cc.values()) or 1
+    dev = sum(abs(cc.get(c,0)/tot - ideal) for c, ideal in _AW.items())
+    all_weather_score = max(0, min(100, int(100 - dev * 50)))
+
+    if fit_label == "STRONG FIT":
+        rec = f"PROCEED -- {ticker} strongly aligned with {quadrant_label} regime. Size within risk budget."
+    elif fit_label == "MODERATE FIT":
+        rec = f"CONSIDER -- Moderate alignment. Reduce size 30-50% vs a strong-fit signal."
+    elif fit_label == "COUNTER-TREND":
+        rec = f"CAUTION -- {ticker} ({asset_label}) counters Dalio's {quadrant_label} playbook. Keep size <2% if high conviction."
+    else:
+        rec = f"NEUTRAL -- No strong quadrant signal. Assess diversification value before committing."
+
+    return {"fit_score": fit_score, "fit_label": fit_label, "quadrant_narrative": playbook["narrative"],
+            "asset_class": asset_class, "reasoning": reasoning, "recommendation": rec,
+            "risk_flags": risk_flags, "all_weather_score": all_weather_score,
+            "quadrant": quadrant, "quadrant_label": quadrant_label, "ticker": ticker, "side": side,
+            "timestamp": datetime.utcnow().isoformat()}
