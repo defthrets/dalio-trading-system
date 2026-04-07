@@ -779,6 +779,11 @@ class PaperPortfolio:
 
 PAPER = PaperPortfolio()
 
+# ── Async locks for global mutable state ────────────────────────────
+_PAPER_LOCK     = asyncio.Lock()
+_MODE_LOCK      = asyncio.Lock()
+_WATCHLIST_LOCK  = asyncio.Lock()
+
 
 # ─────────────────────────────────────────────
 # Broker Abstraction -- live trading
@@ -3389,9 +3394,10 @@ async def _run_cmd(message: str) -> dict:
         price = await _live_price(tkr)
         if price is None:
             return {"type":"error","message":f"Cannot fetch price for {tkr} to close position."}
-        qty = PAPER.positions[tkr]["qty"]
-        result = PAPER.place_order(tkr, "SELL", qty, float(price))
-        _save_paper_state()
+        async with _PAPER_LOCK:
+            qty = PAPER.positions[tkr]["qty"]
+            result = PAPER.place_order(tkr, "SELL", qty, float(price))
+            _save_paper_state()
         await WS_MANAGER.broadcast({"type":"PAPER_CLOSE","data":result})
         pnl = result.get("pnl", PAPER.history[0]["pnl"] if PAPER.history else 0)
         return {"type":"close","message":(
@@ -3407,18 +3413,20 @@ async def _run_cmd(message: str) -> dict:
     wl_add_m = _re.match(r"^watchlist add\s+(\S+)$", msg_lower)
     if wl_add_m:
         tkr = wl_add_m.group(1).upper()
-        if tkr not in WATCHLIST:
-            WATCHLIST.append(tkr)
-            _save_watchlist(WATCHLIST)
+        async with _WATCHLIST_LOCK:
+            if tkr not in WATCHLIST:
+                WATCHLIST.append(tkr)
+                _save_watchlist(WATCHLIST)
         return {"type":"watchlist","message":f"Added {tkr} to watchlist.","data":{"tickers":list(WATCHLIST)}}
 
     wl_rem_m = _re.match(r"^watchlist remove\s+(\S+)$", msg_lower)
     if wl_rem_m:
         tkr = wl_rem_m.group(1).upper()
-        if tkr in WATCHLIST:
-            WATCHLIST.remove(tkr)
-            _save_watchlist(WATCHLIST)
-            return {"type":"watchlist","message":f"Removed {tkr} from watchlist.","data":{"tickers":list(WATCHLIST)}}
+        async with _WATCHLIST_LOCK:
+            if tkr in WATCHLIST:
+                WATCHLIST.remove(tkr)
+                _save_watchlist(WATCHLIST)
+                return {"type":"watchlist","message":f"Removed {tkr} from watchlist.","data":{"tickers":list(WATCHLIST)}}
         return {"type":"watchlist","message":f"{tkr} not in watchlist.","data":{"tickers":list(WATCHLIST)}}
 
     # ── scanner <market> ──────────────────────────────────────────────────
@@ -3467,12 +3475,13 @@ async def _run_cmd(message: str) -> dict:
         if reset_m.group(1):
             PAPER_STARTING_CASH = float(reset_m.group(1).replace(",",""))
             _save_paper_config()
-        PAPER.cash       = PAPER_STARTING_CASH
-        PAPER.positions  = {}
-        PAPER.history    = []
-        PAPER.equity_history = []
-        PAPER.order_id   = 0
-        _save_paper_state()
+        async with _PAPER_LOCK:
+            PAPER.cash       = PAPER_STARTING_CASH
+            PAPER.positions  = {}
+            PAPER.history    = []
+            PAPER.equity_history = []
+            PAPER.order_id   = 0
+            _save_paper_state()
         STATE.add_alert("PAPER", f"Portfolio reset to ${PAPER_STARTING_CASH:,.2f} via CLI", "INFO")
         await WS_MANAGER.broadcast({"type":"PAPER_RESET","data":{"starting_cash":PAPER_STARTING_CASH}})
         return {"type":"reset","message":f"Portfolio reset to ${PAPER_STARTING_CASH:,.2f} starting cash.",
@@ -3563,12 +3572,13 @@ async def _run_cmd(message: str) -> dict:
         try:
             price = await _live_price(tkr)
             if price is None: raise ValueError(f"Cannot determine price for {tkr}")
-            result = PAPER.place_order(tkr, side, qty, float(price))
-            _tks = list(PAPER.positions.keys())
-            _prc = await _prices_for_positions(_tks) if _tks else {}
-            PAPER.equity_history.append({"t":datetime.utcnow().isoformat(),"v":PAPER.total_value(_prc)})
-            PAPER.equity_history = PAPER.equity_history[-2000:]
-            _save_paper_state()
+            async with _PAPER_LOCK:
+                result = PAPER.place_order(tkr, side, qty, float(price))
+                _tks = list(PAPER.positions.keys())
+                _prc = await _prices_for_positions(_tks) if _tks else {}
+                PAPER.equity_history.append({"t":datetime.utcnow().isoformat(),"v":PAPER.total_value(_prc)})
+                PAPER.equity_history = PAPER.equity_history[-2000:]
+                _save_paper_state()
             await WS_MANAGER.broadcast({"type":"PAPER_ORDER","data":result})
             return {"type":"order","message":(
                 f"Order placed: {side} {qty} {tkr} @ ${price:.4f}\n"
@@ -3754,18 +3764,19 @@ async def place_paper_order(payload: dict):
         raise HTTPException(400, f"Cannot determine price for {ticker}")
     price = float(price)
 
-    try:
-        result = PAPER.place_order(ticker, side, qty, price)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    async with _PAPER_LOCK:
+        try:
+            result = PAPER.place_order(ticker, side, qty, price)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
 
-    # Equity snapshot + persist
-    _tickers = list(PAPER.positions.keys())
-    _prices  = await _prices_for_positions(_tickers) if _tickers else {}
-    current_equity = PAPER.total_value(_prices)
-    PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
-    PAPER.equity_history = PAPER.equity_history[-2000:]
-    _save_paper_state()
+        # Equity snapshot + persist
+        _tickers = list(PAPER.positions.keys())
+        _prices  = await _prices_for_positions(_tickers) if _tickers else {}
+        current_equity = PAPER.total_value(_prices)
+        PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
+        PAPER.equity_history = PAPER.equity_history[-2000:]
+        _save_paper_state()
 
     # ── Update circuit breaker with new equity ──
     if CIRCUIT_BREAKER is not None:
@@ -3794,19 +3805,20 @@ async def get_paper_history():
 async def close_paper_position(payload: dict):
     """Close entire position in a ticker at market price."""
     ticker = _normalize_ticker(payload.get("ticker", "").strip())
-    if ticker not in PAPER.positions:
-        raise HTTPException(404, f"No open position in {ticker}")
-    qty   = PAPER.positions[ticker]["qty"]
-    price = await _live_price(ticker)
-    if price is None:
-        raise HTTPException(400, f"Cannot determine price for {ticker}")
-    result = PAPER.place_order(ticker, "SELL", qty, float(price))
+    async with _PAPER_LOCK:
+        if ticker not in PAPER.positions:
+            raise HTTPException(404, f"No open position in {ticker}")
+        qty   = PAPER.positions[ticker]["qty"]
+        price = await _live_price(ticker)
+        if price is None:
+            raise HTTPException(400, f"Cannot determine price for {ticker}")
+        result = PAPER.place_order(ticker, "SELL", qty, float(price))
 
-    _tickers = list(PAPER.positions.keys())
-    _prices  = await _prices_for_positions(_tickers) if _tickers else {}
-    PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": PAPER.total_value(_prices)})
-    PAPER.equity_history = PAPER.equity_history[-2000:]
-    _save_paper_state()
+        _tickers = list(PAPER.positions.keys())
+        _prices  = await _prices_for_positions(_tickers) if _tickers else {}
+        PAPER.equity_history.append({"t": datetime.utcnow().isoformat(), "v": PAPER.total_value(_prices)})
+        PAPER.equity_history = PAPER.equity_history[-2000:]
+        _save_paper_state()
 
     await WS_MANAGER.broadcast({"type": "PAPER_CLOSE", "data": result})
     return result
@@ -3815,12 +3827,13 @@ async def close_paper_position(payload: dict):
 @app.post("/api/paper/reset")
 async def reset_paper_portfolio():
     global PAPER_STARTING_CASH
-    PAPER.cash = PAPER_STARTING_CASH
-    PAPER.positions = {}
-    PAPER.history = []
-    PAPER.equity_history = []
-    PAPER.order_id = 0
-    _save_paper_state()
+    async with _PAPER_LOCK:
+        PAPER.cash = PAPER_STARTING_CASH
+        PAPER.positions = {}
+        PAPER.history = []
+        PAPER.equity_history = []
+        PAPER.order_id = 0
+        _save_paper_state()
     return {"status": "reset", "cash": PAPER_STARTING_CASH}
 
 
@@ -3839,13 +3852,14 @@ async def set_paper_config(payload: dict):
     _save_paper_config()
     # If no open positions, apply new cash immediately and persist
     applied = False
-    if not PAPER.positions:
-        PAPER.cash           = cash
-        PAPER.history        = []
-        PAPER.equity_history = []
-        PAPER.order_id       = 0
-        _save_paper_state()
-        applied = True
+    async with _PAPER_LOCK:
+        if not PAPER.positions:
+            PAPER.cash           = cash
+            PAPER.history        = []
+            PAPER.equity_history = []
+            PAPER.order_id       = 0
+            _save_paper_state()
+            applied = True
     return {"status": "ok", "starting_cash": PAPER_STARTING_CASH, "applied": applied}
 
 
@@ -3863,18 +3877,20 @@ async def watchlist_add(payload: dict):
     ticker = payload.get("ticker", "").upper().strip()
     if not ticker:
         raise HTTPException(400, "ticker required")
-    if ticker not in WATCHLIST:
-        WATCHLIST.append(ticker)
-        _save_watchlist(WATCHLIST)
+    async with _WATCHLIST_LOCK:
+        if ticker not in WATCHLIST:
+            WATCHLIST.append(ticker)
+            _save_watchlist(WATCHLIST)
     return {"watchlist": WATCHLIST}
 
 
 @app.post("/api/watchlist/remove")
 async def watchlist_remove(payload: dict):
     ticker = payload.get("ticker", "").upper().strip()
-    if ticker in WATCHLIST:
-        WATCHLIST.remove(ticker)
-        _save_watchlist(WATCHLIST)
+    async with _WATCHLIST_LOCK:
+        if ticker in WATCHLIST:
+            WATCHLIST.remove(ticker)
+            _save_watchlist(WATCHLIST)
     return {"watchlist": WATCHLIST}
 
 
@@ -4414,8 +4430,9 @@ async def set_trading_mode(payload: dict):
     if new_mode not in ("paper", "live"):
         raise HTTPException(400, "mode must be 'paper' or 'live'")
     broker_connected = ACTIVE_BROKER is not None and ACTIVE_BROKER.is_connected()
-    TRADING_MODE = new_mode
-    _save_trading_mode(new_mode)
+    async with _MODE_LOCK:
+        TRADING_MODE = new_mode
+        _save_trading_mode(new_mode)
     if new_mode == "live" and not broker_connected:
         STATE.add_alert("SYSTEM", "⚠ LIVE MODE — No broker configured. Trading halted until broker connected.", "WARNING")
     else:
