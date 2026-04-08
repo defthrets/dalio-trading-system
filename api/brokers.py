@@ -1,11 +1,10 @@
 """
 Dalios -- Broker Implementations
-All broker classes: BrokerBase, IBKR, Alpaca, Binance, CoinSpot, etc.
+All broker classes: BrokerBase, IBKR, and ASX brokers.
 """
 
 import asyncio
 import json
-import aiohttp
 from datetime import datetime
 from typing import Optional
 
@@ -120,261 +119,14 @@ class IBKRBroker(BrokerBase):
         return await self.place_order(ticker, side, abs(pos["qty"]), None)
 
 
-class BinanceBroker(BrokerBase):
-    name = "binance"
-
-    def __init__(self):
-        self._client = None
-        self._connected = False
-
-    def is_connected(self) -> bool:
-        return self._connected and self._client is not None
-
-    async def connect(self, api_key: str, api_secret: str, testnet: bool = False, **kwargs) -> None:
-        try:
-            from binance.client import Client as BinanceClient
-        except ImportError:
-            raise ImportError("python-binance not installed. Run: pip install python-binance")
-        client = BinanceClient(api_key, api_secret, testnet=testnet)
-        await asyncio.get_running_loop().run_in_executor(_EXECUTOR, client.get_account)
-        self._client = client
-        self._connected = True
-        self._store_credentials(api_key=api_key, api_secret=api_secret, testnet=testnet)
-        logger.info(f"Binance connected -- {'testnet' if testnet else 'live'}")
-
-    async def get_account(self) -> dict:
-        if not self.is_connected(): raise RuntimeError("Binance not connected")
-        acct = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._client.get_account)
-        usdt = next((float(b["free"]) + float(b["locked"]) for b in acct.get("balances", []) if b["asset"] == "USDT"), 0.0)
-        free_usdt = next((float(b["free"]) for b in acct.get("balances", []) if b["asset"] == "USDT"), 0.0)
-        return {"broker": "binance", "account_value": usdt, "buying_power": free_usdt, "cash": free_usdt, "currency": "USDT"}
-
-    async def place_order(self, ticker: str, side: str, qty: float, price: Optional[float] = None) -> dict:
-        if not self.is_connected(): raise RuntimeError("Binance not connected")
-        symbol = ticker.replace("/", "").replace("-", "").upper()
-        params = dict(symbol=symbol, side=side.upper(), type="LIMIT" if price else "MARKET", quantity=qty)
-        if price:
-            params["price"] = str(price)
-            params["timeInForce"] = "GTC"
-        order = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._client.create_order(**params))
-        return {"order_id": str(order["orderId"]), "ticker": ticker, "side": side, "qty": qty,
-                "price": price, "status": order.get("status"), "timestamp": datetime.utcnow().isoformat()}
-
-    async def get_positions(self) -> list:
-        if not self.is_connected(): raise RuntimeError("Binance not connected")
-        acct = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._client.get_account)
-        return [{"ticker": b["asset"], "qty": float(b["free"]) + float(b["locked"]),
-                 "avg_cost": None, "market_val": None, "pnl": None, "side": "LONG"}
-                for b in acct.get("balances", [])
-                if (float(b["free"]) + float(b["locked"])) > 0 and b["asset"] not in ("USDT", "BUSD")]
-
-    async def get_history(self) -> list:
-        if not self.is_connected(): raise RuntimeError("Binance not connected")
-        orders = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._client.get_all_orders(symbol="BTCUSDT", limit=50))
-        return [{"ticker": o["symbol"], "side": o["side"], "qty": float(o["executedQty"]),
-                 "price": float(o["price"]) if o["price"] else None, "timestamp": str(o["time"])}
-                for o in orders if o["status"] == "FILLED"]
-
-    async def close_position(self, ticker: str) -> dict:
-        positions = await self.get_positions()
-        asset = ticker.replace("/", "").replace("-", "").replace("USDT", "").upper()
-        pos = next((p for p in positions if p["ticker"].upper() == asset), None)
-        if not pos: raise ValueError(f"No Binance balance for {ticker}")
-        return await self.place_order(ticker, "SELL", pos["qty"], None)
-
-
-class CoinbaseBroker(BrokerBase):
-    name = "coinbase"
-
-    def __init__(self):
-        self._client = None
-        self._connected = False
-
-    def is_connected(self) -> bool:
-        return self._connected and self._client is not None
-
-    async def connect(self, api_key: str, api_secret: str, **kwargs) -> None:
-        try:
-            from coinbase.rest import RESTClient
-        except ImportError:
-            raise ImportError("coinbase-advanced-py not installed. Run: pip install coinbase-advanced-py")
-        client = RESTClient(api_key=api_key, api_secret=api_secret)
-        await asyncio.get_running_loop().run_in_executor(_EXECUTOR, client.get_accounts)
-        self._client = client
-        self._connected = True
-        self._store_credentials(api_key=api_key, api_secret=api_secret)
-        logger.info("Coinbase Advanced Trade connected")
-
-    async def get_account(self) -> dict:
-        if not self.is_connected(): raise RuntimeError("Coinbase not connected")
-        accounts = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._client.get_accounts)
-        acct_list = accounts.accounts if hasattr(accounts, "accounts") else []
-        cash = sum(float(getattr(a, "available_balance", type("", (), {"value": "0"})).value)
-                   for a in acct_list if getattr(a, "currency", "") in ("USD", "USDC"))
-        return {"broker": "coinbase", "account_value": cash, "buying_power": cash, "cash": cash, "currency": "USD"}
-
-    async def place_order(self, ticker: str, side: str, qty: float, price: Optional[float] = None) -> dict:
-        if not self.is_connected(): raise RuntimeError("Coinbase not connected")
-        import uuid
-        product_id = ticker.upper().replace("/", "-")
-        client_order_id = str(uuid.uuid4())
-        cfg = {"limit_limit_gtc": {"base_size": str(qty), "limit_price": str(price)}} if price \
-              else {"market_market_ioc": {"base_size": str(qty)}}
-        order = await asyncio.get_running_loop().run_in_executor(
-            _EXECUTOR, lambda: self._client.create_order(
-                client_order_id=client_order_id, product_id=product_id, side=side.upper(), order_configuration=cfg))
-        return {"order_id": getattr(order, "order_id", client_order_id), "ticker": ticker, "side": side,
-                "qty": qty, "price": price, "status": "FILLED" if getattr(order, "success", False) else "PENDING",
-                "timestamp": datetime.utcnow().isoformat()}
-
-    async def get_positions(self) -> list:
-        if not self.is_connected(): raise RuntimeError("Coinbase not connected")
-        accounts = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._client.get_accounts)
-        acct_list = accounts.accounts if hasattr(accounts, "accounts") else []
-        return [{"ticker": getattr(a, "currency", ""), "qty": float(getattr(a, "available_balance", type("", (), {"value": "0"})).value),
-                 "avg_cost": None, "market_val": None, "pnl": None, "side": "LONG"}
-                for a in acct_list if getattr(a, "currency", "") not in ("USD", "USDC", "USDT")
-                and float(getattr(a, "available_balance", type("", (), {"value": "0"})).value) > 0]
-
-    async def get_history(self) -> list:
-        if not self.is_connected(): raise RuntimeError("Coinbase not connected")
-        orders = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._client.list_orders(order_status=["FILLED"], limit=50))
-        return [{"ticker": getattr(o, "product_id", ""), "side": getattr(o, "side", ""),
-                 "qty": float(getattr(o, "filled_size", 0) or 0), "price": float(getattr(o, "average_filled_price", 0) or 0),
-                 "timestamp": str(getattr(o, "created_time", ""))} for o in (orders.orders if hasattr(orders, "orders") else [])]
-
-    async def close_position(self, ticker: str) -> dict:
-        positions = await self.get_positions()
-        asset = ticker.split("-")[0].upper()
-        pos = next((p for p in positions if p["ticker"].upper() == asset), None)
-        if not pos: raise ValueError(f"No Coinbase balance for {ticker}")
-        return await self.place_order(ticker, "SELL", pos["qty"], None)
-
-
-class CoinSpotBroker(BrokerBase):
-    """CoinSpot Australian crypto exchange -- REST API v2."""
-    name = "coinspot"
-    _BASE = "https://www.coinspot.com.au/api/v2"
-
-    def __init__(self):
-        self._api_key: Optional[str] = None
-        self._api_secret: Optional[str] = None
-        self._connected = False
-
-    def is_connected(self) -> bool:
-        return self._connected
-
-    def _sign_request(self, data: dict):
-        """Sign a CoinSpot API request."""
-        import time as _t, hmac as _hmac, hashlib as _hs
-
-        nonce = int(_t.time() * 1000)
-        data["nonce"] = nonce
-
-        # Force all float values to fixed-point strings to avoid scientific notation
-        cleaned = {}
-        for k, v in data.items():
-            if isinstance(v, float):
-                cleaned[k] = f"{v:.8f}".rstrip("0").rstrip(".")
-            else:
-                cleaned[k] = v
-
-        body = json.dumps(cleaned, separators=(",", ":"))
-        sig = _hmac.new(self._api_secret.encode("utf-8"), body.encode("utf-8"), _hs.sha512).hexdigest()
-        return body, sig
-
-    async def _post(self, endpoint: str, payload: dict) -> dict:
-        body, sig = self._sign_request(payload)
-        headers = {"Content-Type": "application/json",
-                   "key": self._api_key,
-                   "sign": sig}
-        logger.debug(f"CoinSpot POST {endpoint} body=[REDACTED]")
-        timeout = aiohttp.ClientTimeout(total=12)
-        async with aiohttp.ClientSession(timeout=timeout) as sess:
-            async with sess.post(f"{self._BASE}{endpoint}", data=body, headers=headers) as resp:
-                result = await resp.json(content_type=None)
-                if result.get("status") == "error":
-                    logger.warning(f"CoinSpot error on {endpoint}: {result.get('message','unknown')} | body=[REDACTED]")
-                    raise RuntimeError(f"CoinSpot error: {result.get('message','unknown')}")
-                return result
-
-    async def connect(self, api_key: str, api_secret: str, **kwargs) -> None:
-        self._api_key = api_key
-        self._api_secret = api_secret
-        # Verify credentials with a balances fetch
-        await self.get_account()
-        self._connected = True
-        self._store_credentials(api_key=api_key, api_secret=api_secret)
-        logger.info("CoinSpot connected")
-
-    async def get_account(self) -> dict:
-        result = await self._post("/ro/my/balances", {})
-        bals = result.get("balances", [])
-        total = sum(float(v.get("audbalance", 0))
-                    for b in bals if isinstance(b, dict)
-                    for v in b.values() if isinstance(v, dict))
-        return {"broker": "coinspot", "account_value": round(total, 2),
-                "buying_power": round(total, 2), "cash": round(total, 2), "currency": "AUD"}
-
-    async def place_order(self, ticker: str, side: str, qty: float,
-                          price: Optional[float] = None) -> dict:
-        coin = ticker.replace("-AUD", "").replace("-USD", "").upper()
-        endpoint = ("/my/buy/now"
-                    if side.upper() in ("BUY", "LONG")
-                    else "/my/sell/now")
-        result = await self._post(endpoint, {"cointype": coin, "amount": qty, "amounttype": "coin"})
-        return {"order_id": result.get("id", f"cs_{int(datetime.utcnow().timestamp())}"),
-                "ticker": ticker, "side": side, "qty": qty, "price": price,
-                "timestamp": datetime.utcnow().isoformat()}
-
-    async def get_positions(self) -> list:
-        result = await self._post("/ro/my/balances", {})
-        out = []
-        for b in result.get("balances", []):
-            if not isinstance(b, dict): continue
-            for coin, details in b.items():
-                if not isinstance(details, dict): continue
-                bal = float(details.get("balance", 0))
-                if bal > 0:
-                    out.append({"ticker": f"{coin}-AUD", "qty": bal,
-                                "avg_cost": None,
-                                "market_val": float(details.get("audbalance", 0)),
-                                "pnl": None, "side": "LONG"})
-        return out
-
-    async def get_history(self) -> list:
-        result = await self._post("/ro/my/orders/completed", {})
-        rows = []
-        for o in result.get("buyorders", []):
-            rows.append({"ticker": f"{o.get('cointype','')}-AUD", "side": "BUY",
-                         "qty": float(o.get("amount", 0)),
-                         "price": float(o.get("rate", 0)),
-                         "timestamp": o.get("created", "")})
-        for o in result.get("sellorders", []):
-            rows.append({"ticker": f"{o.get('cointype','')}-AUD", "side": "SELL",
-                         "qty": float(o.get("amount", 0)),
-                         "price": float(o.get("rate", 0)),
-                         "timestamp": o.get("created", "")})
-        return rows
-
-    async def close_position(self, ticker: str) -> dict:
-        positions = await self.get_positions()
-        coin = ticker.replace("-AUD", "").replace("-USD", "").upper()
-        pos = next((p for p in positions if coin in p["ticker"].upper()), None)
-        if not pos:
-            raise ValueError(f"No CoinSpot balance for {ticker}")
-        return await self.place_order(ticker, "SELL", pos["qty"])
-
-
-class GenericCryptoBroker(BrokerBase):
-    """Generic HMAC-signed crypto exchange broker."""
+class GenericASXBroker(BrokerBase):
+    """Generic ASX broker with HMAC-signed API access."""
     name: str = "generic"
     _BASE: str = ""
 
     def __init__(self):
         self._api_key: Optional[str] = None
         self._api_secret: Optional[str] = None
-        self._passphrase: Optional[str] = None
         self._connected = False
 
     def is_connected(self) -> bool:
@@ -385,23 +137,19 @@ class GenericCryptoBroker(BrokerBase):
         ts = str(int(_t.time() * 1000))
         msg = ts + body
         sig = _hmac.new(self._api_secret.encode(), msg.encode(), _hs.sha256).hexdigest()
-        h = {"Content-Type": "application/json", "API-KEY": self._api_key,
-             "API-SIGN": sig, "API-TIMESTAMP": ts}
-        if self._passphrase:
-            h["API-PASSPHRASE"] = self._passphrase
-        return h
+        return {"Content-Type": "application/json", "API-KEY": self._api_key,
+                "API-SIGN": sig, "API-TIMESTAMP": ts}
 
-    async def connect(self, api_key: str, api_secret: str, passphrase: str = "", **kwargs) -> None:
+    async def connect(self, api_key: str, api_secret: str, **kwargs) -> None:
         self._api_key = api_key
         self._api_secret = api_secret
-        self._passphrase = passphrase or None
         self._connected = True
-        self._store_credentials(api_key=api_key, api_secret=api_secret, passphrase=passphrase)
+        self._store_credentials(api_key=api_key, api_secret=api_secret)
         logger.info(f"{self.name.upper()} credentials saved (connection validated on first trade)")
 
     async def get_account(self) -> dict:
         return {"broker": self.name, "account_value": 0, "buying_power": 0,
-                "cash": 0, "currency": "USD", "note": "Connect and trade to populate"}
+                "cash": 0, "currency": "AUD", "note": "Connect and trade to populate"}
 
     async def place_order(self, ticker: str, side: str, qty: float, price: Optional[float] = None) -> dict:
         raise NotImplementedError(f"{self.name.upper()} order routing not yet implemented -- coming soon")
@@ -416,80 +164,35 @@ class GenericCryptoBroker(BrokerBase):
         raise NotImplementedError(f"{self.name.upper()} close not yet implemented")
 
 
-class KrakenBroker(GenericCryptoBroker):
-    name = "kraken"
-    _BASE = "https://api.kraken.com"
-
-
-class BybitBroker(GenericCryptoBroker):
-    name = "bybit"
-    _BASE = "https://api.bybit.com"
-
-
-class OKXBroker(GenericCryptoBroker):
-    name = "okx"
-    _BASE = "https://www.okx.com"
-
-    async def connect(self, api_key: str, api_secret: str, passphrase: str = "", **kwargs) -> None:
-        if not passphrase:
-            raise ValueError("OKX requires a passphrase in addition to API key and secret")
-        await super().connect(api_key, api_secret, passphrase, **kwargs)
-
-
-class KuCoinBroker(GenericCryptoBroker):
-    name = "kucoin"
-    _BASE = "https://api.kucoin.com"
-
-    async def connect(self, api_key: str, api_secret: str, passphrase: str = "", **kwargs) -> None:
-        if not passphrase:
-            raise ValueError("KuCoin requires a passphrase in addition to API key and secret")
-        await super().connect(api_key, api_secret, passphrase, **kwargs)
-
-
-class BitgetBroker(GenericCryptoBroker):
-    name = "bitget"
-    _BASE = "https://api.bitget.com"
-
-    async def connect(self, api_key: str, api_secret: str, passphrase: str = "", **kwargs) -> None:
-        if not passphrase:
-            raise ValueError("Bitget requires a passphrase in addition to API key and secret")
-        await super().connect(api_key, api_secret, passphrase, **kwargs)
-
-
-class IndependentReserveBroker(GenericCryptoBroker):
-    name = "independentreserve"
-    _BASE = "https://api.independentreserve.com"
-
-
-class SelfWealthBroker(GenericCryptoBroker):
+class SelfWealthBroker(GenericASXBroker):
     name = "selfwealth"
     _BASE = "https://api.selfwealth.com.au"
 
-class IGBroker(GenericCryptoBroker):
+class IGBroker(GenericASXBroker):
     name = "ig"
     _BASE = "https://api.ig.com/gateway/deal"
 
-class CMCBroker(GenericCryptoBroker):
+class CMCBroker(GenericASXBroker):
     name = "cmc"
     _BASE = "https://ciapi.cityindex.com/TradingAPI"
 
-class StakeBroker(GenericCryptoBroker):
+class StakeBroker(GenericASXBroker):
     name = "stake"
     _BASE = "https://api.hellostake.com/api"
 
-class CommsecBroker(GenericCryptoBroker):
+class CommsecBroker(GenericASXBroker):
     name = "commsec"
     _BASE = "https://api.commsec.com.au/v1"
 
-class MomooBroker(GenericCryptoBroker):
+class MomooBroker(GenericASXBroker):
     name = "moomoo"
     _BASE = "https://openapi.moomoo.com/v1"
 
-class SuperheroBroker(GenericCryptoBroker):
+class SuperheroBroker(GenericASXBroker):
     name = "superhero"
     _BASE = "https://api.superhero.com.au/v1"
 
-class NabtradeBroker(GenericCryptoBroker):
+class NabtradeBroker(GenericASXBroker):
     name = "nabtrade"
     _BASE = "https://api.nabtrade.com.au/v1"
 
@@ -518,15 +221,9 @@ def _save_broker_creds(creds: dict):
 
 # ── Broker map for connection routing ───────────────────
 BROKER_MAP = {
-    # AU Brokers (ASX-capable)
-    "ibkr": IBKRBroker, "coinspot": CoinSpotBroker,
+    "ibkr": IBKRBroker,
     "stake": StakeBroker, "moomoo": MomooBroker,
     "ig": IGBroker, "cmc": CMCBroker,
     "selfwealth": SelfWealthBroker, "commsec": CommsecBroker,
     "superhero": SuperheroBroker, "nabtrade": NabtradeBroker,
-    # Crypto Exchanges
-    "binance": BinanceBroker, "coinbase": CoinbaseBroker,
-    "kraken": KrakenBroker, "bybit": BybitBroker, "okx": OKXBroker,
-    "kucoin": KuCoinBroker, "bitget": BitgetBroker,
-    "independentreserve": IndependentReserveBroker,
 }
