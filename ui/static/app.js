@@ -2110,10 +2110,13 @@ function _guidedNextTab() {
   const curIdx = GUIDED_TAB_ORDER.indexOf(_spotTabId);
   const nextIdx = curIdx + 1;
   if (nextIdx >= GUIDED_TAB_ORDER.length) {
-    // Tutorial complete!
     _guidedMode = false;
     if (_spotHighlit) { _spotHighlit.classList.remove('spot-highlight'); _spotHighlit = null; }
     el('spotBubble')?.classList.add('hidden');
+    const m = el('spotMascot'); if (m) m.classList.add('hidden');
+    // Show tutorial complete splash
+    const overlay = el('tutorialCompleteOverlay');
+    if (overlay) overlay.classList.remove('hidden');
     return;
   }
   const nextTab = GUIDED_TAB_ORDER[nextIdx];
@@ -2170,6 +2173,14 @@ function openCurrentTutorial() {
 }
 
 function closeTutorial() { skipAllSpots(); }
+
+function closeTutorialComplete() {
+  const overlay = el('tutorialCompleteOverlay');
+  if (overlay) overlay.classList.add('hidden');
+  // Switch back to command center
+  const btn = document.querySelector('[data-tab="command-center"]');
+  if (btn) btn.click();
+}
 
 function stopTutorialForever() {
   skipAllSpots();

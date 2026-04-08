@@ -2648,6 +2648,36 @@ canvas { display: block; max-width: 100%; }
 }
 .welcome-never input { width: 12px; height: 12px; }
 
+/* Tutorial Complete Splash */
+.tut-complete-box { max-width: 520px; }
+.tut-complete-mascot {
+  width: 180px !important;
+  filter: drop-shadow(0 0 20px rgba(255,170,0,0.4));
+  animation: bossFloat 3s ease-in-out infinite;
+}
+@keyframes bossFloat {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50%      { transform: translateY(-10px) rotate(2deg); }
+}
+.tut-complete-wisdom {
+  font-style: italic;
+  color: var(--cyan);
+  border-left: 2px solid var(--cyan);
+  padding-left: 12px;
+  margin: 12px 0;
+  font-size: 12px;
+}
+.tut-complete-tips {
+  font-size: 11px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+.tut-complete-sign {
+  font-size: 11px;
+  color: var(--primary);
+  margin-top: 8px;
+}
+
 /* Spot auto-advance timer bar */
 .spot-timer-bar {
   position: absolute; bottom: 0; left: 0; height: 3px;

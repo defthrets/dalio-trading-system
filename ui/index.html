@@ -10,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1/dist/chartjs-chart-financial.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260408ac" />
+  <link rel="stylesheet" href="/static/style.css?v=20260408ad" />
 </head>
 <body>
   <!-- Scanline overlay -->
@@ -2253,6 +2253,28 @@
       <label class="welcome-never">
         <input type="checkbox" id="welcomeNeverAgain"> Don't show this again, cheers
       </label>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       TUTORIAL COMPLETE SPLASH
+  ═══════════════════════════════════════════════ -->
+  <div id="tutorialCompleteOverlay" class="welcome-overlay hidden">
+    <div class="welcome-box tut-complete-box">
+      <div class="welcome-illust">
+        <img src="/static/img/rex-boss.png" alt="Rex the boss lizard" class="welcome-mascot tut-complete-mascot" />
+      </div>
+      <div class="welcome-header">
+        <span class="welcome-icon">&#9733;</span>
+        <span class="welcome-title">YOU'RE ALL SET, LEGEND!</span>
+      </div>
+      <p class="welcome-text tut-complete-text">That's every tab, every panel, every button. You officially know more about this system than most hedge fund interns. Rex is proud.</p>
+      <p class="welcome-text tut-complete-wisdom">"The goal isn't to predict the future — it's to build a portfolio that survives it."</p>
+      <p class="welcome-text tut-complete-tips">Remember: start on PAPER mode, diversify like your portfolio depends on it (because it does), and never risk more than you can laugh about losing. If the circuit breaker trips, go touch grass. The market will still be there tomorrow.</p>
+      <p class="welcome-text tut-complete-sign">Now go make some calculated, well-diversified, emotionally detached money. Or at least have fun trying.<br><strong>— Rex 🦎</strong></p>
+      <div class="welcome-btns">
+        <button class="welcome-btn-start" onclick="closeTutorialComplete()">LET'S TRADE!</button>
+      </div>
     </div>
   </div>
 
