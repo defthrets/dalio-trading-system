@@ -2133,6 +2133,7 @@ function closeTutorial() { skipAllSpots(); }
 // ─── Welcome Popup & Guided Tutorial ─────────────────────
 
 function initWelcomeTutorial() {
+  if (_loadSettings().tutorials_off) return;
   if (localStorage.getItem('dalios_welcome_never')) return;
   if (localStorage.getItem('dalios_welcome_done')) return;
   const overlay = el('welcomeOverlay');
