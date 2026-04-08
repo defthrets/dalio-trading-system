@@ -292,7 +292,7 @@ async def auth_me(request: Request):
 async def get_status():
     mode = _current_mode().upper()
     return {
-        "status": "PAUSED" if getattr(STATE, 'paused', False) else "OPERATIONAL",
+        "status": "PAUSED" if getattr(STATE, 'paused', False) else "RUNNING",
         "mode": mode,
         "agent_booted": STATE.booted,
         "cycle_count": STATE.cycle_count,
@@ -306,7 +306,7 @@ async def get_status():
 @app.post("/api/system/pause")
 async def toggle_pause(body: dict):
     STATE.paused = body.get("paused", False)
-    return {"paused": STATE.paused, "status": "PAUSED" if STATE.paused else "OPERATIONAL"}
+    return {"paused": STATE.paused, "status": "PAUSED" if STATE.paused else "RUNNING"}
 
 
 # ─────────────────────────────────────────────

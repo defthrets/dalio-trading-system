@@ -5736,7 +5736,7 @@ const _RADAR_STATUS_MSGS = [
   // System health
   () => `UPTIME: ${((performance.now()/1000/60)).toFixed(0)} MIN | MEM: ${(performance.memory?.usedJSHeapSize/1024/1024)?.toFixed(0) ?? '?'}MB`,
   () => `WEBSOCKET: ${STATE._wsConnected ? 'CONNECTED' : 'DISCONNECTED'} | MODE: ${_tradingMode?.toUpperCase() ?? 'PAPER'}`,
-  () => _systemPaused ? '⏸ SYSTEM PAUSED — NO NEW TRADES' : '● ALL SYSTEMS OPERATIONAL — TRADING ACTIVE',
+  () => _systemPaused ? '⏸ SYSTEM PAUSED — NO NEW TRADES' : '● ALL SYSTEMS RUNNING — TRADING ACTIVE',
   () => { const w = _watchlist?.length ?? 0; return `WATCHLIST: ${w} ASSETS TRACKED | ALERTS: ${_priceAlerts?.filter(a=>!a.triggered)?.length ?? 0} ACTIVE`; },
   // Quadrant & sentiment
   () => { const q = STATE.health?.active_quadrant; return q ? `REGIME: ${q.replace(/_/g,' ').toUpperCase()} | STRATEGY ALIGNED` : 'ECONOMIC QUADRANT: DETECTING'; },
@@ -5886,7 +5886,7 @@ function pushOpsLine(cmd, msg, type) {
 
 // ═══════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════
-// SYSTEM STATUS TOGGLE (OPERATIONAL / PAUSED)
+// SYSTEM STATUS TOGGLE (RUNNING / PAUSED)
 // ═══════════════════════════════════════════════════════════
 let _systemPaused = true;
 
@@ -5900,7 +5900,7 @@ function toggleSystemStatus() {
     pushAlert('SYSTEM', 'Trading PAUSED — no new trades will be executed', 'warning');
     playBeep(220, 0.15);
   } else {
-    badge.textContent = '● OPERATIONAL';
+    badge.textContent = '● RUNNING';
     badge.className = 'badge badge--green';
     pushAlert('SYSTEM', 'Trading RESUMED — system is operational', 'info');
     playBeep(660, 0.1);
