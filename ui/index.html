@@ -644,11 +644,19 @@
             <span class="panel-title">SENTIMENT DISTRIBUTION</span>
             <span class="panel-tag" id="totalArticles">-- ARTICLES</span>
           </div>
-          <div class="panel-hint">Doughnut chart showing overall market mood from analysed news articles. Green = bullish, red = bearish, grey = neutral. A heavily bullish skew suggests optimism; bearish skew suggests caution. Stats below break it down by economic quadrant.</div>
-          <div class="chart-container chart-container--sm">
-            <canvas id="sentimentChart"></canvas>
+          <div class="panel-hint">Market mood from 50+ news sources. Each segment = an economic quadrant. Inner ring shows article count, outer glow pulses with sentiment intensity.</div>
+          <div class="sent-doughnut-wrap">
+            <div class="sent-doughnut-container">
+              <canvas id="sentimentChart"></canvas>
+              <div class="sent-center-label" id="sentCenterLabel">
+                <div class="sent-center-num" id="sentCenterNum">--</div>
+                <div class="sent-center-sub">ARTICLES</div>
+                <div class="sent-center-mood" id="sentCenterMood">SCANNING</div>
+              </div>
+            </div>
+            <div class="sent-glow-ring" id="sentGlowRing"></div>
           </div>
-          <div class="sentiment-quadrant-stats" id="sentimentStats"></div>
+          <div class="sent-quadrant-grid" id="sentimentStats"></div>
         </div>
 
         <!-- FinBERT News Feed -->

@@ -941,14 +941,22 @@ function applySentiment(d) {
   // Quadrant sentiment chart
   updateSentimentChart(d.quadrant_sentiment);
 
-  // Stats
+  // Stats grid
   const stats = el('sentimentStats');
   if (stats) {
+    const totalArts = d.total_articles || 1;
     stats.innerHTML = Object.entries(d.quadrant_sentiment || {}).map(([q, v]) => {
       const meta = QUADRANT_META[q] || {};
-      return `<div class="sq-stat">
-        <span class="sq-stat-label" style="color:${meta.color||'var(--text-2)'}">${(meta.label||q).replace(/_/g,' ')}</span>
-        <span class="sq-stat-val">${v.article_count} arts · ${v.bullish_pct.toFixed(0)}% bull</span>
+      const pct = ((v.article_count / totalArts) * 100).toFixed(0);
+      const color = meta.color || 'var(--text-2)';
+      return `<div class="sq-card">
+        <div class="sq-card-label" style="color:${color}">${(meta.label||q).replace(/_/g,' ').toUpperCase()}</div>
+        <div class="sq-card-bar"><div class="sq-card-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="sq-card-stats">
+          <span class="sq-card-count">${v.article_count}</span>
+          <span>${pct}% of feed</span>
+          <span style="color:${v.bullish_pct > 50 ? 'var(--green)' : 'var(--red)'}">${v.bullish_pct.toFixed(0)}% bull</span>
+        </div>
       </div>`;
     }).join('');
   }
@@ -1631,19 +1639,36 @@ function initCharts() {
         datasets: [{
           data: [0,0,0,0],
           backgroundColor: ['#00cc44','#ff2222','#ffb300','#00d4ff'],
-          borderColor: 'rgba(0,0,0,0.3)',
-          borderWidth: 2,
-          hoverOffset: 8,
+          hoverBackgroundColor: ['#22ff66','#ff4444','#ffcc33','#33ddff'],
+          borderColor: 'transparent',
+          borderWidth: 0,
+          hoverOffset: 12,
+          spacing: 3,
+          borderRadius: 4,
         }],
       },
       options: {
-        ...CHART_DEFAULTS,
-        maintainAspectRatio: false,
-        cutout: '55%',
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '62%',
+        rotation: -90,
+        animation: { animateRotate: true, animateScale: true, duration: 1200, easing: 'easeOutQuart' },
         plugins: {
-          ...CHART_DEFAULTS.plugins,
-          legend: { display: true, position: 'bottom', labels: { color: '#a8a29e', font: { size: 9 }, padding: 8, boxWidth: 10 } },
-          tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw} articles` } },
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(0,0,0,0.85)',
+            titleFont: { family: "'JetBrains Mono', monospace", size: 11 },
+            bodyFont: { family: "'JetBrains Mono', monospace", size: 10 },
+            padding: 10,
+            cornerRadius: 6,
+            callbacks: {
+              label: ctx => {
+                const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+                const pct = total ? ((ctx.raw / total) * 100).toFixed(1) : 0;
+                return ` ${ctx.raw} articles (${pct}%)`;
+              }
+            },
+          },
         },
       },
     });
@@ -1722,9 +1747,23 @@ function updateEquityChart(history) {
 
 function updateSentimentChart(qs) {
   if (!charts.sentiment || !qs) return;
-  const keys   = ['rising_growth','falling_growth','rising_inflation','falling_inflation'];
-  charts.sentiment.data.datasets[0].data = keys.map(k => qs[k]?.article_count ?? 0);
-  charts.sentiment.update('none');
+  const keys = ['rising_growth','falling_growth','rising_inflation','falling_inflation'];
+  const data = keys.map(k => qs[k]?.article_count ?? 0);
+  charts.sentiment.data.datasets[0].data = data;
+  charts.sentiment.update();
+
+  // Center label
+  const total = data.reduce((a,b) => a+b, 0);
+  setEl('sentCenterNum', total.toLocaleString());
+  const dominant = keys.reduce((best, k, i) => data[i] > (data[best.i] ?? -1) ? {k, i} : best, {k: keys[0], i: 0});
+  const moodMap = { rising_growth: 'BULLISH', falling_growth: 'BEARISH', rising_inflation: 'CAUTIOUS', falling_inflation: 'EASING' };
+  const moodColors = { rising_growth: 'var(--green)', falling_growth: 'var(--red)', rising_inflation: 'var(--amber)', falling_inflation: 'var(--cyan)' };
+  const moodEl = el('sentCenterMood');
+  if (moodEl) {
+    moodEl.textContent = moodMap[dominant.k] || 'MIXED';
+    moodEl.style.color = moodColors[dominant.k] || 'var(--text-2)';
+    moodEl.style.borderColor = moodColors[dominant.k] || 'var(--border)';
+  }
 }
 
 function updateWFChart(periods) {
