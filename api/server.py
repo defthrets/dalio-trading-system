@@ -48,10 +48,10 @@ from api.state import (
     _PAPER_LOCK,
 )
 from api.scanners import (
-    ASX_TICKERS, CRYPTO_TICKERS, COMMODITY_TICKERS, ALL_TICKERS, CORR_TICKERS,
+    ASX_TICKERS, COMMODITY_TICKERS, ALL_TICKERS, CORR_TICKERS,
     _ASSET_META, _scanner_cache, _CACHE_TTL,
-    _get_crypto_coingecko, _live_price, _prices_for_positions,
-    _scan_yfinance, _scan_coingecko, _MARKET_DEMO,
+    _live_price, _prices_for_positions,
+    _scan_yfinance, _MARKET_DEMO,
 )
 from api.portfolio import (
     PAPER, PAPER_STARTING_CASH, _save_paper_state, _load_paper_state,
@@ -64,10 +64,8 @@ from api.signals import (
     _gen_portfolio_health, _gen_backtest_results, dalio_analyse_trade,
 )
 from api.brokers import (
-    BrokerBase, IBKRBroker, BinanceBroker,
-    CoinbaseBroker, CoinSpotBroker, GenericCryptoBroker,
-    KrakenBroker, BybitBroker, OKXBroker, KuCoinBroker, BitgetBroker,
-    IndependentReserveBroker, SelfWealthBroker, IGBroker, CMCBroker,
+    BrokerBase, IBKRBroker,
+    SelfWealthBroker, IGBroker, CMCBroker,
     StakeBroker, CommsecBroker, MomooBroker,
     SuperheroBroker, NabtradeBroker,
     ACTIVE_BROKER, _load_broker_creds, _save_broker_creds, BROKER_MAP,
@@ -483,22 +481,6 @@ async def market_summary():
         return cached
 
     watchlist = [
-        # Crypto
-        ("BTC-USD",  "Bitcoin",        "crypto"),
-        ("ETH-USD",  "Ethereum",       "crypto"),
-        ("SOL-USD",  "Solana",         "crypto"),
-        ("BNB-USD",  "BNB",            "crypto"),
-        ("XRP-USD",  "XRP",            "crypto"),
-        ("ADA-USD",  "Cardano",        "crypto"),
-        ("DOGE-USD", "Dogecoin",       "crypto"),
-        ("AVAX-USD", "Avalanche",      "crypto"),
-        ("DOT-USD",  "Polkadot",       "crypto"),
-        ("LINK-USD", "Chainlink",      "crypto"),
-        ("MATIC-USD","Polygon",        "crypto"),
-        ("ATOM-USD", "Cosmos",         "crypto"),
-        ("LTC-USD",  "Litecoin",       "crypto"),
-        ("UNI-USD",  "Uniswap",        "crypto"),
-        ("NEAR-USD", "NEAR",           "crypto"),
         # ASX
         ("^AXJO",    "ASX 200",        "index"),
         ("CBA.AX",   "CommBank",       "asx"),
@@ -538,14 +520,7 @@ async def market_summary():
         ("DBA",      "Agriculture ETF","commodity"),
     ]
     tickers = [t for t, _, _ in watchlist]
-    prices_map = await _get_prices(tickers, "5d")
-
-    cg_task  = asyncio.create_task(_get_crypto_coingecko())
-    idx_tickers = [t for t, _, c in watchlist if c != "crypto"]
-    yf_task  = asyncio.create_task(_get_prices(idx_tickers, "5d"))
-    cg_data, yf_data = await asyncio.gather(cg_task, yf_task, return_exceptions=True)
-    if isinstance(cg_data, Exception):  cg_data = None
-    if isinstance(yf_data, Exception):  yf_data = None
+    yf_data = await _get_prices(tickers, "5d")
 
     demo_map = {row[0]: (row[3], row[4]) for row in _MARKET_DEMO}
 
@@ -554,10 +529,7 @@ async def market_summary():
         price = chg_pct = None
         source = "DEMO"
 
-        if category == "crypto" and isinstance(cg_data, dict) and ticker in cg_data:
-            cg = cg_data[ticker]
-            price, chg_pct, source = cg["price"], cg["change_pct"], "CoinGecko"
-        elif category != "crypto" and isinstance(yf_data, dict):
+        if isinstance(yf_data, dict):
             closes = yf_data.get(ticker)
             if closes and len(closes) >= 2:
                 price   = round(closes[-1], 2)
@@ -630,7 +602,7 @@ async def suggest_trades(n: int = 8):
         "portfolio_positions": len(PAPER.positions),
         "scanner_cached": {
             mkt: bool(_scanner_cache.get(mkt))
-            for mkt in ("asx", "crypto", "commodities")
+            for mkt in ("asx", "commodities")
         },
     }
 
@@ -777,15 +749,14 @@ async def chart_data(ticker: str, period: str = "6mo", interval: str = "1d"):
 
 @app.get("/api/markets/{market}")
 async def market_scanner(market: str):
-    """Scan a market: asx | crypto | commodities. Uses cache (90s TTL)."""
+    """Scan a market: asx | commodities. Uses cache (90s TTL)."""
     market = market.lower()
     ticker_map = {
         "asx":         ASX_TICKERS,
-        "crypto":      CRYPTO_TICKERS,
         "commodities": COMMODITY_TICKERS,
     }
     if market not in ticker_map:
-        raise HTTPException(400, f"Unknown market '{market}'. Use: asx, crypto, commodities")
+        raise HTTPException(400, f"Unknown market '{market}'. Use: asx, commodities")
 
     cached = _scanner_cache.get(market)
     if cached and (time.time() - cached["ts"]) < _CACHE_TTL:
@@ -794,10 +765,7 @@ async def market_scanner(market: str):
                 "cache_age": int(time.time() - cached["ts"])}
 
     tickers = ticker_map[market]
-    if market == "crypto":
-        rows = await _scan_coingecko(tickers)
-    else:
-        rows = await _scan_yfinance(tickers, market)
+    rows = await _scan_yfinance(tickers, market)
 
     good = [r for r in rows if r["price"] > 0]
     if good:
@@ -1300,7 +1268,7 @@ async def broker_connect(payload: dict):
     import api.brokers as _brokers_mod
     broker_name = payload.get("broker", "").lower().strip()
     if not broker_name:
-        raise HTTPException(400, "Missing 'broker' field. Send {\"broker\": \"binance\", \"api_key\": \"...\", \"api_secret\": \"...\"}")
+        raise HTTPException(400, "Missing 'broker' field. Send {\"broker\": \"ibkr\", \"host\": \"...\", \"port\": ..., \"client_id\": ...}")
     if broker_name not in BROKER_MAP:
         raise HTTPException(400, f"Unknown broker '{broker_name}'. Available: {', '.join(sorted(BROKER_MAP))}")
 
@@ -1406,12 +1374,6 @@ def _broker_required_fields(broker_name: str) -> list[str]:
     FIELDS = {
         "ibkr": ["host", "port", "client_id"],
         "alpaca": ["api_key", "api_secret"],
-        "binance": ["api_key", "api_secret"],
-        "coinbase": ["api_key", "api_secret"],
-        "coinspot": ["api_key", "api_secret"],
-        "okx": ["api_key", "api_secret", "passphrase"],
-        "kucoin": ["api_key", "api_secret", "passphrase"],
-        "bitget": ["api_key", "api_secret", "passphrase"],
     }
     return FIELDS.get(broker_name, ["api_key", "api_secret"])
 
@@ -1506,11 +1468,8 @@ async def get_suggested_qty(ticker: str = "", confidence: float = 50):
         return {"ticker": ticker, "suggested_qty": 0, "price": 0,
                 "allocation_pct": round(pct, 2), "buying_power": buying_power}
     qty = alloc / price
-    # Round appropriately: whole shares for stocks, 4 decimals for crypto
-    if ticker.endswith("-USD") or ticker.startswith("BTC") or ticker.startswith("ETH"):
-        qty = round(qty, 4)
-    else:
-        qty = max(1, int(qty))
+    # Round to whole shares for stocks
+    qty = max(1, int(qty))
     return {"ticker": ticker, "suggested_qty": qty, "price": round(price, 4),
             "allocation_pct": round(pct, 2), "buying_power": round(buying_power, 2)}
 
@@ -1759,7 +1718,7 @@ async def risk_reset():
 async def fx_audusd():
     """Return current AUD/USD exchange rate."""
     rate = await _get_aud_usd_rate()
-    return {"rate": round(rate, 5), "pair": "AUD/USD", "source": "CoinGecko/yfinance"}
+    return {"rate": round(rate, 5), "pair": "AUD/USD", "source": "yfinance"}
 
 
 # ─────────────────────────────────────────────
