@@ -1940,7 +1940,6 @@ const GUIDED_TAB_ORDER = [
 
 function showTutorial(tabId, force = false) {
   _spotTabId = tabId;
-  _guidedMode = true;
   const spots = SPOTS[tabId] || [];
   _spotQueue = spots.filter(s => force || !localStorage.getItem(`dalios_spot_${s.id}`));
   _spotIdx   = 0;
@@ -2175,11 +2174,18 @@ function openCurrentTutorial() {
 function closeTutorial() { skipAllSpots(); }
 
 function closeTutorialComplete() {
+  // Mark all spots across all tabs as seen so no tutorials re-trigger
+  Object.values(SPOTS).forEach(arr => arr.forEach(s => localStorage.setItem(`dalios_spot_${s.id}`, '1')));
+  _guidedMode = false;
+  _spotQueue = [];
+  // Hide overlay
   const overlay = el('tutorialCompleteOverlay');
   if (overlay) overlay.classList.add('hidden');
-  // Switch back to command center
-  const btn = document.querySelector('[data-tab="command-center"]');
-  if (btn) btn.click();
+  // Switch back to command center after a tick (so guided mode is fully off)
+  setTimeout(() => {
+    const btn = document.querySelector('[data-tab="command-center"]');
+    if (btn) btn.click();
+  }, 50);
 }
 
 function stopTutorialForever() {
