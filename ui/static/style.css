@@ -665,10 +665,10 @@ a:hover { color: var(--primary); text-decoration: underline; }
 .logo-text { display: flex; flex-direction: column; line-height: 1.1; }
 .logo-main {
   font-family: var(--font-hud);
-  font-size: 28px;
+  font-size: 36px;
   font-weight: 900;
   color: var(--primary);
-  letter-spacing: 8px;
+  letter-spacing: 10px;
   text-shadow: 0 0 14px var(--primary);
   animation: logoGlitch 8s ease-in-out infinite;
 }
