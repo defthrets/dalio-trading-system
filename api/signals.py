@@ -1561,7 +1561,17 @@ async def _gen_sentiment_data() -> dict:
 # ── Correlation matrix ─────────────────────────────────
 
 def _gen_correlation_matrix_demo() -> dict:
-    tickers = CORR_TICKERS
+    """Demo correlation matrix using portfolio + watchlist (or defaults)."""
+    portfolio_tickers = list(PAPER.positions.keys())
+    watchlist_tickers = list(WATCHLIST) if WATCHLIST else []
+    tickers = list(dict.fromkeys(portfolio_tickers + watchlist_tickers))
+    if len(tickers) < 6:
+        defaults = ["CBA.AX", "BHP.AX", "CSL.AX", "WDS.AX", "BTC-USD", "ETH-USD", "GC=F", "CL=F"]
+        for t in defaults:
+            if t not in tickers:
+                tickers.append(t)
+            if len(tickers) >= 12:
+                break
     n = len(tickers)
     mat = np.eye(n)
     for i in range(n):
@@ -1574,14 +1584,33 @@ def _gen_correlation_matrix_demo() -> dict:
         "tickers": tickers, "matrix": mat.tolist(),
         "mean_correlation": round(float(np.mean(mat[upper])), 3),
         "max_correlation": round(float(np.max(mat[upper])), 3),
-        "holy_grail_count": sum(1 for i in range(n) if np.mean(np.abs(mat[i][np.arange(n) != i])) < 0.35),
+        "holy_grail_count": sum(1 for i in range(n) if np.mean(np.abs(mat[i][np.arange(n) != i])) < 0.3),
         "threshold": 0.3, "data_source": "DEMO", "timestamp": datetime.utcnow().isoformat(),
     }
 
 
 async def _real_correlation_matrix() -> Optional[dict]:
-    tickers = CORR_TICKERS
-    prices_map = await _get_prices(tickers, "3mo")
+    """Correlation matrix of portfolio holdings + watchlist.
+    Holy Grail count measures how many of YOUR assets have mean
+    correlation < 0.3 — not the entire ticker universe."""
+    # Use actual portfolio positions + watchlist for meaningful correlation
+    portfolio_tickers = list(PAPER.positions.keys())
+    watchlist_tickers = list(WATCHLIST) if WATCHLIST else []
+    # Combine, deduplicate, preserving order
+    tickers = list(dict.fromkeys(portfolio_tickers + watchlist_tickers))
+    # If too few, pad with representative tickers from each market
+    if len(tickers) < 6:
+        defaults = [
+            "CBA.AX", "BHP.AX", "CSL.AX", "WDS.AX", "GMG.AX",  # ASX
+            "BTC-USD", "ETH-USD", "SOL-USD",                      # Crypto
+            "GC=F", "CL=F", "SI=F",                               # Commodities
+        ]
+        for t in defaults:
+            if t not in tickers:
+                tickers.append(t)
+            if len(tickers) >= 15:
+                break
+    prices_map = await _get_prices(tickers[:30], "3mo")
     if not prices_map or len(prices_map) < 4: return None
     valid = [t for t in tickers if t in prices_map and len(prices_map[t]) >= 20]
     if len(valid) < 4: return None
@@ -1591,7 +1620,7 @@ async def _real_correlation_matrix() -> Optional[dict]:
     corr = np.round(np.corrcoef(returns), 3)
     n = len(valid)
     upper = np.triu_indices(n, k=1)
-    hg_count = sum(1 for i in range(n) if float(np.mean(np.abs(corr[i][np.arange(n) != i]))) < 0.35)
+    hg_count = sum(1 for i in range(n) if float(np.mean(np.abs(corr[i][np.arange(n) != i]))) < 0.3)
     return {
         "tickers": valid, "matrix": corr.tolist(),
         "mean_correlation": round(float(np.mean(corr[upper])), 3),
