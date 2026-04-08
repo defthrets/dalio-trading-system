@@ -308,9 +308,38 @@ jobs:
           name: DALIOS-android
           path: DALIOS-android.apk
 
+  # ── iOS Build (Xcode project only — needs signing to produce IPA) ──
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install kivy-ios toolchain
+        run: pip install kivy-ios cython
+
+      - name: Build Python recipes for iOS
+        run: |
+          toolchain build python3 kivy openssl libffi
+        timeout-minutes: 60
+
+      - name: Create Xcode project
+        run: toolchain create DALIOS ios_main.py
+
+      - name: Zip Xcode project
+        run: zip -r DALIOS-ios-xcode.zip dalios-ios/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DALIOS-ios
+          path: DALIOS-ios-xcode.zip
+
   # ── Create GitHub Release ──
   release:
-    needs: [build-windows, build-linux, build-macos, build-android]
+    needs: [build-windows, build-linux, build-macos, build-android, build-ios]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -333,6 +362,7 @@ jobs:
             | **Linux** | `DALIOS-linux.tar.gz` | `tar xzf` → run `./DALIOS` |
             | **macOS** | `DALIOS-macos.zip` | Unzip → open `DALIOS.app` (right-click → Open if blocked) |
             | **Android** | `DALIOS-android.apk` | Transfer to phone → tap to install (enable unknown sources) |
+            | **iOS** | `DALIOS-ios-xcode.zip` | Open in Xcode → sign → run on device or archive for TestFlight |
 
             ---
             Built automatically by GitHub Actions.
@@ -341,5 +371,6 @@ jobs:
             artifacts/DALIOS-linux/DALIOS-linux.tar.gz
             artifacts/DALIOS-macos/DALIOS-macos.zip
             artifacts/DALIOS-android/DALIOS-android.apk
+            artifacts/DALIOS-ios/DALIOS-ios-xcode.zip
           draft: false
           prerelease: false
