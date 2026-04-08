@@ -2119,9 +2119,10 @@ function _guidedNextTab() {
     return;
   }
   const nextTab = GUIDED_TAB_ORDER[nextIdx];
-  // Switch tab
+  // Switch tab and scroll to top
   const btn = document.querySelector(`[data-tab="${nextTab}"]`);
   if (btn) btn.click();
+  window.scrollTo(0, 0);
   // Small delay to let the tab render
   setTimeout(() => showTutorial(nextTab, true), 400);
 }
