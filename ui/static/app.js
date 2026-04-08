@@ -1958,6 +1958,7 @@ function _showSpot(idx) {
 
   if (idx >= _spotQueue.length) {
     bubble.classList.add('hidden');
+    const m = el('spotMascot'); if (m) m.classList.add('hidden');
     if (_guidedMode) _guidedNextTab();
     return;
   }
@@ -2008,7 +2009,7 @@ function _showSpot(idx) {
 
   bubble.className = `spot-bubble arrow-${spot.arrow}`;
 
-  // Rex computer mascot for all tutorial bubbles
+  // Rex computer mascot for all tutorial bubbles — shown as sibling behind bubble
   const mascot = el('spotMascot');
   if (mascot) {
     mascot.src = '/static/img/rex-computer.png';
@@ -2020,19 +2021,24 @@ function _showSpot(idx) {
     target.classList.add('spot-highlight');
     _spotHighlit = target;
     target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    setTimeout(() => _positionBubble(bubble, target, spot.arrow), 100);
+    setTimeout(() => {
+      _positionBubble(bubble, target, spot.arrow);
+      _positionMascot(bubble, idx);
+    }, 100);
   } else {
     bubble.style.top  = '50%';
     bubble.style.left = '50%';
     bubble.style.transform = 'translate(-50%,-50%)';
+    _positionMascot(bubble, idx);
   }
 }
 
 function _positionBubble(bubble, target, arrow) {
   const GAP  = 16;
   const tr   = target.getBoundingClientRect();
-  const bw   = 240;
-  const bh   = 160;
+  const br   = bubble.getBoundingClientRect();
+  const bw   = br.width  || 240;
+  const bh   = br.height || 160;
   const vw   = window.innerWidth;
   const vh   = window.innerHeight;
 
@@ -2062,6 +2068,21 @@ function _positionBubble(bubble, target, arrow) {
 
   bubble.style.top  = `${top}px`;
   bubble.style.left = `${left}px`;
+}
+
+function _positionMascot(bubble, idx) {
+  const mascot = el('spotMascot');
+  if (!mascot) return;
+  const br = bubble.getBoundingClientRect();
+  const isRight = idx % 2 !== 0;
+  // Place Rex behind the bubble, offset to one side
+  if (isRight) {
+    mascot.style.top  = `${br.top - 60}px`;
+    mascot.style.left = `${br.left - 100}px`;
+  } else {
+    mascot.style.top  = `${br.top - 60}px`;
+    mascot.style.left = `${br.right - 100}px`;
+  }
 }
 
 function _guidedAdvanceSpot() {
@@ -2117,6 +2138,7 @@ function skipAllSpots() {
   (_spotQueue || []).forEach(s => localStorage.setItem(`dalios_spot_${s.id}`, '1'));
   if (_spotHighlit) { _spotHighlit.classList.remove('spot-highlight'); _spotHighlit = null; }
   el('spotBubble').classList.add('hidden');
+  const m = el('spotMascot'); if (m) m.classList.add('hidden');
   _spotQueue = [];
   _guidedMode = false;
 }

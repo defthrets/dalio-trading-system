@@ -2685,24 +2685,20 @@ canvas { display: block; max-width: 100%; }
   50%      { transform: scaleX(-1) translateY(-12px); }
 }
 .spot-mascot {
-  position: absolute;
-  width: 320px;
+  position: fixed;
+  width: 200px;
   height: auto;
-  top: -120px;
-  right: -40px;
   pointer-events: none;
   filter: drop-shadow(0 3px 10px rgba(0,0,0,0.6));
-  z-index: -1;
+  z-index: 8499;
   opacity: 1;
   animation: mascotFloat 3s ease-in-out infinite;
 }
+.spot-mascot.hidden { display: none; }
 .spot-mascot.mascot-left {
-  right: -20px;
-  left: auto;
+  animation: mascotFloat 3s ease-in-out infinite;
 }
 .spot-mascot.mascot-right {
-  right: auto;
-  left: -40px;
   animation: mascotFloatFlip 3s ease-in-out infinite;
 }
 @keyframes bubble-pop {
