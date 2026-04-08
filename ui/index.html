@@ -10,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1/dist/chartjs-chart-financial.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260408i" />
+  <link rel="stylesheet" href="/static/style.css?v=20260408j" />
 </head>
 <body>
   <!-- Scanline overlay -->
@@ -2274,7 +2274,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=20260408i"></script>
+  <script src="/static/app.js?v=20260408j"></script>
 
   <!-- ═══════════════════════════════════════════════
        SPEECH BUBBLE SPOTLIGHT TOOLTIP
@@ -2397,5 +2397,28 @@
 
   <!-- ── Broker Setup Wizard ───────────────────────────────── -->
   <button class="tut-launch-btn" onclick="openTutorial()" title="Help — what does each tab do?">?</button>
+
+  <!-- ── Site Footer ── -->
+  <footer class="site-footer">
+    <div class="footer-links">
+      <a href="#" onclick="openLegalModal('privacy');return false">Privacy Policy</a>
+      <span class="footer-sep">|</span>
+      <a href="#" onclick="openLegalModal('terms');return false">Terms &amp; Conditions</a>
+      <span class="footer-sep">|</span>
+      <a href="#" onclick="openLegalModal('transparency');return false">Transparency Report</a>
+    </div>
+    <div class="footer-copy">&copy; 2026 DaliosATF. All rights reserved.</div>
+  </footer>
+
+  <!-- ── Legal Modal ── -->
+  <div class="legal-modal-overlay hidden" id="legalModalOverlay" onclick="if(event.target===this)closeLegalModal()">
+    <div class="legal-modal">
+      <div class="legal-modal-header">
+        <span class="legal-modal-title" id="legalModalTitle">Privacy Policy</span>
+        <button class="order-modal-close" onclick="closeLegalModal()">&times;</button>
+      </div>
+      <div class="legal-modal-body" id="legalModalBody"></div>
+    </div>
+  </div>
 </body>
 </html>
