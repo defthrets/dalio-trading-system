@@ -2688,12 +2688,12 @@ canvas { display: block; max-width: 100%; }
   position: absolute;
   width: 320px;
   height: auto;
-  top: -160px;
-  right: -80px;
+  top: -120px;
+  right: -40px;
   pointer-events: none;
   filter: drop-shadow(0 3px 10px rgba(0,0,0,0.6));
-  z-index: 2;
-  opacity: 1;
+  z-index: -1;
+  opacity: 0.5;
   animation: mascotFloat 3s ease-in-out infinite;
 }
 .spot-mascot.mascot-left {
@@ -2701,9 +2701,9 @@ canvas { display: block; max-width: 100%; }
   left: auto;
 }
 .spot-mascot.mascot-right {
-  right: -20px;
-  left: auto;
-  transform: scaleX(-1);
+  right: auto;
+  left: -40px;
+  animation: mascotFloatFlip 3s ease-in-out infinite;
 }
 @keyframes bubble-pop {
   from { opacity: 0; transform: scale(0.88); }
