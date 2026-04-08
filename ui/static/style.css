@@ -599,17 +599,17 @@ a:hover { color: var(--primary); text-decoration: underline; }
 
 /* ── Hologram Brain Logo ── */
 .holo-brain {
-  width: 44px;
-  height: 44px;
+  width: 62px;
+  height: 62px;
   display: flex;
   align-items: center;
   justify-content: center;
   text-shadow: none;
 }
 .holo-brain-scene {
-  width: 40px;
-  height: 40px;
-  perspective: 200px;
+  width: 58px;
+  height: 58px;
+  perspective: 280px;
 }
 .holo-brain-rotator {
   width: 100%;
@@ -622,8 +622,8 @@ a:hover { color: var(--primary); text-decoration: underline; }
   100% { transform: rotateY(360deg); }
 }
 .holo-brain-svg {
-  width: 40px;
-  height: 40px;
+  width: 58px;
+  height: 58px;
   filter: drop-shadow(0 0 6px rgba(0,212,255,0.5)) drop-shadow(0 0 14px rgba(0,255,170,0.2));
   backface-visibility: visible;
 }
@@ -691,9 +691,9 @@ a:hover { color: var(--primary); text-decoration: underline; }
   }
 }
 .logo-sub {
-  font-size: 11px;
+  font-size: 7.5px;
   color: var(--text-2);
-  letter-spacing: 3.5px;
+  letter-spacing: 3px;
   text-transform: uppercase;
 }
 
@@ -4875,7 +4875,7 @@ body.cli-expanded { padding-bottom: 272px; }
 @media (max-width: 640px) {
   .app-header { padding: 6px 8px; }
   .logo-main { font-size: 16px; }
-  .logo-sub { font-size: 7px; }
+  .logo-sub { font-size: 6px; }
   .system-badges { gap: 4px; }
   .badge { font-size: 8px; padding: 2px 6px; }
 
