@@ -1,22 +1,7 @@
 {
-  "cash": 899.9,
-  "positions": {
-    "TEST.AX": {
-      "qty": 2.0,
-      "entry_price": 50.0,
-      "entry_time": "2026-04-07T10:41:48.671745",
-      "side": "LONG",
-      "cost_basis": 100.0,
-      "stop_loss": null,
-      "take_profit": null
-    }
-  },
+  "cash": 1000.0,
+  "positions": {},
   "history": [],
-  "equity_history": [
-    {
-      "t": "2026-04-07T10:41:48.671786",
-      "v": 999.9
-    }
-  ],
-  "order_id": 1
+  "equity_history": [],
+  "order_id": 0
 }
