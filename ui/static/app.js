@@ -1927,6 +1927,7 @@ let _spotIdx     = 0;
 let _spotTabId   = null;
 let _spotHighlit = null;
 let _spotAutoTimer = null;
+let _spotCountdown = null;
 let _guidedMode  = false;
 
 // Tab order for guided tutorial walkthrough
@@ -1939,6 +1940,7 @@ const GUIDED_TAB_ORDER = [
 
 function showTutorial(tabId, force = false) {
   _spotTabId = tabId;
+  _guidedMode = true;
   const spots = SPOTS[tabId] || [];
   _spotQueue = spots.filter(s => force || !localStorage.getItem(`dalios_spot_${s.id}`));
   _spotIdx   = 0;
@@ -1951,6 +1953,7 @@ function showTutorial(tabId, force = false) {
 
 function _showSpot(idx) {
   clearTimeout(_spotAutoTimer);
+  clearInterval(_spotCountdown);
   const bubble = el('spotBubble');
   if (!bubble) return;
 
@@ -1966,45 +1969,62 @@ function _showSpot(idx) {
   const spot = _spotQueue[idx];
   el('spotTitle').textContent = spot.title;
   el('spotText').textContent  = spot.text;
-  el('spotCount').textContent = `${idx + 1} / ${_spotQueue.length}`;
 
   // Show/hide prev button — show when not on first spot
   const prevBtn = el('spotPrevBtn');
   if (prevBtn) prevBtn.style.display = idx > 0 ? '' : 'none';
 
-  // In guided mode: auto-advance spots, show "NEXT TAB" on last spot
-  if (_guidedMode) {
-    const isLastSpot = idx === _spotQueue.length - 1;
-    const nextTabIdx = GUIDED_TAB_ORDER.indexOf(_spotTabId) + 1;
-    const hasMoreTabs = nextTabIdx < GUIDED_TAB_ORDER.length;
+  const isLastSpot = idx === _spotQueue.length - 1;
+  const nextTabIdx = GUIDED_TAB_ORDER.indexOf(_spotTabId) + 1;
+  const hasMoreTabs = nextTabIdx < GUIDED_TAB_ORDER.length;
 
-    if (isLastSpot && hasMoreTabs) {
-      el('spotNextBtn').textContent = 'NEXT TAB \u2192';
-    } else if (isLastSpot) {
-      el('spotNextBtn').textContent = 'FINISH \u2713';
-    } else {
-      el('spotNextBtn').textContent = '';
-    }
+  // Always auto-advance every spot after 10s
+  let _secsLeft = 10;
+  const countEl = el('spotCount');
+  const updateCount = () => {
+    countEl.textContent = `${idx + 1} / ${_spotQueue.length}  ·  ${_secsLeft}s`;
+  };
+  updateCount();
 
-    // Auto-advance after 10s unless it's the last spot on this tab
-    if (!isLastSpot) {
-      _spotAutoTimer = setTimeout(() => _guidedAdvanceSpot(), 10000);
-    }
+  _spotCountdown = setInterval(() => {
+    _secsLeft--;
+    if (_secsLeft <= 0) { clearInterval(_spotCountdown); return; }
+    updateCount();
+  }, 1000);
 
-    // Timer bar animation
-    const timerBar = bubble.querySelector('.spot-timer-bar');
-    if (timerBar) {
-      timerBar.style.animation = 'none';
-      timerBar.offsetHeight; // reflow
-      if (!isLastSpot) {
-        timerBar.style.animation = 'spotTimer 10s linear forwards';
+  _spotAutoTimer = setTimeout(() => {
+    clearInterval(_spotCountdown);
+    if (isLastSpot) {
+      // Mark this spot done, then advance to next tab or finish
+      if (spot) localStorage.setItem(`dalios_spot_${spot.id}`, '1');
+      if (_guidedMode) {
+        _spotIdx++;
+        _showSpot(_spotIdx); // triggers _guidedNextTab via idx >= length
       } else {
-        timerBar.style.animation = 'none';
-        timerBar.style.width = '0';
+        _guidedMode = true;
+        _spotIdx++;
+        _showSpot(_spotIdx);
       }
+    } else {
+      _guidedAdvanceSpot();
     }
+  }, 10000);
+
+  // Timer bar animation — always run
+  const timerBar = bubble.querySelector('.spot-timer-bar');
+  if (timerBar) {
+    timerBar.style.animation = 'none';
+    timerBar.offsetHeight; // reflow
+    timerBar.style.animation = 'spotTimer 10s linear forwards';
+  }
+
+  // Button labels
+  if (isLastSpot && hasMoreTabs) {
+    el('spotNextBtn').textContent = 'NEXT TAB →';
+  } else if (isLastSpot) {
+    el('spotNextBtn').textContent = 'Finish ✓';
   } else {
-    el('spotNextBtn').textContent = idx === _spotQueue.length - 1 ? 'Done \u2713' : 'Next \u2192';
+    el('spotNextBtn').textContent = 'Next →';
   }
 
   bubble.className = `spot-bubble arrow-${spot.arrow}`;
@@ -2106,6 +2126,7 @@ function _guidedNextTab() {
 
 function nextSpot() {
   clearTimeout(_spotAutoTimer);
+  clearInterval(_spotCountdown);
   if (!_spotQueue.length) return;
   const spot = _spotQueue[_spotIdx];
   if (spot) localStorage.setItem(`dalios_spot_${spot.id}`, '1');
@@ -2114,6 +2135,7 @@ function nextSpot() {
   if (_spotIdx >= _spotQueue.length) {
     if (_spotHighlit) { _spotHighlit.classList.remove('spot-highlight'); _spotHighlit = null; }
     el('spotBubble').classList.add('hidden');
+    const m = el('spotMascot'); if (m) m.classList.add('hidden');
     if (_guidedMode) _guidedNextTab();
     return;
   }
@@ -2122,6 +2144,7 @@ function nextSpot() {
 
 function prevSpot() {
   clearTimeout(_spotAutoTimer);
+  clearInterval(_spotCountdown);
   if (!_spotQueue.length || _spotIdx <= 0) return;
   _spotIdx--;
   _showSpot(_spotIdx);
@@ -2129,6 +2152,7 @@ function prevSpot() {
 
 function skipAllSpots() {
   clearTimeout(_spotAutoTimer);
+  clearInterval(_spotCountdown);
   (_spotQueue || []).forEach(s => localStorage.setItem(`dalios_spot_${s.id}`, '1'));
   if (_spotHighlit) { _spotHighlit.classList.remove('spot-highlight'); _spotHighlit = null; }
   el('spotBubble').classList.add('hidden');

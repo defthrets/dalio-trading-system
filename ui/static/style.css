@@ -2650,9 +2650,9 @@ canvas { display: block; max-width: 100%; }
 
 /* Spot auto-advance timer bar */
 .spot-timer-bar {
-  position: absolute; bottom: 0; left: 0; height: 2px;
+  position: absolute; bottom: 0; left: 0; height: 3px;
   background: var(--primary); border-radius: 0 0 6px 6px;
-  animation: spotTimer 5s linear forwards;
+  width: 100%;
 }
 @keyframes spotTimer {
   from { width: 100%; }
