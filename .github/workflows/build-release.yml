@@ -193,7 +193,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pywebview pyinstaller
+          pip install pywebview pyinstaller Pillow
           pip install -r requirements.txt
 
       - name: Build macOS app
@@ -266,80 +266,9 @@ jobs:
           name: DALIOS-macos
           path: DALIOS-macos.zip
 
-  # ── Android Build ──
-  build-android:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq \
-            build-essential git autoconf libtool pkg-config \
-            zlib1g-dev libncurses5-dev libncursesw5-dev \
-            cmake libffi-dev libssl-dev zip unzip
-
-      - name: Install Buildozer & Kivy
-        run: |
-          pip install buildozer cython kivy
-
-      - name: Build Android APK
-        run: |
-          buildozer android debug
-        timeout-minutes: 60
-
-      - name: Find APK
-        run: |
-          APK=$(find bin -name "*.apk" | head -1)
-          cp "$APK" DALIOS-android.apk
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: DALIOS-android
-          path: DALIOS-android.apk
-
-  # ── iOS Build (Xcode project only — needs signing to produce IPA) ──
-  build-ios:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install kivy-ios toolchain
-        run: pip install kivy-ios cython
-
-      - name: Build Python recipes for iOS
-        run: |
-          toolchain build python3 kivy openssl libffi
-        timeout-minutes: 60
-
-      - name: Create Xcode project
-        run: toolchain create DALIOS ios_main.py
-
-      - name: Zip Xcode project
-        run: zip -r DALIOS-ios-xcode.zip dalios-ios/
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: DALIOS-ios
-          path: DALIOS-ios-xcode.zip
-
   # ── Create GitHub Release ──
   release:
-    needs: [build-windows, build-linux, build-macos, build-android, build-ios]
+    needs: [build-windows, build-linux, build-macos]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -361,8 +290,6 @@ jobs:
             | **Windows** | `DALIOS-windows.zip` | Unzip → double-click `DALIOS.exe` |
             | **Linux** | `DALIOS-linux.tar.gz` | `tar xzf` → run `./DALIOS` |
             | **macOS** | `DALIOS-macos.zip` | Unzip → open `DALIOS.app` (right-click → Open if blocked) |
-            | **Android** | `DALIOS-android.apk` | Transfer to phone → tap to install (enable unknown sources) |
-            | **iOS** | `DALIOS-ios-xcode.zip` | Open in Xcode → sign → run on device or archive for TestFlight |
 
             ---
             Built automatically by GitHub Actions.
@@ -370,7 +297,5 @@ jobs:
             artifacts/DALIOS-windows/DALIOS-windows.zip
             artifacts/DALIOS-linux/DALIOS-linux.tar.gz
             artifacts/DALIOS-macos/DALIOS-macos.zip
-            artifacts/DALIOS-android/DALIOS-android.apk
-            artifacts/DALIOS-ios/DALIOS-ios-xcode.zip
           draft: false
           prerelease: false
