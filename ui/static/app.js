@@ -1918,7 +1918,7 @@ const SPOTS = {
   'comms-config': [
     { id:'cfg-brokers',  sel:'.panel--brokers',     arrow:'top',    title:'\ud83d\udd17 BROKER CONNECTIONS',     text:"Connect your Australian broker here. IBKR is great for getting started. Click \'Open\' to visit their site." },
     { id:'cfg-discord',  sel:'.panel--discord',     arrow:'right',  title:'\ud83d\udce3 DISCORD ALERTS',         text:"Get trade alerts sent straight to your Discord. Paste in your webhook URL, hit Test, done. Never miss a signal again." },
-    { id:'cfg-mode',     sel:'#cfgMode',            arrow:'left',   title:'\u26a0 PAPER vs LIVE MODE',      text:"Start in PAPER mode, always. It\'s play money so you can learn the system risk-free. Only switch to LIVE when you\'re confident. No rush, legend." },
+    { id:'cfg-mode',     sel:'#modeBadge',           arrow:'bottom', title:'\u26a0 PAPER vs LIVE MODE',      text:"Start in PAPER mode, always. It\'s play money so you can learn the system risk-free. Only switch to LIVE when you\'re confident. No rush, legend." },
   ],
 };
 
