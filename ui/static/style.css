@@ -402,6 +402,8 @@ canvas {
 }
 .panel--broker-bar {
   animation: brokerBarIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
+  overflow: visible;
+  z-index: 10;
 }
 
 /* ─── Search Button Hover ─── */
@@ -3707,7 +3709,7 @@ canvas { display: block; max-width: 100%; }
   border: 1px solid var(--border-hi);
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-  z-index: 100;
+  z-index: 9999;
   overflow: hidden;
 }
 .broker-picker-header {
