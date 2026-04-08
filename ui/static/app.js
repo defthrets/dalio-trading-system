@@ -252,7 +252,7 @@ async function loadStatus() {
     const d = await fetchJSON('/api/status');
     STATE.status = d;
     document.getElementById('modeBadge').textContent   = `MODE: ${d.mode} ▾`;
-    document.getElementById('modeBadge').className     = d.mode === 'LIVE' ? 'badge badge--red' : 'badge badge--amber';
+    document.getElementById('modeBadge').className     = d.mode === 'LIVE' ? 'badge badge--red mode-live' : 'badge badge--cyan mode-paper';
     // Status badge respects paused state from server
     const sb = document.getElementById('statusBadge');
     if (sb) {
