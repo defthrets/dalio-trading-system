@@ -5038,10 +5038,10 @@ body.cli-expanded { padding-bottom: 272px; }
    Every element using var(--xxx) automatically becomes light.
    ══════════════════════════════════════════════════════════════ */
 .light-theme {
-  /* ── Backgrounds: warm cream / soft tan ── */
-  --bg-0:        #f5f3f0;
+  /* ── Backgrounds: light gray / warm panels ── */
+  --bg-0:        #e8e8e8;
   --bg-1:        #faf9f7;
-  --bg-2:        #efece8;
+  --bg-2:        #e0e0e0;
   --bg-panel:    #faf9f7;
   --bg-panel-2:  #f5f3f0;
   --bg-card:     #faf9f7;
@@ -5085,12 +5085,12 @@ body.cli-expanded { padding-bottom: 272px; }
   --border-hi:   #cdc6bd;
   --border-act:  #d4820a;
 
-  background: #f5f3f0 !important;
+  background: #e8e8e8 !important;
   color: #3d3428;
 }
 
 /* ── Body / root background ── */
-.light-theme body { background: #f5f3f0 !important; color: #3d3428; }
+.light-theme body { background: #e8e8e8 !important; color: #3d3428; }
 
 /* ── Panels: warm cream cards ── */
 .light-theme .panel {
@@ -5100,7 +5100,7 @@ body.cli-expanded { padding-bottom: 272px; }
 }
 .light-theme .panel-header {
   border-color: #e0dbd4;
-  background: #f5f3f0;
+  background: #efefef;
   color: #2c2418;
 }
 
@@ -5153,7 +5153,7 @@ body.cli-expanded { padding-bottom: 272px; }
 
 /* ── Tables ── */
 .light-theme table { border-color: #e0dbd4; }
-.light-theme table tr:nth-child(even) { background: #f5f3f0; }
+.light-theme table tr:nth-child(even) { background: #f0f0f0; }
 .light-theme table tr:hover { background: #f0ede8; }
 .light-theme .data-table th {
   background: #efece8;
@@ -5188,13 +5188,13 @@ body.cli-expanded { padding-bottom: 272px; }
   box-shadow: 0 8px 32px rgba(80,60,40,0.14);
 }
 .light-theme .modal-overlay { background: rgba(60,48,32,0.12); }
-.light-theme .welcome-overlay { background: rgba(245,243,240,0.96); }
+.light-theme .welcome-overlay { background: rgba(232,232,232,0.96); }
 .light-theme .welcome-box {
   background: #faf9f7;
   border-color: #e0dbd4;
   box-shadow: 0 8px 32px rgba(80,60,40,0.12);
 }
-.light-theme .tutorial-overlay { background: rgba(245,243,240,0.92); }
+.light-theme .tutorial-overlay { background: rgba(232,232,232,0.92); }
 
 /* ── Search & CLI ── */
 .light-theme .search-box {
@@ -5206,7 +5206,7 @@ body.cli-expanded { padding-bottom: 272px; }
   border-color: #e0dbd4;
 }
 .light-theme .cli-input { background: transparent; color: #3d3428; }
-.light-theme .cli-output { background: #f5f3f0; color: #5c5347; border-color: #e0dbd4; }
+.light-theme .cli-output { background: #efefef; color: #5c5347; border-color: #e0dbd4; }
 
 /* ── Badges ── */
 .light-theme .badge {
@@ -5252,7 +5252,7 @@ body.cli-expanded { padding-bottom: 272px; }
   border-color: #e0dbd4;
 }
 .light-theme .opp-card:hover,
-.light-theme .sq-card:hover { border-color: #cdc6bd; background: #f5f3f0; }
+.light-theme .sq-card:hover { border-color: #cdc6bd; background: #efefef; }
 .light-theme .paper-summary-grid .ps-stat {
   background: #faf9f7;
   border-color: #e0dbd4;
@@ -5315,7 +5315,7 @@ body.cli-expanded { padding-bottom: 272px; }
 
 /* ── Broker config panels in settings ── */
 .light-theme .broker-config-panel {
-  background: #f5f3f0 !important;
+  background: #e8e8e8 !important;
   border-color: #e0dbd4 !important;
 }
 
