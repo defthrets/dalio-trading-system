@@ -2327,11 +2327,8 @@ function requestNotificationPermission() {
 
 // ─── Theme switcher ────────────────────────────────────────
 const _THEMES = {
-  cyber:  { primary: '#ff8c00', green: '#00cc44', red: '#ff1744', amber: '#ffc107', bg0: '#000000' },
-  matrix: { primary: '#00cc44', green: '#00cc44', red: '#ff3355', amber: '#ccff00', bg0: '#000d02' },
-  void:   { primary: '#c084fc', green: '#a3e635', red: '#f87171', amber: '#fbbf24', bg0: '#06020f' },
-  amber:  { primary: '#ffb000', green: '#00cc44', red: '#ff3355', amber: '#ffb000', bg0: '#0c0700' },
-  light:  { primary: '#d97706', green: '#16a34a', red: '#dc2626', amber: '#d97706', bg0: '#f5f5f4' },
+  dark:   { primary: '#d97706', green: '#16a34a', red: '#dc2626', amber: '#d97706', bg0: '#f5f5f4' },
+  light:  { primary: '#c2410c', green: '#15803d', red: '#b91c1c', amber: '#b45309', bg0: '#ffffff' },
 };
 
 function setTheme(name, btn) {
@@ -2342,10 +2339,36 @@ function setTheme(name, btn) {
   root.style.setProperty('--red',          t.red);
   root.style.setProperty('--amber',        t.amber);
   root.style.setProperty('--bg-0',         t.bg0);
-  root.style.setProperty('--primary-glow', t.primary + '40');
-  root.style.setProperty('--green-glow',   t.green + '40');
+  root.style.setProperty('--primary-glow', t.primary + '20');
+  root.style.setProperty('--green-glow',   t.green + '20');
+
+  // Both modes are light-based (no more dark terminal themes)
+  root.classList.add('light-theme');
 
   if (name === 'light') {
+    // Ultra-light: pure white, very subtle borders
+    root.style.setProperty('--bg-1', '#f8f8f8');
+    root.style.setProperty('--bg-2', '#f0f0f0');
+    root.style.setProperty('--bg-panel', '#ffffff');
+    root.style.setProperty('--bg-panel-2', '#fdfdfd');
+    root.style.setProperty('--bg-card', '#ffffff');
+    root.style.setProperty('--bg-row-hover', '#f8f7f6');
+    root.style.setProperty('--text-primary', '#0c0a09');
+    root.style.setProperty('--text-1', '#1c1917');
+    root.style.setProperty('--text-2', '#57534e');
+    root.style.setProperty('--text-muted', '#a8a29e');
+    root.style.setProperty('--border', '#e7e5e4');
+    root.style.setProperty('--border-hi', '#d6d3d1');
+    root.style.setProperty('--border-act', t.primary);
+    root.style.setProperty('--glass', 'rgba(0,0,0,0.02)');
+    root.style.setProperty('--glass-border', 'rgba(0,0,0,0.05)');
+    root.style.setProperty('--shadow-sm', '0 1px 3px rgba(0,0,0,0.06)');
+    root.style.setProperty('--shadow-md', '0 4px 12px rgba(0,0,0,0.08)');
+    root.style.setProperty('--shadow-lg', '0 8px 32px rgba(0,0,0,0.10)');
+    root.style.setProperty('--cyan', '#0284c7');
+    root.style.setProperty('--cyan-glow', 'rgba(2,132,199,0.10)');
+  } else {
+    // Dark mode: warm off-white panels, subtle warmth
     root.style.setProperty('--bg-1', '#eeeeee');
     root.style.setProperty('--bg-2', '#e5e5e5');
     root.style.setProperty('--bg-panel', '#ffffff');
@@ -2356,38 +2379,28 @@ function setTheme(name, btn) {
     root.style.setProperty('--text-1', '#292524');
     root.style.setProperty('--text-2', '#78716c');
     root.style.setProperty('--text-muted', '#a8a29e');
-    root.style.setProperty('--border', '#e7e5e4');
-    root.style.setProperty('--border-hi', '#d6d3d1');
-    root.classList.add('light-theme');
-  } else {
-    root.style.setProperty('--bg-1', '#0a0a0a');
-    root.style.setProperty('--bg-2', '#141414');
-    root.style.setProperty('--bg-panel', '#0d0d0d');
-    root.style.setProperty('--bg-panel-2', '#111111');
-    root.style.setProperty('--bg-card', '#0f0f0f');
-    root.style.setProperty('--bg-row-hover', '#1a1a1a');
-    root.style.setProperty('--text-primary', '#f0e8e0');
-    root.style.setProperty('--text-1', '#e0d6cc');
-    root.style.setProperty('--text-2', '#8a7e72');
-    root.style.setProperty('--text-muted', '#8a7e72');
-    root.style.setProperty('--border', '#222222');
-    root.style.setProperty('--border-hi', '#333333');
-    root.classList.remove('light-theme');
+    root.style.setProperty('--border', '#d6d3d1');
+    root.style.setProperty('--border-hi', '#c4c0bc');
+    root.style.setProperty('--border-act', t.primary);
+    root.style.setProperty('--glass', 'rgba(0,0,0,0.03)');
+    root.style.setProperty('--glass-border', 'rgba(0,0,0,0.06)');
+    root.style.setProperty('--shadow-sm', '0 1px 3px rgba(0,0,0,0.08)');
+    root.style.setProperty('--shadow-md', '0 4px 12px rgba(0,0,0,0.10)');
+    root.style.setProperty('--shadow-lg', '0 8px 32px rgba(0,0,0,0.12)');
+    root.style.setProperty('--cyan', '#0369a1');
+    root.style.setProperty('--cyan-glow', 'rgba(3,105,161,0.10)');
   }
 
-  document.querySelectorAll('.sett-theme-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
   _saveSetting('theme', name);
   _updateThemeToggleBtn(name);
-  pushAlert('SETTINGS', `Theme set to ${name.toUpperCase()}`, 'info');
 }
 
 function _applyStoredTheme() {
   const s = _loadSettings();
-  const theme = s.theme || 'light';
-  const btn = document.querySelector(`[data-theme="${theme}"]`);
-  setTheme(theme, btn);
-  _updateThemeToggleBtn(theme);
+  let theme = s.theme || 'dark';
+  // Migrate old themes to dark
+  if (!_THEMES[theme]) theme = 'dark';
+  setTheme(theme, null);
 }
 
 // ─── Restore signal filters + slider from localStorage ────
@@ -6170,13 +6183,9 @@ document.addEventListener('DOMContentLoaded', () => {
 // ═══════════════════════════════════════════════════════════
 
 function toggleLightDark() {
-  const current = _loadSettings().theme || 'light';
-  const isLight = current === 'light';
-  const prevDark = localStorage.getItem('dalios_prev_dark_theme') || 'cyber';
-  const next = isLight ? prevDark : 'light';
-  if (!isLight) localStorage.setItem('dalios_prev_dark_theme', current);
-  const btn = document.querySelector(`[data-theme="${next}"]`);
-  setTheme(next, btn);
+  const current = _loadSettings().theme || 'dark';
+  const next = current === 'light' ? 'dark' : 'light';
+  setTheme(next, null);
 }
 
 function _updateThemeToggleBtn(themeName) {
@@ -6184,10 +6193,10 @@ function _updateThemeToggleBtn(themeName) {
   const label = document.getElementById('themeLabel');
   if (!icon || !label) return;
   if (themeName === 'light') {
-    icon.textContent = '☀️';
+    icon.textContent = '☀';
     label.textContent = 'LIGHT';
   } else {
-    icon.textContent = '🌙';
+    icon.textContent = '◐';
     label.textContent = 'DARK';
   }
 }
