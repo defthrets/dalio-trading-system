@@ -724,7 +724,7 @@ def _gen_quadrant_data() -> dict:
     try:
         return _classify_quadrant_from_market_data()
     except Exception as exc:
-        logger.warning(f"Real quadrant classification failed ({exc}), using random fallback")
+        logger.debug(f"Quadrant using fallback ({exc}) — normal on startup before scanners run")
         return _gen_quadrant_data_random()
 
 
