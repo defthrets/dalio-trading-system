@@ -2008,9 +2008,23 @@ function _showSpot(idx) {
 
   bubble.className = `spot-bubble arrow-${spot.arrow}`;
 
-  // Alternate mascot side — even spots left, odd spots right (mirrors image)
+  // Context-aware Rex mascot per tab
+  const REX_TAB_IMG = {
+    'command-center': '/static/img/rex-thinking.png',
+    'live-trading': '/static/img/rex-boss.png',
+    'signal-ops': '/static/img/rex-computer.png',
+    'intel-center': '/static/img/rex-computer.png',
+    'holy-grail': '/static/img/rex-thinking.png',
+    'risk-matrix': '/static/img/rex-panic.png',
+    'backtest-lab': '/static/img/rex-boss.png',
+    'asx-scanner': '/static/img/rex-money.png',
+    'commodities-scanner': '/static/img/rex-money.png',
+    'paper-trading': '/static/img/rex-money.png',
+    'comms-config': '/static/img/rex-computer.png',
+  };
   const mascot = el('spotMascot');
   if (mascot) {
+    mascot.src = REX_TAB_IMG[_spotTabId] || '/static/img/mascot.png';
     mascot.className = idx % 2 === 0 ? 'spot-mascot mascot-left' : 'spot-mascot mascot-right';
   }
 
