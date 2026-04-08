@@ -2685,8 +2685,8 @@ function applyPaperPortfolio(d) {
     </tr>`;
   }).join('');
 
-  // Mirror to Command Centre
-  applyCommandCentre(d, null);
+  // Mirror to Command Centre (paper mode only — live mode uses broker data)
+  if (_tradingMode !== 'live') applyCommandCentre(d, null);
 }
 
 async function closePaperPosition(ticker) {
@@ -2823,8 +2823,8 @@ function applyPaperHistory(d) {
     </tr>`;
   }).join('');
 
-  // Mirror to Command Centre
-  applyCommandCentre(null, d);
+  // Mirror to Command Centre (paper mode only — live mode uses broker data)
+  if (_tradingMode !== 'live') applyCommandCentre(null, d);
 
   // Push most recent trade to activity feed (only the latest one to avoid spam)
   if (d.trades.length) {

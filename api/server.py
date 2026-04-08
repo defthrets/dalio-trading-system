@@ -313,11 +313,14 @@ async def toggle_pause(body: dict):
 
 @app.get("/api/portfolio/health")
 async def portfolio_health():
-    if TRADING_MODE == "live" and ACTIVE_BROKER and ACTIVE_BROKER.is_connected():
-        try:
-            data = await _gen_live_portfolio_health()
-        except Exception:
-            data = _gen_portfolio_health()
+    if TRADING_MODE == "live":
+        if ACTIVE_BROKER and ACTIVE_BROKER.is_connected():
+            try:
+                data = await _gen_live_portfolio_health()
+            except Exception:
+                data = _gen_live_placeholder()
+        else:
+            data = _gen_live_placeholder()
     else:
         data = _gen_portfolio_health()
     STATE.last_health = data
@@ -386,6 +389,23 @@ async def _gen_live_portfolio_health() -> dict:
         "sharpe_ratio": sharpe, "positions": positions_list,
         "peak_equity": round(peak_equity, 2),
         "source": "live",
+    }
+
+
+def _gen_live_placeholder() -> dict:
+    """Return zeroed live-mode stats when no broker is connected."""
+    return {
+        "timestamp": datetime.utcnow().isoformat(), "equity": 0,
+        "initial_equity": 0, "cash": 0,
+        "total_return_pct": 0, "daily_pnl": 0, "daily_pnl_pct": 0,
+        "drawdown_pct": 0, "open_positions": 0,
+        "dalio_diversification_met": False,
+        "selected_portfolio_size": 0,
+        "circuit_breaker_active": False,
+        "daily_limit_pct": 2.0, "max_drawdown_pct": 10.0,
+        "sharpe_ratio": 0, "positions": [],
+        "peak_equity": 0,
+        "source": "live", "broker_connected": False,
     }
 
 
@@ -777,10 +797,8 @@ async def market_scanner(market: str):
     if good:
         rows = good
 
-    if market == "crypto":
-        rows = sorted(rows, key=lambda r: r.get("volume", 0), reverse=True)
-    else:
-        rows = sorted(rows, key=lambda r: abs(r["change_pct"]), reverse=True)
+    # Uniform sorting: biggest movers first (consistent across all markets)
+    rows = sorted(rows, key=lambda r: abs(r.get("change_pct", 0)), reverse=True)
 
     _scanner_cache[market] = {"ts": time.time(), "rows": rows}
     return {"market": market, "rows": rows, "count": len(rows), "cached": False}

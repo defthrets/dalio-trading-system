@@ -62,39 +62,137 @@ QUADRANT_META = {
 }
 
 ASSET_CLASS_MAP: dict = {
-    # Crypto (USD)
-    "BTC-USD":"crypto","ETH-USD":"crypto","BNB-USD":"crypto","SOL-USD":"crypto","XRP-USD":"crypto",
-    "ADA-USD":"crypto","AVAX-USD":"crypto","DOT-USD":"crypto","LINK-USD":"crypto","MATIC-USD":"crypto",
-    "DOGE-USD":"crypto","LTC-USD":"crypto","UNI-USD":"crypto","ATOM-USD":"crypto","NEAR-USD":"crypto",
-    # Crypto (AUD)
-    "BTC-AUD":"crypto","ETH-AUD":"crypto","BNB-AUD":"crypto","SOL-AUD":"crypto","XRP-AUD":"crypto",
-    "ADA-AUD":"crypto","AVAX-AUD":"crypto","DOT-AUD":"crypto","LINK-AUD":"crypto","MATIC-AUD":"crypto",
-    "DOGE-AUD":"crypto","LTC-AUD":"crypto","UNI-AUD":"crypto","ATOM-AUD":"crypto","NEAR-AUD":"crypto",
-    "SHIB-AUD":"crypto",
-    # Gold / Precious metals
-    "GLD":"gold","SLV":"gold","PALL":"gold","NCM.AX":"gold","EVN.AX":"gold","NST.AX":"gold",
-    # Commodities
-    "USO":"commodities","UNG":"commodities","COPX":"commodities","WEAT":"commodities",
-    "DBA":"commodities","XOM":"commodities","CVX":"commodities","WDS.AX":"commodities",
-    "STO.AX":"commodities","BPT.AX":"commodities","BHP.AX":"commodities","RIO.AX":"commodities","FMG.AX":"commodities",
-    # Long Bonds
-    "TLT":"long_bonds","IEF":"long_bonds","AGG":"long_bonds","BND":"long_bonds",
-    # TIPS / Inflation-linked
-    "TIP":"tips","VTIP":"tips","SCHP":"tips",
-    # Corporate bonds
-    "LQD":"corporate_bonds","HYG":"corporate_bonds",
-    # Real assets / REIT
-    "GMG.AX":"real_assets","TCL.AX":"real_assets","SCG.AX":"real_assets","VNQ":"real_assets",
-    # ASX Equities
-    "CBA.AX":"equities","ANZ.AX":"equities","NAB.AX":"equities","WBC.AX":"equities",
-    "MQG.AX":"equities","CSL.AX":"equities","COH.AX":"equities","RMD.AX":"equities",
-    "WES.AX":"equities","WOW.AX":"equities","COL.AX":"equities","TLS.AX":"equities",
-    "XRO.AX":"equities","WTC.AX":"equities","ALU.AX":"equities","REA.AX":"equities",
-    "S32.AX":"equities","MIN.AX":"equities","AGL.AX":"equities","ORG.AX":"equities",
-    "QAN.AX":"equities","SUN.AX":"equities","QBE.AX":"equities","AMP.AX":"equities",
-    # US / Global ETFs
-    "SPY":"equities","QQQ":"growth_stocks","VTI":"equities","IWLD":"equities","EEM":"equities",
+    # ── Gold & Precious Metals ──
+    "PMGOLD.AX":"gold","QAU.AX":"gold","MNRS.AX":"gold","GOLD.AX":"gold",
+    "NST.AX":"gold","EVN.AX":"gold","SBM.AX":"gold","RRL.AX":"gold","SAR.AX":"gold",
+    "GOR.AX":"gold","CMM.AX":"gold","RMS.AX":"gold","DEG.AX":"gold","WAF.AX":"gold",
+    "MML.AX":"gold","RSG.AX":"gold","PRU.AX":"gold","SDG.AX":"gold","BDC.AX":"gold",
+    "SKY.AX":"gold","MAU.AX":"gold",
+    "GC=F":"gold","SI=F":"gold","PL=F":"gold","PA=F":"gold",
+    "PAXG-USD":"gold",
+    # ── Commodities — Energy ──
+    "OOO.AX":"commodities","WDS.AX":"commodities","STO.AX":"commodities","BPT.AX":"commodities",
+    "APA.AX":"commodities","KAR.AX":"commodities","CVN.AX":"commodities","STX.AX":"commodities",
+    "MEL.AX":"commodities","COE.AX":"commodities","NHE.AX":"commodities","TAP.AX":"commodities",
+    "OPT.AX":"commodities",
+    "CL=F":"commodities","BZ=F":"commodities","NG=F":"commodities",
+    # ── Commodities — Base & Industrial Metals ──
+    "OZL.AX":"commodities","29M.AX":"commodities","HG=F":"commodities",
+    "BHP.AX":"commodities","RIO.AX":"commodities","FMG.AX":"commodities",
+    "S32.AX":"commodities","MIN.AX":"commodities",
+    "IGO.AX":"commodities","SFR.AX":"commodities","ILU.AX":"commodities","AWC.AX":"commodities",
+    "NIC.AX":"commodities","WSA.AX":"commodities","CIA.AX":"commodities","MGX.AX":"commodities",
+    "GRR.AX":"commodities","CLQ.AX":"commodities","CHN.AX":"commodities","TNG.AX":"commodities",
+    "NHC.AX":"commodities","WHC.AX":"commodities","CRN.AX":"commodities","BCB.AX":"commodities",
+    "TER.AX":"commodities","RED.AX":"commodities","SLR.AX":"commodities","OGC.AX":"commodities",
+    "BGL.AX":"commodities","RXL.AX":"commodities","MEU.AX":"commodities","AIS.AX":"commodities",
+    "IPT.AX":"commodities","GWR.AX":"commodities","SBR.AX":"commodities",
+    # ── Commodities — Broad / Agriculture ──
+    "QCB.AX":"commodities","COMB.AX":"commodities","FOOD.AX":"commodities","QAG.AX":"commodities",
+    "ZC=F":"commodities","ZW=F":"commodities","ZS=F":"commodities",
+    "KC=F":"commodities","SB=F":"commodities","CC=F":"commodities",
+    "LE=F":"commodities","GF=F":"commodities","HE=F":"commodities","LBS=F":"commodities",
+    "GNC.AX":"commodities","NUF.AX":"commodities","ELD.AX":"commodities",
+    # ── Commodities — Uranium ──
+    "PDN.AX":"commodities","BOE.AX":"commodities","NXE.AX":"commodities","ERA.AX":"commodities",
+    "92E.AX":"commodities","AGE.AX":"commodities","SLX.AX":"commodities","PEN.AX":"commodities",
+    "BMN.AX":"commodities","LOT.AX":"commodities","DYL.AX":"commodities",
+    "BKY.AX":"commodities","TOE.AX":"commodities","GTR.AX":"commodities",
+    # ── Commodities — Lithium & Battery Metals ──
+    "AKE.AX":"commodities","PLS.AX":"commodities","SYA.AX":"commodities","CXO.AX":"commodities",
+    "GL1.AX":"commodities","AVZ.AX":"commodities","LKE.AX":"commodities","PLL.AX":"commodities",
+    "EUR.AX":"commodities","DEL.AX":"commodities","NVX.AX":"commodities","EV1.AX":"commodities",
+    "LAT.AX":"commodities","LTR.AX":"commodities",
+    # ── Commodities — Rare Earths ──
+    "LYC.AX":"commodities","ARU.AX":"commodities","VML.AX":"commodities","HAS.AX":"commodities",
+    "REE.AX":"commodities","NTU.AX":"commodities","ASM.AX":"commodities","HLX.AX":"commodities",
+    # ── Real Assets / REITs ──
+    "GMG.AX":"real_assets","SCG.AX":"real_assets","GPT.AX":"real_assets","VCX.AX":"real_assets",
+    "CLW.AX":"real_assets","MGR.AX":"real_assets","DXS.AX":"real_assets","CHC.AX":"real_assets",
+    "BWP.AX":"real_assets","NSR.AX":"real_assets","CQR.AX":"real_assets","HMC.AX":"real_assets",
+    "ABP.AX":"real_assets","SCP.AX":"real_assets","HDN.AX":"real_assets","URW.AX":"real_assets",
+    "AOF.AX":"real_assets","CNI.AX":"real_assets","GDI.AX":"real_assets","PPC.AX":"real_assets",
+    "RGN.AX":"real_assets","ARF.AX":"real_assets","CRF.AX":"real_assets",
+    "TCL.AX":"real_assets",
+    # ── ASX Equities — Financials ──
+    "CBA.AX":"equities","WBC.AX":"equities","ANZ.AX":"equities","NAB.AX":"equities",
+    "MQG.AX":"equities","BEN.AX":"equities","BOQ.AX":"equities","SUN.AX":"equities",
+    "QBE.AX":"equities","IAG.AX":"equities","AMP.AX":"equities","ASX.AX":"equities",
+    "PPT.AX":"equities","CGF.AX":"equities","CPU.AX":"equities","NHF.AX":"equities",
+    "MPL.AX":"equities","NIB.AX":"equities","AUB.AX":"equities","HUB.AX":"equities",
+    "MFG.AX":"equities","PTM.AX":"equities","GQG.AX":"equities","PDL.AX":"equities",
+    "EQT.AX":"equities","IFL.AX":"equities","CIP.AX":"equities","AFG.AX":"equities",
+    "MAB.AX":"equities","SDF.AX":"equities",
+    # ── ASX Equities — Healthcare ──
+    "CSL.AX":"equities","RMD.AX":"equities","COH.AX":"equities","SHL.AX":"equities",
+    "ANN.AX":"equities","PME.AX":"equities","EBO.AX":"equities","HLS.AX":"equities",
+    "PNV.AX":"equities","RHC.AX":"equities","CUV.AX":"equities","NEU.AX":"equities",
+    "TLX.AX":"equities","MSB.AX":"equities","AVH.AX":"equities","IMM.AX":"equities",
+    "PXA.AX":"equities","NAN.AX":"equities","ACL.AX":"equities","RAC.AX":"equities",
+    "PRO.AX":"equities","MX1.AX":"equities","OSL.AX":"equities","EMV.AX":"equities",
+    # ── ASX Equities — Technology ──
+    "WTC.AX":"equities","XRO.AX":"equities","ALU.AX":"equities","MP1.AX":"equities",
+    "TNE.AX":"equities","REA.AX":"equities","APX.AX":"equities","TYR.AX":"equities",
+    "SDR.AX":"equities","DTL.AX":"equities","NXT.AX":"equities","DUB.AX":"equities",
+    "LNW.AX":"equities","STP.AX":"equities","RDY.AX":"equities","BVS.AX":"equities",
+    "OTW.AX":"equities","AR9.AX":"equities",
+    # ── ASX Equities — Fintech ──
+    "ZIP.AX":"equities","EML.AX":"equities","APT.AX":"equities","SPT.AX":"equities",
+    "MNY.AX":"equities","LBL.AX":"equities","MYS.AX":"equities","PGL.AX":"equities",
+    "ABA.AX":"equities","FIN.AX":"equities",
+    # ── ASX Equities — Cybersecurity ──
+    "TNT.AX":"equities","RNO.AX":"equities","PKS.AX":"equities",
+    # ── ASX Equities — Consumer / Retail ──
+    "WES.AX":"equities","WOW.AX":"equities","COL.AX":"equities","JBH.AX":"equities",
+    "TWE.AX":"equities","HVN.AX":"equities","DMP.AX":"equities","SUL.AX":"equities",
+    "LOV.AX":"equities","KGN.AX":"equities","TPW.AX":"equities","MYR.AX":"equities",
+    "NCK.AX":"equities","BBN.AX":"equities","UNI.AX":"equities","PFP.AX":"equities",
+    "BCF.AX":"equities","TRS.AX":"equities","ADH.AX":"equities",
+    # ── ASX Equities — Consumer Staples ──
+    "BKL.AX":"equities","CGC.AX":"equities","TGR.AX":"equities","HUO.AX":"equities",
+    "SKC.AX":"equities",
+    # ── ASX Equities — Cannabis ──
+    "CPH.AX":"equities","BOD.AX":"equities","CAN.AX":"equities","LEGA.AX":"equities",
+    "CUP.AX":"equities",
+    # ── ASX Equities — Industrials ──
+    "QAN.AX":"equities","BXB.AX":"equities","AZJ.AX":"equities","QUB.AX":"equities",
+    "WOR.AX":"equities","MND.AX":"equities","JHX.AX":"equities","CSR.AX":"equities",
+    "BLD.AX":"equities","DOW.AX":"equities","SVW.AX":"equities","ALQ.AX":"equities",
+    "NWH.AX":"equities","SXE.AX":"equities","CIM.AX":"equities","IDR.AX":"equities",
+    "RWC.AX":"equities","LGL.AX":"equities",
+    # ── ASX Equities — Energy (utilities) ──
+    "AGL.AX":"equities","ORG.AX":"equities",
+    # ── ASX Equities — Telecom ──
+    "TLS.AX":"equities","TPG.AX":"equities","SPK.AX":"equities","NXL.AX":"equities",
+    "PPS.AX":"equities",
+    # ── ASX Equities — Media ──
+    "NWS.AX":"equities","SEK.AX":"equities","CAR.AX":"equities","NEC.AX":"equities",
+    "SWM.AX":"equities","MMS.AX":"equities","OML.AX":"equities","AHG.AX":"equities",
+    # ── ASX ETFs (equity-tracking) ──
+    "VAS.AX":"equities","VGS.AX":"equities","IOZ.AX":"equities","STW.AX":"equities",
+    "NDQ.AX":"equities","A200.AX":"equities","ETHI.AX":"equities","IVV.AX":"equities",
+    "IAA.AX":"equities","VHY.AX":"equities","SFY.AX":"equities","MVW.AX":"equities",
+    "TECH.AX":"equities","HACK.AX":"equities","SEMI.AX":"equities","RBTZ.AX":"equities",
+    "ACDC.AX":"equities","ERTH.AX":"equities",
+    # ── ASX LICs ──
+    "AFI.AX":"equities","ARG.AX":"equities","MLT.AX":"equities","WAM.AX":"equities",
+    "WHF.AX":"equities","MIR.AX":"equities","AMH.AX":"equities","PIC.AX":"equities",
 }
+
+
+def _get_asset_class(ticker: str) -> str:
+    """Resolve asset class for quadrant playbook scoring.
+    Explicit map first, then pattern-based fallback so new tickers
+    added to scanner universes get reasonable classification."""
+    if ticker in ASSET_CLASS_MAP:
+        return ASSET_CLASS_MAP[ticker]
+    if ticker.endswith("-USD") or ticker.endswith("-AUD"):
+        return "crypto"
+    if ticker.endswith("=F"):
+        return "commodities"
+    if ticker.endswith(".AX"):
+        return "equities"
+    return "equities"
 
 QUADRANT_PLAYBOOK: dict = {
     "rising_growth": {
@@ -141,6 +239,102 @@ QUADRANT_PLAYBOOK: dict = {
         ),
     },
 }
+
+# ── Crypto-Specific Trading Principles ──────────────────
+# Crypto markets follow different dynamics from traditional macro regimes.
+# We use Dalio-compatible concepts where they apply (risk-on/risk-off, inflation
+# hedging for BTC) but layer on crypto-native signals: BTC dominance cycle,
+# momentum/mean-reversion, volatility regime, and altcoin rotation.
+
+CRYPTO_REGIME_PLAYBOOK: dict = {
+    # BTC trending up + low vol → risk-on, altcoins rally
+    "crypto_bull": {
+        "strong_buy": ["crypto"],
+        "buy":        ["gold"],          # BTC as digital gold narrative
+        "avoid":      ["long_bonds"],
+        "narrative":  (
+            "Crypto Bull: BTC in confirmed uptrend with expanding momentum. "
+            "Altcoins typically outperform BTC in this phase. Layer-1s and DeFi "
+            "tokens see highest beta. Trend-follow with wider stops — crypto "
+            "volatility rewards patience. HODL mentality dominates."
+        ),
+    },
+    # BTC trending down → risk-off, capital flees to stables/BTC
+    "crypto_bear": {
+        "strong_buy": [],
+        "buy":        ["gold"],
+        "avoid":      ["crypto"],
+        "narrative":  (
+            "Crypto Bear: BTC in confirmed downtrend, altcoins bleed harder. "
+            "Capital rotates to stablecoins or exits crypto entirely. "
+            "Only counter-trend scalps on extreme oversold — no swing longs. "
+            "Preserve capital, wait for trend reversal confirmation."
+        ),
+    },
+    # BTC sideways / consolidation → mean-reversion, range trading
+    "crypto_range": {
+        "strong_buy": [],
+        "buy":        ["crypto"],
+        "avoid":      [],
+        "narrative":  (
+            "Crypto Range: BTC consolidating in a range — volatility compression. "
+            "Mean-reversion setups work: buy oversold RSI, sell overbought. "
+            "Breakout watch — range compression often precedes explosive moves. "
+            "Position sizing smaller until direction is confirmed."
+        ),
+    },
+    # High volatility spike (crash or euphoria) → reduce exposure, wait
+    "crypto_volatile": {
+        "strong_buy": [],
+        "buy":        [],
+        "avoid":      ["crypto"],
+        "narrative":  (
+            "Crypto Volatile: extreme volatility regime — liquidation cascades or "
+            "blow-off tops. Not a time to initiate new positions. "
+            "Wait for vol to compress. If already positioned, tighten stops. "
+            "Historically, buying extreme fear (RSI < 25) has been profitable on BTC."
+        ),
+    },
+}
+
+
+def _detect_crypto_regime(btc_closes: list | None) -> str:
+    """Determine current crypto market regime from BTC price action.
+    Uses trend direction + volatility to classify into one of four states."""
+    if not btc_closes or len(btc_closes) < 20:
+        return "crypto_range"
+
+    trend = _calc_trend(btc_closes)
+    # 20-day realised volatility (annualised)
+    rets = [btc_closes[i] / btc_closes[i - 1] - 1 for i in range(1, len(btc_closes))]
+    recent_rets = rets[-20:]
+    vol_20d = float(np.std(recent_rets)) * (252 ** 0.5) if len(recent_rets) >= 10 else 0.5
+
+    if vol_20d > 1.2:       # > 120% annualised vol = extreme
+        return "crypto_volatile"
+    if trend == "uptrend":
+        return "crypto_bull"
+    if trend == "downtrend":
+        return "crypto_bear"
+    return "crypto_range"
+
+
+def _get_playbook(ticker: str, btc_closes: list | None = None) -> tuple:
+    """Return (playbook_dict, regime_name, is_crypto) for a ticker.
+    ASX/commodities use Dalio quadrant. Crypto uses crypto regime."""
+    ac = _get_asset_class(ticker)
+    if ac == "crypto":
+        regime = _detect_crypto_regime(btc_closes)
+        return CRYPTO_REGIME_PLAYBOOK[regime], regime, True
+    # Dalio macro regime for everything else
+    qdata = STATE.last_quadrant or {}
+    quadrant = qdata.get("quadrant", "rising_growth")
+    pb = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
+    return pb, quadrant, False
+
+
+# Cache for BTC closes (shared across signal generation)
+_btc_closes_cache: list | None = None
 
 
 def _gen_price_history_demo(price: float, trend: str, n_points: int = 30) -> list:
@@ -237,6 +431,24 @@ async def _gen_signals(n: int = 12) -> list[dict]:
                 if r.get("price", 0) > 0:
                     cache_prices[r["ticker"]] = r["price"]
 
+    # Grab BTC closes for crypto regime detection
+    btc_closes = prices_map.get("BTC-USD")
+    if not btc_closes and YF_AVAILABLE:
+        try:
+            loop = asyncio.get_running_loop()
+            import yfinance as _yf_btc
+            def _fetch_btc():
+                h = _yf_btc.Ticker("BTC-USD").history(period="3mo", interval="1d", auto_adjust=True)
+                if h is not None and not h.empty and "Close" in h.columns:
+                    return [float(c) for c in h["Close"].dropna().tolist()[-90:]]
+                return None
+            btc_closes = await loop.run_in_executor(_EXECUTOR, _fetch_btc)
+        except Exception:
+            btc_closes = None
+
+    crypto_regime = _detect_crypto_regime(btc_closes)
+    crypto_pb = CRYPTO_REGIME_PLAYBOOK[crypto_regime]
+
     signals = []
     for ticker in candidates:
         closes = prices_map.get(ticker)
@@ -254,52 +466,136 @@ async def _gen_signals(n: int = 12) -> list[dict]:
         score = 0.0
         signal_reasons = []
 
+        # ── Crypto-specific scoring ──
         if is_crypto_ticker:
             rsi_oversold, rsi_overbought = 38, 62
+
+            # Crypto principle 1: Momentum matters more than mean-reversion
+            # In crypto bull, trend-following gets extra weight
+            if crypto_regime == "crypto_bull":
+                if trend == "uptrend":
+                    score += 2.5  # Stronger than ASX (trend-follow)
+                    signal_reasons.append("Uptrend in crypto bull market — ride the wave")
+                elif trend == "downtrend":
+                    score -= 1.5  # Less penalty — dips get bought in bulls
+                    signal_reasons.append("Dip in bull market — watch for reversal")
+            elif crypto_regime == "crypto_bear":
+                if trend == "downtrend":
+                    score -= 3.0  # Harsh — don't catch falling knives
+                    signal_reasons.append("Downtrend in crypto bear — avoid")
+                elif trend == "uptrend":
+                    score += 1.0  # Tepid — bear market rallies fade
+                    signal_reasons.append("Bear market rally — lower conviction")
+            elif crypto_regime == "crypto_volatile":
+                # Only extreme oversold gets a buy in high-vol regime
+                if rsi < 25:
+                    score += 2.5
+                    signal_reasons.append(f"Extreme fear RSI {rsi:.0f} in vol spike — contrarian buy")
+                elif rsi > 75:
+                    score -= 2.5
+                    signal_reasons.append(f"Euphoria RSI {rsi:.0f} in vol spike — take profit")
+                else:
+                    score *= 0.5  # Halve conviction in volatile regime
+                    signal_reasons.append("High volatility — reduced conviction")
+            else:  # crypto_range
+                # Mean-reversion works in ranges
+                if trend == "uptrend":
+                    score += 1.5
+                    signal_reasons.append("Range-bound uptrend")
+                elif trend == "downtrend":
+                    score -= 1.5
+                    signal_reasons.append("Range-bound downtrend")
+
+            # Crypto principle 2: RSI thresholds (tighter than traditional)
+            if rsi < rsi_oversold:
+                score += 2.0
+                signal_reasons.append(f"RSI oversold ({rsi:.0f})")
+            elif rsi > rsi_overbought:
+                score -= 2.0
+                signal_reasons.append(f"RSI overbought ({rsi:.0f})")
+            elif rsi < 45:
+                score += 0.5
+            elif rsi > 55:
+                score -= 0.5
+
+            # Crypto principle 3: MACD — same logic, works well for crypto
+            if macd_data["macd_signal"] == "bullish":
+                score += 1.5
+                signal_reasons.append("MACD bullish")
+            else:
+                score -= 1.5
+                signal_reasons.append("MACD bearish")
+            if macd_data["macd_crossover"]:
+                score += 1.5 if crypto_regime == "crypto_bull" else 0.8
+                signal_reasons.append("Fresh MACD crossover")
+
+            # Crypto principle 4: Bollinger — wider bands matter more
+            if bb_data["bb_position"] == "below_lower":
+                score += 2.0 if crypto_regime != "crypto_bear" else 1.0
+                signal_reasons.append("Below lower Bollinger Band")
+            elif bb_data["bb_position"] == "above_upper":
+                score -= 2.0 if crypto_regime != "crypto_bull" else 1.0
+                signal_reasons.append("Above upper Bollinger Band")
+
+            # Crypto principle 5: Rate of change — momentum is king
+            if len(closes) >= 10:
+                roc = (closes[-1] / closes[-10] - 1) * 100
+                if roc > 8:
+                    score += 1.0 if crypto_regime == "crypto_bull" else 0.3
+                    signal_reasons.append(f"Strong 10d momentum ({roc:+.1f}%)")
+                elif roc < -8:
+                    score -= 1.0 if crypto_regime == "crypto_bear" else 0.3
+                    signal_reasons.append(f"Weak 10d momentum ({roc:+.1f}%)")
+
+            # Crypto principle 6: Wider stop-losses (crypto is volatile)
+            sl_mult, tp_mult = 2.0, 3.5
         else:
+            # ── ASX / Commodities — Dalio principles ──
             rsi_oversold, rsi_overbought = 32, 68
 
-        if rsi < rsi_oversold:
-            score += 2.0
-            signal_reasons.append(f"RSI oversold ({rsi:.0f})")
-        elif rsi > rsi_overbought:
-            score -= 2.0
-            signal_reasons.append(f"RSI overbought ({rsi:.0f})")
-        elif rsi < 45:
-            score += 0.5
-        elif rsi > 55:
-            score -= 0.5
-
-        if macd_data["macd_signal"] == "bullish":
-            score += 1.5
-            signal_reasons.append("MACD bullish")
-        else:
-            score -= 1.5
-            signal_reasons.append("MACD bearish")
-        if macd_data["macd_crossover"]:
-            score += 1.0
-            signal_reasons.append("Fresh MACD crossover")
-
-        if bb_data["bb_position"] == "below_lower":
-            score += 1.5
-            signal_reasons.append("Below lower Bollinger Band")
-        elif bb_data["bb_position"] == "above_upper":
-            score -= 1.5
-            signal_reasons.append("Above upper Bollinger Band")
-
-        if trend == "uptrend":
-            score += 2.0
-            signal_reasons.append("Confirmed uptrend")
-        elif trend == "downtrend":
-            score -= 2.0
-            signal_reasons.append("Confirmed downtrend")
-
-        if len(closes) >= 10:
-            roc = (closes[-1] / closes[-10] - 1) * 100
-            if roc > 5:
+            if rsi < rsi_oversold:
+                score += 2.0
+                signal_reasons.append(f"RSI oversold ({rsi:.0f})")
+            elif rsi > rsi_overbought:
+                score -= 2.0
+                signal_reasons.append(f"RSI overbought ({rsi:.0f})")
+            elif rsi < 45:
                 score += 0.5
-            elif roc < -5:
+            elif rsi > 55:
                 score -= 0.5
+
+            if macd_data["macd_signal"] == "bullish":
+                score += 1.5
+                signal_reasons.append("MACD bullish")
+            else:
+                score -= 1.5
+                signal_reasons.append("MACD bearish")
+            if macd_data["macd_crossover"]:
+                score += 1.0
+                signal_reasons.append("Fresh MACD crossover")
+
+            if bb_data["bb_position"] == "below_lower":
+                score += 1.5
+                signal_reasons.append("Below lower Bollinger Band")
+            elif bb_data["bb_position"] == "above_upper":
+                score -= 1.5
+                signal_reasons.append("Above upper Bollinger Band")
+
+            if trend == "uptrend":
+                score += 2.0
+                signal_reasons.append("Confirmed uptrend")
+            elif trend == "downtrend":
+                score -= 2.0
+                signal_reasons.append("Confirmed downtrend")
+
+            if len(closes) >= 10:
+                roc = (closes[-1] / closes[-10] - 1) * 100
+                if roc > 5:
+                    score += 0.5
+                elif roc < -5:
+                    score -= 0.5
+
+            sl_mult, tp_mult = 1.5, 2.5
 
         if score >= 3.0:
             action = "BUY"
@@ -314,16 +610,21 @@ async def _gen_signals(n: int = 12) -> list[dict]:
 
         price_history = [round(c, 4 if "USD" in ticker else 2) for c in closes[-30:]]
 
-        sl_offset = max(atr * 1.5, price * 0.025)
-        tp_offset = atr * 2.5
+        sl_offset = max(atr * sl_mult, price * 0.025)
+        tp_offset = atr * tp_mult
 
-        conf_floor = 40.0 if is_crypto_ticker else 50.0
-        conf = round(min(95, max(conf_floor, 50 + abs(score) * 6)), 1)
+        conf = round(min(95, max(50.0, 50 + abs(score) * 6)), 1)
 
-        qdata = STATE.last_quadrant or {}
-        quadrant = qdata.get("quadrant", "rising_growth")
-        pb = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
-        ac = ASSET_CLASS_MAP.get(ticker, "equities")
+        # Use crypto playbook for crypto, Dalio quadrant for ASX/commodities
+        ac = _get_asset_class(ticker)
+        if is_crypto_ticker:
+            pb = crypto_pb
+            quadrant = crypto_regime
+        else:
+            qdata = STATE.last_quadrant or {}
+            quadrant = qdata.get("quadrant", "rising_growth")
+            pb = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
+
         if ac in pb["strong_buy"]:   q_fit = "strong"
         elif ac in pb["buy"]:         q_fit = "moderate"
         elif ac in pb["avoid"]:       q_fit = "avoid"
@@ -416,18 +717,29 @@ def _opp_from_signal_fallback(sigs: list, quadrant: str, playbook: dict,
                                qdata: dict, existing_classes: list, n: int) -> list:
     """Fallback when no scanner cache exists."""
     regime_label = qdata.get("label", quadrant.replace("_"," ").title())
+    crypto_regime = _detect_crypto_regime(None)
+    crypto_pb_fb = CRYPTO_REGIME_PLAYBOOK[crypto_regime]
     results = []
     for s in sigs:
         if s["action"] in ("HOLD", "SELL", "SHORT"):
             continue
-        ac    = ASSET_CLASS_MAP.get(s["ticker"], "equities")
-        q_fit = ("strong"   if ac in playbook["strong_buy"] else
-                 "moderate" if ac in playbook["buy"]        else
-                 "avoid"    if ac in playbook["avoid"]      else "neutral")
+        ac    = _get_asset_class(s["ticker"])
+        # Crypto uses its own playbook
+        if ac == "crypto":
+            pb = crypto_pb_fb
+            s_regime = crypto_regime
+            s_regime_label = crypto_regime.replace("_", " ").title()
+        else:
+            pb = playbook
+            s_regime = quadrant
+            s_regime_label = regime_label
+        q_fit = ("strong"   if ac in pb["strong_buy"] else
+                 "moderate" if ac in pb["buy"]        else
+                 "avoid"    if ac in pb["avoid"]      else "neutral")
         q_w   = {"strong": 1.4, "moderate": 1.0, "neutral": 0.6, "avoid": 0.2}[q_fit]
         score = round(s["confidence"] * q_w, 1)
         jus   = s.get("dalio_justification", {})
-        reason_0 = (f"Regime: {regime_label} -- {ac.replace('_',' ').title()} is "
+        reason_0 = (f"Regime: {s_regime_label} -- {ac.replace('_',' ').title()} is "
                     f"{'favoured' if q_fit in ('strong','moderate') else 'on avoid list'}.")
         reason_1 = f"RSI {s['rsi']:.0f} | trend: {s['trend']} | signal: {s['action']}"
         reasoning = [reason_0, reason_1]
@@ -449,7 +761,7 @@ def _opp_from_signal_fallback(sigs: list, quadrant: str, playbook: dict,
             "data_source": s["data_source"],
             "reasoning": reasoning,
             "volume_fmt": "--", "sector": "--",
-            "quadrant": quadrant, "regime_label": regime_label,
+            "quadrant": s_regime, "regime_label": s_regime_label,
         })
     results.sort(key=lambda o: o["score"], reverse=True)
     return results[:n]
@@ -459,8 +771,19 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
     """Return the top-N trade opportunities."""
     qdata    = STATE.last_quadrant or _gen_quadrant_data()
     quadrant = qdata.get("quadrant", "rising_growth")
-    playbook = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
-    existing_classes = [ASSET_CLASS_MAP.get(t, "equities") for t in PAPER.positions]
+    dalio_pb = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
+    existing_classes = [_get_asset_class(t) for t in PAPER.positions]
+
+    # Detect crypto regime from BTC price action
+    btc_closes = None
+    crypto_sc = _scanner_cache.get("crypto")
+    if crypto_sc:
+        btc_row = next((r for r in crypto_sc["rows"] if r["ticker"] == "BTC-USD"), None)
+        if btc_row:
+            btc_prices = await _get_prices(["BTC-USD"], "3mo")
+            btc_closes = btc_prices.get("BTC-USD") if btc_prices else None
+    crypto_regime = _detect_crypto_regime(btc_closes)
+    crypto_pb = CRYPTO_REGIME_PLAYBOOK[crypto_regime]
 
     all_rows: list[dict] = []
     for mkt in ("crypto", "asx", "commodities"):
@@ -473,22 +796,31 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
 
     if not all_rows:
         sigs = await _gen_signals(n * 2)
-        return _opp_from_signal_fallback(sigs, quadrant, playbook, qdata, existing_classes, n)
+        return _opp_from_signal_fallback(sigs, quadrant, dalio_pb, qdata, existing_classes, n)
 
     def _prescore(r: dict) -> float:
         tkr = r["ticker"]
         if tkr in PAPER.positions:
             return -999.0
-        ac  = ASSET_CLASS_MAP.get(tkr, "equities")
+        ac  = _get_asset_class(tkr)
         chg = r.get("change_pct", 0.0)
-        q_s = (100 if ac in playbook["strong_buy"] else
-               70  if ac in playbook["buy"]        else
-               10  if ac in playbook["avoid"]      else 45)
-        mom = min(abs(chg) * 3.0, 30.0)
-        dir_b = (15 if ac in playbook["strong_buy"] and chg > 0 else
-                 10 if ac in playbook["avoid"] and chg < 0      else 0)
-        div_b = max(0.0, 20.0 - existing_classes.count(ac) * 5)
-        return q_s * 0.40 + mom * 0.25 + dir_b * 0.20 + div_b * 0.15
+        # Use crypto playbook for crypto, Dalio for everything else
+        pb = crypto_pb if ac == "crypto" else dalio_pb
+        q_s = (100 if ac in pb["strong_buy"] else
+               70  if ac in pb["buy"]        else
+               10  if ac in pb["avoid"]      else 45)
+        # Crypto principle: momentum weighted higher than macro fit
+        if ac == "crypto":
+            mom = min(abs(chg) * 4.0, 40.0)  # Higher momentum weight
+            dir_b = (20 if crypto_regime == "crypto_bull" and chg > 0 else
+                     15 if crypto_regime == "crypto_bear" and chg < 0 else 0)
+            return q_s * 0.25 + mom * 0.40 + dir_b * 0.20 + max(0.0, 20.0 - existing_classes.count(ac) * 5) * 0.15
+        else:
+            mom = min(abs(chg) * 3.0, 30.0)
+            dir_b = (15 if ac in pb["strong_buy"] and chg > 0 else
+                     10 if ac in pb["avoid"] and chg < 0      else 0)
+            div_b = max(0.0, 20.0 - existing_classes.count(ac) * 5)
+            return q_s * 0.40 + mom * 0.25 + dir_b * 0.20 + div_b * 0.15
 
     all_rows.sort(key=_prescore, reverse=True)
     candidates = [r for r in all_rows if r["ticker"] not in PAPER.positions][:30]
@@ -532,7 +864,7 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
 
     for r in candidates:
         tkr    = r["ticker"]
-        ac     = ASSET_CLASS_MAP.get(tkr, "equities")
+        ac     = _get_asset_class(tkr)
         closes = history_map.get(tkr)
         chg    = r.get("change_pct", 0.0)
         price  = r.get("price", 0.0)
@@ -568,16 +900,21 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
         else:                                   action = "WATCH"
 
         is_short_signal = action in ("SELL", "SHORT")
-        is_avoid_class  = ac in playbook["avoid"]
+        # Select the right playbook based on asset class
+        is_crypto = ac == "crypto"
+        tkr_pb = crypto_pb if is_crypto else dalio_pb
+        tkr_regime = crypto_regime if is_crypto else quadrant
+
+        is_avoid_class  = ac in tkr_pb["avoid"]
         if is_short_signal and not is_avoid_class:
             continue
 
-        q_score = (100 if ac in playbook["strong_buy"] else
-                   70  if ac in playbook["buy"]        else
-                   10  if ac in playbook["avoid"]      else 45)
-        q_fit   = ("strong"   if ac in playbook["strong_buy"] else
-                   "moderate" if ac in playbook["buy"]        else
-                   "avoid"    if ac in playbook["avoid"]      else "neutral")
+        q_score = (100 if ac in tkr_pb["strong_buy"] else
+                   70  if ac in tkr_pb["buy"]        else
+                   10  if ac in tkr_pb["avoid"]      else 45)
+        q_fit   = ("strong"   if ac in tkr_pb["strong_buy"] else
+                   "moderate" if ac in tkr_pb["buy"]        else
+                   "avoid"    if ac in tkr_pb["avoid"]      else "neutral")
 
         if not is_short_signal:
             rsi_score = max(0.0, 50.0 - rsi) * 0.8
@@ -586,21 +923,36 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
 
         mom_score  = min(abs(chg) * 2.5, 25.0)
         div_score  = max(0.0, 20.0 - existing_classes.count(ac) * 5.0)
-        composite  = round(
-            q_score   * 0.35 +
-            rsi_score * 0.30 +
-            mom_score * 0.20 +
-            div_score * 0.15,
-            1
-        )
+
+        # Crypto: momentum-heavy weighting; ASX/Commodities: quadrant-heavy (Dalio)
+        if is_crypto:
+            composite = round(
+                q_score   * 0.20 +     # Regime fit matters less for crypto
+                rsi_score * 0.25 +
+                mom_score * 0.40 +     # Momentum is king in crypto
+                div_score * 0.15,
+                1
+            )
+        else:
+            composite = round(
+                q_score   * 0.35 +     # Dalio quadrant fit is primary driver
+                rsi_score * 0.30 +
+                mom_score * 0.20 +
+                div_score * 0.15,
+                1
+            )
 
         atr = max(vol_d * price * 14, price * 0.01)
-        sl  = round(price - atr * 1.5, 4)
-        tp  = round(price + atr * 2.5, 4)
+        # Wider stops for crypto (more volatile)
+        sl_m = 2.0 if is_crypto else 1.5
+        sl  = round(price - atr * sl_m, 4)
+        tp_m = 3.5 if is_crypto else 2.5
+        tp  = round(price + atr * tp_m, 4)
         rr  = round((tp - price) / max(price - sl, 1e-6), 2)
 
+        regime_display = tkr_regime.replace('_', ' ').title()
         reasons = [
-            f"Regime: {quadrant.replace('_',' ').title()} -- "
+            f"Regime: {regime_display} -- "
             f"{ac.replace('_',' ').title()} is "
             f"{'FAVOURED (strong buy)' if q_fit=='strong' else 'favoured' if q_fit=='moderate' else 'AVOID LIST' if q_fit=='avoid' else 'neutral'}.",
             f"RSI {rsi:.0f} ({'oversold' if rsi<35 else 'overbought' if rsi>65 else 'neutral'}) | "
@@ -643,19 +995,36 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
             "reasoning":    reasons,
             "volume_fmt":   r.get("volume_fmt", "--"),
             "sector":       r.get("sector", "--"),
-            "quadrant":     quadrant,
-            "regime_label": qdata.get("label", quadrant),
+            "quadrant":     tkr_regime,
+            "regime_label": regime_display,
         })
 
     opportunities.sort(key=lambda o: o["score"], reverse=True)
-    return opportunities[:n]
+
+    # ── Per-market balancing: guarantee minimum representation ──
+    # Each market gets at least floor(n/3) slots, rest filled by best score
+    per_mkt = max(1, n // 3)
+    balanced = []
+    for mkt in ("asx", "crypto", "commodities"):
+        mkt_opps = [o for o in opportunities if o.get("market") == mkt]
+        balanced.extend(mkt_opps[:per_mkt])
+
+    seen = {o["ticker"] for o in balanced}
+    remaining = [o for o in opportunities if o["ticker"] not in seen]
+    balanced.extend(remaining[:max(0, n - len(balanced))])
+    balanced.sort(key=lambda o: o["score"], reverse=True)
+
+    logger.info(f"Opportunities: {len(balanced[:n])} total -- "
+                f"ASX:{sum(1 for o in balanced[:n] if o.get('market')=='asx')} "
+                f"Crypto:{sum(1 for o in balanced[:n] if o.get('market')=='crypto')} "
+                f"Commodities:{sum(1 for o in balanced[:n] if o.get('market')=='commodities')}")
+    return balanced[:n]
 
 
 def _gen_justification(ticker: str, action: str, **kwargs) -> dict:
-    """Generate Dalio-framework justification using real signal data."""
-    qdata = STATE.last_quadrant or {}
-    quadrant = qdata.get("quadrant", "rising_growth")
-    meta = QUADRANT_META.get(quadrant, QUADRANT_META["rising_growth"])
+    """Generate framework justification — Dalio for ASX/commodities, crypto-native for crypto."""
+    ac = _get_asset_class(ticker)
+    is_crypto = ac == "crypto"
 
     rsi_val = kwargs.get("rsi", 50.0)
     rr = kwargs.get("rr", 2.0)
@@ -666,57 +1035,94 @@ def _gen_justification(ticker: str, action: str, **kwargs) -> dict:
 
     sent_score = 0.0
     sent_source = "keyword"
-    if STATE.last_sentiment:
-        qs = STATE.last_sentiment.get("quadrant_sentiment", {})
-        q_sent = qs.get(quadrant, {})
-        sent_score = q_sent.get("avg_score", 0.0)
-        sent_source = STATE.last_sentiment.get("sentiment_model", "keyword")
 
     n_positions = len(PAPER.positions) + 1
     corr_estimate = round(max(-0.15, min(0.1, 0.3 - 0.03 * n_positions)), 3)
     sharpe_est = round(max(0.01, min(0.4, (rr - 1.0) * 0.1)), 3)
     risk_contrib = round(100.0 / max(n_positions, 1), 2)
 
-    action_word = {
-        "BUY": "long", "LONG": "long",
-        "SELL": "exit", "SHORT": "short", "HOLD": "hold",
-    }.get(action, "enter")
-
-    sentiment_word = "positive" if sent_score > 0.1 else "negative" if sent_score < -0.1 else "neutral"
     rsi_desc = "oversold" if rsi_val < 35 else "overbought" if rsi_val > 65 else "neutral"
-    quadrant_label = quadrant.replace("_", " ").title()
 
-    ai_overview = (
-        f"{ticker} presents a {action.lower()} opportunity under the current {quadrant_label} regime. "
-        f"Sentiment ({sent_source}) is {sentiment_word} (score {sent_score:+.3f}), "
-        f"RSI reads {rsi_val:.0f} ({rsi_desc}), MACD is {macd_sig}, "
-        f"BB position: {bb_pos}, trend: {trend}. "
-        f"Risk/reward ratio is {rr}:1. "
-        f"Estimated correlation delta {corr_estimate:+.3f} -- within Holy Grail threshold. "
-        f"Quadrant fit: {q_fit}. "
-        f"Dalio framework favours {', '.join(meta['favoured'][:3])} in this environment."
-    )
+    if is_crypto:
+        # Crypto-native justification
+        crypto_regime = _detect_crypto_regime(None)
+        regime_label = crypto_regime.replace("_", " ").title()
+        crypto_pb = CRYPTO_REGIME_PLAYBOOK.get(crypto_regime, CRYPTO_REGIME_PLAYBOOK["crypto_range"])
+        narrative = crypto_pb.get("narrative", "")
 
-    reasons = [
-        f"Asset has {q_fit} alignment with {quadrant_label} environment",
-        f"Sentiment ({sent_source}): {sentiment_word} ({sent_score:+.3f}) for {ticker}",
-        f"RSI {rsi_val:.0f} -- {rsi_desc} zone",
-        f"MACD {macd_sig} | Bollinger: {bb_pos} | Trend: {trend}",
-        f"Correlation delta {corr_estimate:+.3f} -- within Holy Grail threshold",
-    ]
+        ai_overview = (
+            f"{ticker} presents a {action.lower()} opportunity in the current {regime_label} regime. "
+            f"RSI reads {rsi_val:.0f} ({rsi_desc}), MACD is {macd_sig}, "
+            f"BB position: {bb_pos}, trend: {trend}. "
+            f"Risk/reward ratio is {rr}:1. "
+            f"Crypto regime fit: {q_fit}. "
+            f"Strategy: {'trend-follow with momentum' if crypto_regime == 'crypto_bull' else 'defensive — capital preservation' if crypto_regime == 'crypto_bear' else 'mean-reversion in range' if crypto_regime == 'crypto_range' else 'wait for volatility to compress'}."
+        )
+        reasons = [
+            f"Crypto regime: {regime_label} — {q_fit} alignment",
+            f"RSI {rsi_val:.0f} — {rsi_desc} zone (crypto thresholds 38/62)",
+            f"MACD {macd_sig} | Bollinger: {bb_pos} | Trend: {trend}",
+            f"Momentum weight 40% — crypto rewards trend-following",
+            f"Correlation delta {corr_estimate:+.3f} — portfolio diversification",
+        ]
+        return {
+            "quadrant": crypto_regime,
+            "quadrant_description": narrative[:200],
+            "sentiment_score": sent_score,
+            "sentiment_model": sent_source,
+            "sharpe_improvement": sharpe_est,
+            "correlation_delta": corr_estimate,
+            "risk_contribution_pct": risk_contrib,
+            "ai_overview": ai_overview,
+            "reasons": reasons,
+            "data_source": "LIVE",
+        }
+    else:
+        # Dalio framework for ASX/commodities
+        qdata = STATE.last_quadrant or {}
+        quadrant = qdata.get("quadrant", "rising_growth")
+        meta = QUADRANT_META.get(quadrant, QUADRANT_META["rising_growth"])
+        quadrant_label = quadrant.replace("_", " ").title()
 
-    return {
-        "quadrant": quadrant,
-        "quadrant_description": meta["description"],
-        "sentiment_score": sent_score,
-        "sentiment_model": sent_source,
-        "sharpe_improvement": sharpe_est,
-        "correlation_delta": corr_estimate,
-        "risk_contribution_pct": risk_contrib,
-        "ai_overview": ai_overview,
-        "reasons": reasons,
-        "data_source": "LIVE",
-    }
+        if STATE.last_sentiment:
+            qs = STATE.last_sentiment.get("quadrant_sentiment", {})
+            q_sent = qs.get(quadrant, {})
+            sent_score = q_sent.get("avg_score", 0.0)
+            sent_source = STATE.last_sentiment.get("sentiment_model", "keyword")
+
+        sentiment_word = "positive" if sent_score > 0.1 else "negative" if sent_score < -0.1 else "neutral"
+
+        ai_overview = (
+            f"{ticker} presents a {action.lower()} opportunity under the current {quadrant_label} regime. "
+            f"Sentiment ({sent_source}) is {sentiment_word} (score {sent_score:+.3f}), "
+            f"RSI reads {rsi_val:.0f} ({rsi_desc}), MACD is {macd_sig}, "
+            f"BB position: {bb_pos}, trend: {trend}. "
+            f"Risk/reward ratio is {rr}:1. "
+            f"Estimated correlation delta {corr_estimate:+.3f} -- within Holy Grail threshold. "
+            f"Quadrant fit: {q_fit}. "
+            f"Dalio framework favours {', '.join(meta['favoured'][:3])} in this environment."
+        )
+
+        reasons = [
+            f"Asset has {q_fit} alignment with {quadrant_label} environment",
+            f"Sentiment ({sent_source}): {sentiment_word} ({sent_score:+.3f}) for {ticker}",
+            f"RSI {rsi_val:.0f} -- {rsi_desc} zone",
+            f"MACD {macd_sig} | Bollinger: {bb_pos} | Trend: {trend}",
+            f"Correlation delta {corr_estimate:+.3f} -- within Holy Grail threshold",
+        ]
+
+        return {
+            "quadrant": quadrant,
+            "quadrant_description": meta["description"],
+            "sentiment_score": sent_score,
+            "sentiment_model": sent_source,
+            "sharpe_improvement": sharpe_est,
+            "correlation_delta": corr_estimate,
+            "risk_contribution_pct": risk_contrib,
+            "ai_overview": ai_overview,
+            "reasons": reasons,
+            "data_source": "LIVE",
+        }
 
 
 def _gen_quadrant_data() -> dict:
@@ -1268,7 +1674,7 @@ def dalio_analyse_trade(ticker: str, side: str, quadrant: str,
                         cash: float, positions: dict, current_signals: list) -> dict:
     ticker = ticker.upper().strip()
     side = side.upper().strip()
-    asset_class = ASSET_CLASS_MAP.get(ticker, "equities")
+    asset_class = _get_asset_class(ticker)
     playbook = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
 
     if side == "BUY":
@@ -1285,7 +1691,7 @@ def dalio_analyse_trade(ticker: str, side: str, quadrant: str,
     risk_flags: list = []
     total_pv = cash + sum(p.get("qty", 0) * p.get("entry_price", 0) for p in positions.values())
     n_pos = len(positions)
-    existing_classes = [ASSET_CLASS_MAP.get(t, "equities") for t in positions]
+    existing_classes = [_get_asset_class(t) for t in positions]
     class_count = existing_classes.count(asset_class)
     if class_count >= 4: risk_flags.append(f"High concentration: {class_count} existing {asset_class} positions")
     if n_pos >= 15: risk_flags.append("Portfolio at 15-position Holy Grail limit")
