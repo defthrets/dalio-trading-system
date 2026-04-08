@@ -3446,7 +3446,7 @@ function renderScanner(market, filterText = '', filterSector = '') {
         <span class="sc-price">${priceStr}</span>
         ${miniSparkSVG(ticker, r.change_pct)}
         <span class="sc-change ${dir}">${chgStr}</span>
-        <div class="sc-brokers" style="font-size:7.5px;color:var(--text-muted);letter-spacing:0.3px;width:100%;margin-top:2px" data-ticker="${escHtml(ticker)}"></div>
+        <div class="sc-brokers" data-ticker="${escHtml(ticker)}"></div>
         <span class="sc-actions">
           <button class="sc-star-btn${wlCls}" onclick="event.stopPropagation();toggleWatchlist('${escHtml(ticker)}',this)">${wlIcon}</button>
           <button class="sc-trade-btn" onclick="event.stopPropagation();scannerOpenTrade('${escHtml(ticker)}',${r.price})">▶</button>

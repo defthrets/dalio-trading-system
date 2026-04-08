@@ -4265,6 +4265,13 @@ body.cli-expanded { padding-bottom: 272px; }
 .scanner-card .sc-star-btn:hover { color: var(--amber); border-color: var(--amber); }
 .scanner-card .sc-trade-btn { color: var(--green); border-color: var(--green-dim); }
 .scanner-card .sc-trade-btn:hover { background: var(--green-glow); }
+.scanner-card .sc-brokers {
+  grid-column: 1 / -1;
+  font-size: 7.5px;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+  margin-top: -4px;
+}
 @media (max-width: 1400px) {
   .scanner-card-grid { grid-template-columns: 1fr 1fr; }
 }
