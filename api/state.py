@@ -44,7 +44,7 @@ class SystemState:
         self.agent = None
         self.booted = False
         self.mode = "PAPER"
-        self.paused = True
+        self.paused = False
         self.start_time = datetime.utcnow()
         self.cycle_count = 0
         self.last_cycle: Optional[dict] = None
