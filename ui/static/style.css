@@ -5038,14 +5038,14 @@ body.cli-expanded { padding-bottom: 272px; }
    Every element using var(--xxx) automatically becomes light.
    ══════════════════════════════════════════════════════════════ */
 .light-theme {
-  /* ── Backgrounds: light gray / warm panels ── */
-  --bg-0:        #e8e8e8;
-  --bg-1:        #faf9f7;
-  --bg-2:        #e0e0e0;
-  --bg-panel:    #faf9f7;
-  --bg-panel-2:  #f5f3f0;
-  --bg-card:     #faf9f7;
-  --bg-row-hover:#f0ede8;
+  /* ── Backgrounds: modern cool gray + warm panels ── */
+  --bg-0:        #dfe1e5;
+  --bg-1:        #f7f6f4;
+  --bg-2:        #d4d6da;
+  --bg-panel:    #f7f6f4;
+  --bg-panel-2:  #edecea;
+  --bg-card:     #f7f6f4;
+  --bg-row-hover:#eeecE8;
 
   /* ── Glass & shadows: warm subtle ── */
   --glass:        rgba(120,100,80,0.03);
@@ -5085,33 +5085,33 @@ body.cli-expanded { padding-bottom: 272px; }
   --border-hi:   #cdc6bd;
   --border-act:  #d4820a;
 
-  background: #e8e8e8 !important;
+  background: #dfe1e5 !important;
   color: #3d3428;
 }
 
 /* ── Body / root background ── */
-.light-theme body { background: #e8e8e8 !important; color: #3d3428; }
+.light-theme body { background: #dfe1e5 !important; color: #3d3428; }
 
 /* ── Panels: warm cream cards ── */
 .light-theme .panel {
-  background: #faf9f7;
+  background: #f7f6f4;
   border-color: #e0dbd4;
   box-shadow: 0 1px 3px rgba(80,60,40,0.05);
 }
 .light-theme .panel-header {
   border-color: #e0dbd4;
-  background: #efefef;
+  background: #edecea;
   color: #2c2418;
 }
 
 /* ── App header & nav ── */
 .light-theme .app-header {
-  background: #faf9f7 !important;
+  background: #f7f6f4 !important;
   border-color: #e0dbd4 !important;
   box-shadow: 0 1px 3px rgba(80,60,40,0.05);
 }
 .light-theme .tab-nav {
-  background: #faf9f7 !important;
+  background: #f7f6f4 !important;
   border-color: #e0dbd4 !important;
 }
 .light-theme .tab-btn {
@@ -5127,11 +5127,11 @@ body.cli-expanded { padding-bottom: 272px; }
 
 /* ── Ticker strip ── */
 .light-theme .ticker-strip {
-  background: #faf9f7 !important;
+  background: #f7f6f4 !important;
   border-color: #e0dbd4 !important;
 }
-.light-theme .ticker-strip::before { background: linear-gradient(to right, #faf9f7, transparent) !important; }
-.light-theme .ticker-strip::after  { background: linear-gradient(to left, #faf9f7, transparent) !important; }
+.light-theme .ticker-strip::before { background: linear-gradient(to right, #f7f6f4, transparent) !important; }
+.light-theme .ticker-strip::after  { background: linear-gradient(to left, #f7f6f4, transparent) !important; }
 
 /* ── Forms & inputs ── */
 .light-theme .form-input,
@@ -5139,7 +5139,7 @@ body.cli-expanded { padding-bottom: 272px; }
 .light-theme input,
 .light-theme select,
 .light-theme textarea {
-  background: #faf9f7 !important;
+  background: #f7f6f4 !important;
   border-color: #e0dbd4 !important;
   color: #3d3428 !important;
 }
@@ -5153,7 +5153,7 @@ body.cli-expanded { padding-bottom: 272px; }
 
 /* ── Tables ── */
 .light-theme table { border-color: #e0dbd4; }
-.light-theme table tr:nth-child(even) { background: #f0f0f0; }
+.light-theme table tr:nth-child(even) { background: #edecea; }
 .light-theme table tr:hover { background: #f0ede8; }
 .light-theme .data-table th {
   background: #efece8;
@@ -5168,12 +5168,12 @@ body.cli-expanded { padding-bottom: 272px; }
 /* ── Alerts ── */
 .light-theme .alert-item {
   border-color: #e0dbd4;
-  background: #faf9f7;
+  background: #f7f6f4;
 }
 
 /* ── Signal cards ── */
 .light-theme .signal-card {
-  background: #faf9f7;
+  background: #f7f6f4;
   border-color: #e0dbd4;
   box-shadow: 0 1px 3px rgba(80,60,40,0.05);
 }
@@ -5183,30 +5183,30 @@ body.cli-expanded { padding-bottom: 272px; }
 /* ── Modals & overlays ── */
 .light-theme .order-modal,
 .light-theme .modal {
-  background: #faf9f7;
+  background: #f7f6f4;
   border-color: #e0dbd4;
   box-shadow: 0 8px 32px rgba(80,60,40,0.14);
 }
 .light-theme .modal-overlay { background: rgba(60,48,32,0.12); }
-.light-theme .welcome-overlay { background: rgba(232,232,232,0.96); }
+.light-theme .welcome-overlay { background: rgba(223,225,229,0.96); }
 .light-theme .welcome-box {
-  background: #faf9f7;
+  background: #f7f6f4;
   border-color: #e0dbd4;
   box-shadow: 0 8px 32px rgba(80,60,40,0.12);
 }
-.light-theme .tutorial-overlay { background: rgba(232,232,232,0.92); }
+.light-theme .tutorial-overlay { background: rgba(223,225,229,0.92); }
 
 /* ── Search & CLI ── */
 .light-theme .search-box {
-  background: #faf9f7;
+  background: #f7f6f4;
   border-color: #e0dbd4;
 }
 .light-theme .cli-bar {
-  background: #faf9f7;
+  background: #f7f6f4;
   border-color: #e0dbd4;
 }
 .light-theme .cli-input { background: transparent; color: #3d3428; }
-.light-theme .cli-output { background: #efefef; color: #5c5347; border-color: #e0dbd4; }
+.light-theme .cli-output { background: #edecea; color: #5c5347; border-color: #e0dbd4; }
 
 /* ── Badges ── */
 .light-theme .badge {
@@ -5232,13 +5232,13 @@ body.cli-expanded { padding-bottom: 272px; }
 
 /* ── Dropdowns ── */
 .light-theme .mode-dropdown-menu {
-  background: #faf9f7;
+  background: #f7f6f4;
   border-color: #e0dbd4;
   box-shadow: 0 4px 16px rgba(80,60,40,0.10);
 }
 .light-theme .mode-drop-opt:hover { background: #f0ede8; }
 .light-theme .broker-picker-dropdown {
-  background: #faf9f7;
+  background: #f7f6f4;
   border-color: #e0dbd4;
   box-shadow: 0 4px 16px rgba(80,60,40,0.10);
 }
@@ -5248,31 +5248,31 @@ body.cli-expanded { padding-bottom: 272px; }
 .light-theme .opp-card,
 .light-theme .cc-pos-tile,
 .light-theme .broker-card {
-  background: #faf9f7;
+  background: #f7f6f4;
   border-color: #e0dbd4;
 }
 .light-theme .opp-card:hover,
-.light-theme .sq-card:hover { border-color: #cdc6bd; background: #efefef; }
+.light-theme .sq-card:hover { border-color: #cdc6bd; background: #edecea; }
 .light-theme .paper-summary-grid .ps-stat {
-  background: #faf9f7;
+  background: #f7f6f4;
   border-color: #e0dbd4;
 }
-.light-theme .opportunity-list { background: #faf9f7; }
+.light-theme .opportunity-list { background: #f7f6f4; }
 
 /* ── Scanner ── */
-.light-theme .scanner-toolbar { background: #faf9f7; border-color: #e0dbd4; }
+.light-theme .scanner-toolbar { background: #f7f6f4; border-color: #e0dbd4; }
 .light-theme .scanner-search {
-  background: #faf9f7;
+  background: #f7f6f4;
   color: #3d3428;
   border-color: #e0dbd4;
 }
-.light-theme .scanner-card { background: #faf9f7; }
+.light-theme .scanner-card { background: #f7f6f4; }
 .light-theme .scanner-card:hover { background: #f0ede8; }
 .light-theme .scanner-card-grid { background: #e0dbd4; }
 
 /* ── Spot bubble (tutorials) ── */
 .light-theme .spot-bubble {
-  background: #faf9f7;
+  background: #f7f6f4;
   border-color: var(--primary);
   color: #3d3428;
   box-shadow: 0 2px 8px rgba(80,60,40,0.10);
@@ -5289,29 +5289,29 @@ body.cli-expanded { padding-bottom: 272px; }
 .light-theme .stat-label { color: #9c9488; }
 .light-theme .stat-val { color: #2c2418; }
 
-/* ── Logo: warm solid tones for light mode ── */
+/* ── Logo: black brain & text for light mode ── */
 .light-theme .logo-main {
-  color: #3d3428 !important;
+  color: #1a1a1a !important;
   text-shadow: none !important;
   animation: none !important;
 }
-.light-theme .logo-sub { color: #9c9488 !important; }
+.light-theme .logo-sub { color: #1a1a1a !important; }
 .light-theme .holo-brain-svg {
-  filter: none !important;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.15)) !important;
 }
 .light-theme .holo-brain-svg path {
-  stroke: #b87a1a !important;
-  opacity: 0.7;
+  stroke: #1a1a1a !important;
+  opacity: 0.85;
 }
 .light-theme .holo-brain-svg circle {
-  fill: #d4920a !important;
-  opacity: 0.8;
+  fill: #2a2a2a !important;
+  opacity: 0.9;
 }
 .light-theme .holo-brain-svg line {
-  stroke: #d4920a !important;
+  stroke: #2a2a2a !important;
 }
 .light-theme .holo-brain-scene::after { display: none; }
-.light-theme #holoGrad stop { stop-color: #c4820a !important; }
+.light-theme #holoGrad stop { stop-color: #1a1a1a !important; }
 
 /* ── Misc ── */
 .light-theme .sent-center-label { color: #2c2418 !important; }
@@ -5333,13 +5333,13 @@ body.cli-expanded { padding-bottom: 272px; }
 
 /* ── Broker config panels in settings ── */
 .light-theme .broker-config-panel {
-  background: #e8e8e8 !important;
+  background: #dfe1e5 !important;
   border-color: #e0dbd4 !important;
 }
 
 /* ── Quick pos panel ── */
 .light-theme .quick-pos-panel {
-  background: #faf9f7;
+  background: #f7f6f4;
   border-color: #e0dbd4;
   box-shadow: 0 4px 16px rgba(80,60,40,0.10);
 }
