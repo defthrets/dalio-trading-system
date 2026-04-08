@@ -3452,7 +3452,7 @@ function updateModeUI(mode, brokerConnected = false) {
   const badge = el('modeBadge');
   if (badge) {
     badge.textContent = mode === 'live' ? 'MODE: LIVE ▾' : 'MODE: PAPER ▾';
-    badge.className   = mode === 'live' ? 'badge badge--red' : 'badge badge--amber';
+    badge.className   = mode === 'live' ? 'badge badge--red mode-live' : 'badge badge--cyan mode-paper';
     // Flash to confirm mode change
     badge.classList.remove('data-flash'); void badge.offsetWidth; badge.classList.add('data-flash');
   }
