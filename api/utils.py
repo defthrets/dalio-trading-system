@@ -130,7 +130,6 @@ class SourceRateLimiter:
     def __init__(self):
         self._limits = {
             "yfinance":  {"max_per_min": 30, "max_concurrent": 5},
-            "coingecko": {"max_per_min": 10, "max_concurrent": 2},
         }
         self._timestamps: dict[str, list[float]] = {}
         self._semaphores: dict[str, asyncio.Semaphore] = {}
@@ -279,116 +278,19 @@ def _calc_sma(closes: list, period: int) -> float:
 
 def _normalize_ticker(ticker: str) -> str:
     """Normalise user-entered tickers to yfinance format.
-    BTC -> BTC-USD, ETH -> ETH-USD, bhp -> BHP.AX (if known), etc.
-    Also converts -AUD pairs to -USD for data lookups (CoinSpot -> yfinance).
+    bhp -> BHP.AX (if known), etc.
     """
     # Import ticker lists here to avoid circular import at module level
-    from api.scanners import CRYPTO_TICKERS, ASX_TICKERS
+    from api.scanners import ASX_TICKERS
     t = ticker.upper().strip()
-    # -AUD pairs -> convert to -USD for data fetching
-    if t.endswith("-AUD"):
-        return t.replace("-AUD", "-USD")
     # Already correct format -- pass through
-    if t.endswith("-USD") or t.endswith(".AX") or "-" in t or "." in t:
+    if t.endswith(".AX") or "." in t:
         return t
-    # Known crypto base symbols -> append -USD
-    _crypto_bases = {c.replace("-USD", "") for c in CRYPTO_TICKERS}
-    if t in _crypto_bases:
-        return f"{t}-USD"
     # Check if it matches an ASX ticker without suffix
     _asx_bases = {c.replace(".AX", "") for c in ASX_TICKERS}
     if t in _asx_bases:
         return f"{t}.AX"
     return t
-
-
-# ── Ticker conversion utilities ──────────────────────────
-# yfinance/CoinGecko use -USD tickers for data. CoinSpot trades in -AUD.
-# These helpers bridge that gap.
-
-# Cached AUD/USD exchange rate (refreshed every 5 min with other caches)
-_AUD_USD_RATE: float = 0.0  # 0 = not fetched yet
-
-
-async def _get_aud_usd_rate() -> float:
-    """Get current AUD/USD rate. Cached 5 min."""
-    global _AUD_USD_RATE
-    cached = _cache_get("aud_usd_rate")
-    if cached is not None:
-        _AUD_USD_RATE = cached
-        return cached
-    # Try yfinance first
-    try:
-        import yfinance as _yf_fx
-        YF_AVAILABLE = True
-    except ImportError:
-        YF_AVAILABLE = False
-
-    if YF_AVAILABLE:
-        try:
-            loop = asyncio.get_running_loop()
-
-            def _fetch_fx():
-                import yfinance as _yf_fx2
-                hist = _yf_fx2.Ticker("AUDUSD=X").history(period="5d")
-                if hist is not None and not hist.empty and "Close" in hist.columns:
-                    return float(hist["Close"].iloc[-1])
-                return None
-            rate = await asyncio.wait_for(
-                loop.run_in_executor(_EXECUTOR, _fetch_fx), timeout=8.0)
-            if rate and 0.3 < rate < 1.2:  # sanity check
-                _AUD_USD_RATE = rate
-                _cache_set("aud_usd_rate", rate)
-                return rate
-        except Exception:
-            pass
-    # Fallback: CoinGecko BTC price comparison
-    try:
-        import aiohttp as _aio_fx
-        async with _aio_fx.ClientSession(timeout=_aio_fx.ClientTimeout(total=5)) as s:
-            async with s.get(
-                "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,aud"
-            ) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    usd = data.get("bitcoin", {}).get("usd", 0)
-                    aud = data.get("bitcoin", {}).get("aud", 0)
-                    if usd and aud:
-                        rate = usd / aud  # AUD/USD = how many USD per AUD
-                        _AUD_USD_RATE = rate
-                        _cache_set("aud_usd_rate", rate)
-                        return rate
-    except Exception:
-        pass
-    # Last resort: hardcoded reasonable estimate
-    if _AUD_USD_RATE > 0:
-        return _AUD_USD_RATE
-    _AUD_USD_RATE = 0.65
-    return 0.65
-
-
-def _usd_to_aud(usd_price: float) -> float:
-    """Convert USD price to AUD using cached rate."""
-    if _AUD_USD_RATE > 0:
-        return round(usd_price / _AUD_USD_RATE, 4)
-    return round(usd_price / 0.65, 4)  # fallback
-
-
-def _to_data_ticker(ticker: str) -> str:
-    """Convert any ticker format to the yfinance/CoinGecko -USD format for data fetching."""
-    return ticker.replace("-AUD", "-USD")
-
-
-def _to_trade_ticker(ticker: str) -> str:
-    """Convert any ticker format to the CoinSpot -AUD format for trade execution."""
-    if "-USD" in ticker:
-        return ticker.replace("-USD", "-AUD")
-    return ticker
-
-
-def _is_crypto(ticker: str) -> bool:
-    """Check if a ticker is a crypto pair."""
-    return "-USD" in ticker or "-AUD" in ticker
 
 
 # ── yfinance availability ──────────────────────────────────

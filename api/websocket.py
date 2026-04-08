@@ -22,10 +22,10 @@ from api.portfolio import (
     _calculate_position_size, _RISK_MAX_POS_SIZE_PCT,
 )
 from api.scanners import (
-    ASX_TICKERS, CRYPTO_TICKERS, COMMODITY_TICKERS,
+    ASX_TICKERS, COMMODITY_TICKERS,
     _ASSET_META, _scanner_cache, _CACHE_TTL,
     _live_price, _prices_for_positions,
-    _scan_yfinance, _scan_coingecko,
+    _scan_yfinance,
 )
 from api.signals import (
     QUADRANT_PLAYBOOK, ASSET_CLASS_MAP,
@@ -80,8 +80,8 @@ async def _run_cmd(message: str) -> dict:
         return {"type":"help","message":(
             "Dalios CLI Commands\n"
             "-------------------\n"
-            "  buy <qty> <ticker>              -- Paper buy  (e.g. buy 10 BTC)\n"
-            "  sell <qty> <ticker>             -- Paper sell (e.g. sell 5 ETH)\n"
+            "  buy <qty> <ticker>              -- Paper buy  (e.g. buy 10 BHP.AX)\n"
+            "  sell <qty> <ticker>             -- Paper sell (e.g. sell 5 CBA.AX)\n"
             "  close <ticker>                  -- Close open position\n"
             "  portfolio                       -- Full portfolio summary\n"
             "  positions                       -- Open positions detail\n"
@@ -91,9 +91,8 @@ async def _run_cmd(message: str) -> dict:
             "  watchlist add <ticker>          -- Add to watchlist\n"
             "  watchlist remove <ticker>       -- Remove from watchlist\n"
             "  scanner asx                     -- ASX scanner data\n"
-            "  scanner crypto                  -- Crypto scanner data\n"
             "  scanner commodities             -- Commodities scanner data\n"
-            "  suggest [n]                     -- Top N trade opportunities (all markets)\n"
+            "  suggest [n]                     -- Top N trade opportunities\n"
             "  signals                         -- Top 5 active signals\n"
             "  analyse <ticker>                -- Dalio All Weather analysis\n"
             "  risk                            -- Portfolio risk assessment\n"
@@ -209,19 +208,16 @@ async def _run_cmd(message: str) -> dict:
         return {"type":"watchlist","message":f"{tkr} not in watchlist.","data":{"tickers":list(WATCHLIST)}}
 
     # ── scanner <market> ──────────────────────────────────────────────────
-    scanner_m = _re.match(r"^scanner\s+(asx|crypto|commodities)$", msg_lower)
+    scanner_m = _re.match(r"^scanner\s+(asx|commodities)$", msg_lower)
     if scanner_m:
         market = scanner_m.group(1)
-        ticker_map = {"asx": ASX_TICKERS, "crypto": CRYPTO_TICKERS, "commodities": COMMODITY_TICKERS}
+        ticker_map = {"asx": ASX_TICKERS, "commodities": COMMODITY_TICKERS}
         cached = _scanner_cache.get(market)
         if cached and (_time.time() - cached["ts"]) < _CACHE_TTL:
             all_rows = cached["rows"]
         else:
             tickers = ticker_map[market]
-            if market == "crypto":
-                all_rows = await _scan_coingecko(tickers)
-            else:
-                all_rows = await _scan_yfinance(tickers, market)
+            all_rows = await _scan_yfinance(tickers, market)
             good = [r for r in all_rows if r["price"] > 0]
             if good: all_rows = good
             _scanner_cache[market] = {"ts": _time.time(), "rows": all_rows}

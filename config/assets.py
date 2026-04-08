@@ -56,36 +56,16 @@ DEFENSIVE_ETFS = {
     "VAS.AX": {"name": "Vanguard Australian Shares", "type": "equity_etf", "quadrant_bias": "rising_growth"},
 }
 
-# Cryptocurrencies (CoinSpot AUD pairs)
-CRYPTO = {
-    "BTC-AUD": {"name": "Bitcoin", "type": "crypto", "quadrant_bias": "rising_inflation"},
-    "ETH-AUD": {"name": "Ethereum", "type": "crypto", "quadrant_bias": "rising_growth"},
-    "LTC-AUD": {"name": "Litecoin", "type": "crypto", "quadrant_bias": "rising_inflation"},
-    "SOL-AUD": {"name": "Solana", "type": "crypto", "quadrant_bias": "rising_growth"},
-    "XRP-AUD": {"name": "Ripple", "type": "crypto", "quadrant_bias": "rising_growth"},
-    "ADA-AUD": {"name": "Cardano", "type": "crypto", "quadrant_bias": "rising_growth"},
-    "DOGE-AUD": {"name": "Dogecoin", "type": "crypto", "quadrant_bias": "rising_growth"},
-    "BNB-AUD": {"name": "Binance Coin", "type": "crypto", "quadrant_bias": "rising_growth"},
-    "AVAX-AUD": {"name": "Avalanche", "type": "crypto", "quadrant_bias": "rising_growth"},
-    "DOT-AUD": {"name": "Polkadot", "type": "crypto", "quadrant_bias": "rising_growth"},
-    "LINK-AUD": {"name": "Chainlink", "type": "crypto", "quadrant_bias": "rising_growth"},
-    "MATIC-AUD": {"name": "Polygon", "type": "crypto", "quadrant_bias": "rising_growth"},
-    "SHIB-AUD": {"name": "Shiba Inu", "type": "crypto", "quadrant_bias": "rising_growth"},
-    "UNI-AUD": {"name": "Uniswap", "type": "crypto", "quadrant_bias": "rising_growth"},
-    "ATOM-AUD": {"name": "Cosmos", "type": "crypto", "quadrant_bias": "rising_growth"},
-}
-
 def get_all_assets() -> dict:
-    """Return the full asset universe (56 assets)."""
+    """Return the full asset universe (41 assets)."""
     all_assets = {}
     all_assets.update(ASX_EQUITIES)
     all_assets.update(COMMODITIES)
     all_assets.update(DEFENSIVE_ETFS)
-    all_assets.update(CRYPTO)
     return all_assets
 
 
-# Core subset (~20 assets) for low-memory systems (< 8GB RAM).
+# Core subset (~13 assets) for low-memory systems (< 8GB RAM).
 # Covers all quadrants with the most liquid instruments.
 CORE_TICKERS = [
     # ASX blue chips (5)
@@ -94,8 +74,6 @@ CORE_TICKERS = [
     "GC=F", "CL=F", "SI=F", "HG=F", "NG=F",
     # Defensive ETFs (3)
     "TLT", "GLD", "TIP",
-    # Crypto (5)
-    "BTC-AUD", "ETH-AUD", "SOL-AUD", "XRP-AUD", "BNB-AUD",
 ]
 
 

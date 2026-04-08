@@ -19,7 +19,6 @@ _STUB_MODULES = [
     "yfinance", "feedparser", "apscheduler", "apscheduler.schedulers",
     "apscheduler.schedulers.asyncio", "apscheduler.triggers",
     "apscheduler.triggers.interval",
-    "python_binance", "binance", "binance.client",
     "ib_insync", "alpaca_trade_api",
 ]
 
@@ -51,9 +50,5 @@ def sample_signals():
         {
             "ticker": "BHP.AX", "action": "BUY", "confidence": 75,
             "price": 45.00, "stop_loss": 42.75, "take_profit": 49.50,
-        },
-        {
-            "ticker": "BTC-USD", "action": "SELL", "confidence": 80,
-            "price": 65000, "stop_loss": 68000, "take_profit": 60000,
         },
     ]

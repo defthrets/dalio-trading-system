@@ -193,20 +193,17 @@ async def _run_autonomous_cycle():
     # 1. Refresh scanner data for all markets
     # market_scanner is a route function in server.py; we call scanners directly
     from api.scanners import (
-        ASX_TICKERS, CRYPTO_TICKERS, COMMODITY_TICKERS,
-        _scan_yfinance, _scan_coingecko, _scanner_cache,
+        ASX_TICKERS, COMMODITY_TICKERS,
+        _scan_yfinance, _scanner_cache,
     )
     import time as _time
 
     markets_refreshed = 0
-    ticker_map = {"asx": ASX_TICKERS, "crypto": CRYPTO_TICKERS, "commodities": COMMODITY_TICKERS}
-    for market in ("asx", "crypto", "commodities"):
+    ticker_map = {"asx": ASX_TICKERS, "commodities": COMMODITY_TICKERS}
+    for market in ("asx", "commodities"):
         try:
             tickers = ticker_map[market]
-            if market == "crypto":
-                rows = await _scan_coingecko(tickers)
-            else:
-                rows = await _scan_yfinance(tickers, market)
+            rows = await _scan_yfinance(tickers, market)
             good = [r for r in rows if r["price"] > 0]
             if good:
                 rows = good

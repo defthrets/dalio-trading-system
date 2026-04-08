@@ -34,7 +34,7 @@ from loguru import logger
 # ── Module imports ─────────────────────────────────────────
 from api.utils import (
     _cache_get, _cache_set, _cache_get_with_age, _get_prices, _EXECUTOR, _fmt_vol,
-    YF_AVAILABLE, _normalize_ticker, _get_aud_usd_rate,
+    YF_AVAILABLE, _normalize_ticker,
     RateLimiter,
 )
 from api.state import (
@@ -182,13 +182,6 @@ async def _on_startup():
 
     import api.state as _state_mod
     _state_mod.REAL_EQUITY_CURVE = _load_real_equity()
-
-    # Fetch AUD/USD exchange rate
-    try:
-        rate = await _get_aud_usd_rate()
-        logger.info(f"AUD/USD rate: {rate:.4f}")
-    except Exception as exc:
-        logger.warning(f"AUD/USD rate fetch failed: {exc}")
 
     # Launch SL/TP monitoring background task
     asyncio.get_event_loop().create_task(_sl_tp_monitor_loop())
@@ -1717,7 +1710,12 @@ async def risk_reset():
 @app.get("/api/fx/audusd")
 async def fx_audusd():
     """Return current AUD/USD exchange rate."""
-    rate = await _get_aud_usd_rate()
+    try:
+        import yfinance as yf
+        ticker = yf.Ticker("AUDUSD=X")
+        rate = ticker.fast_info.get("lastPrice", 0.65)
+    except Exception:
+        rate = 0.65
     return {"rate": round(rate, 5), "pair": "AUD/USD", "source": "yfinance"}
 
 

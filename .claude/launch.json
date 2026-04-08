@@ -5,7 +5,8 @@
       "name": "dalios-ui",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "uvicorn", "api.server:app", "--host", "0.0.0.0", "--port", "8000", "--reload"],
-      "port": 8000
+      "port": 8000,
+      "cwd": "C:\\Users\\mmidd\\dalio-trading-system"
     },
     {
       "name": "frontend",

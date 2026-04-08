@@ -14,7 +14,7 @@ from api.state import (
     _db_sync_positions, _PAPER_LOCK,
     SETTINGS_AVAILABLE,
 )
-from api.scanners import CRYPTO_TICKERS, COMMODITY_TICKERS
+from api.scanners import COMMODITY_TICKERS
 
 
 # ── Trading Fee Schedule (percentage of trade value) ─────────────────
@@ -22,7 +22,6 @@ from api.scanners import CRYPTO_TICKERS, COMMODITY_TICKERS
 TRADING_FEES = {
     "asx":         0.10,   # 0.10% -- typical ASX online broker (CommSec, SelfWealth)
     "us_equity":   0.05,   # 0.05% -- typical US broker (incl. SEC/FINRA micro-fees)
-    "crypto":      0.20,   # 0.20% -- crypto exchange (Binance 0.1%, CoinSpot 0.1-1%)
     "commodities": 0.10,   # 0.10% -- commodity ETF brokerage
     "forex":       0.03,   # 0.03% -- forex spread cost estimate
     "default":     0.10,   # 0.10% -- fallback for unknown asset types
@@ -31,9 +30,7 @@ TRADING_FEES = {
 
 def _get_fee_pct(ticker: str) -> float:
     """Return the estimated round-trip fee percentage for a ticker."""
-    if ticker in CRYPTO_TICKERS or ticker.endswith("-USD"):
-        return TRADING_FEES["crypto"]
-    elif ticker.endswith(".AX"):
+    if ticker.endswith(".AX"):
         return TRADING_FEES["asx"]
     elif ticker in COMMODITY_TICKERS:
         return TRADING_FEES["commodities"]

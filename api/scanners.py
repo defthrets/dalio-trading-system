@@ -14,7 +14,7 @@ from loguru import logger
 
 from api.utils import (
     _cache_get, _cache_set, _get_prices, _fmt_vol, _EXECUTOR,
-    YF_AVAILABLE, _is_crypto, SOURCE_LIMITER,
+    YF_AVAILABLE, SOURCE_LIMITER,
 )
 from api.state import WATCHLIST
 

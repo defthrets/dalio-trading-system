@@ -3210,7 +3210,6 @@ canvas { display: block; max-width: 100%; }
   border: 1px solid;
 }
 .sr-cat--asx       { color: var(--cyan);    border-color: var(--cyan);    background: var(--cyan-glow); }
-.sr-cat--crypto    { color: var(--amber);   border-color: var(--amber);   background: var(--amber-glow); }
 .sr-cat--commodity { color: var(--primary); border-color: var(--primary); background: var(--primary-glow); }
 
 .sr-price { font-family: var(--font-hud); font-size: 13px; color: var(--text-1); }
@@ -4014,7 +4013,7 @@ body.cli-expanded { padding-bottom: 272px; }
 }
 
 /* ═══════════════════════════════════════════════════════════
-   MARKET SCANNER TABS (ASX / CRYPTO / COMMODITIES)
+   MARKET SCANNER TABS (ASX / COMMODITIES)
    ═══════════════════════════════════════════════════════════ */
 .scanner-wrap {
   display: flex;

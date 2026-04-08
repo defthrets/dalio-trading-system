@@ -9,13 +9,6 @@ class TestGetFeePct:
         from api.server import _get_fee_pct
         assert _get_fee_pct("BHP.AX") == 0.10
         assert _get_fee_pct("CBA.AX") == 0.10
-
-    def test_crypto_fees(self):
-        """Crypto tickers get 0.20% fee."""
-        from api.server import _get_fee_pct
-        assert _get_fee_pct("BTC-USD") == 0.20
-        assert _get_fee_pct("ETH-USD") == 0.20
-
     def test_commodity_fees(self):
         """Commodity tickers get 0.10% fee."""
         from api.server import _get_fee_pct, COMMODITY_TICKERS
@@ -37,14 +30,6 @@ class TestCalcFee:
         fee = _calc_fee("BHP.AX", 10, 100.0)
         expected = round(10 * 100.0 * 0.10 / 100, 4)
         assert fee == expected
-
-    def test_fee_calculation_crypto(self):
-        """Crypto fee: 1 BTC @ $65000, 0.20% => $130."""
-        from api.server import _calc_fee
-        fee = _calc_fee("BTC-USD", 1, 65000.0)
-        expected = round(1 * 65000.0 * 0.20 / 100, 4)
-        assert fee == expected
-
     def test_round_trip_fees(self, paper_portfolio):
         """Both buy and sell legs incur fees on a round trip."""
         initial_cash = paper_portfolio.cash

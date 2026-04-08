@@ -135,9 +135,6 @@
     <button class="tab-btn" data-tab="asx-scanner" role="tab" aria-selected="false" aria-controls="tab-asx-scanner">
       <span class="tab-icon" aria-hidden="true">▣</span> ASX
     </button>
-    <button class="tab-btn" data-tab="crypto-scanner" role="tab" aria-selected="false" aria-controls="tab-crypto-scanner">
-      <span class="tab-icon" aria-hidden="true">₿</span> CRYPTO
-    </button>
     <button class="tab-btn" data-tab="commodities-scanner" role="tab" aria-selected="false" aria-controls="tab-commodities-scanner">
       <span class="tab-icon" aria-hidden="true">▤</span> COMMODITIES
     </button>
@@ -1102,40 +1099,6 @@
       </div>
     </section>
 
-    <!-- ─────────────────────────────────────
-         TAB 8: CRYPTO SCANNER
-    ───────────────────────────────────── -->
-    <section id="tab-crypto-scanner" class="tab-panel">      <div class="scanner-wrap">
-        <div class="scanner-toolbar">
-          <div class="scanner-title">₿ CRYPTO MARKET SCANNER</div>
-          <div class="panel-hint" style="flex-basis:100%;margin:-4px 0 4px">Live cryptocurrency prices from CoinGecko. Shows price, 24h change, volume, and market cap. Click TRADE to open an order or ★ to watchlist. First load may take a few seconds.</div>
-          <div class="scanner-toolbar-right">
-            <input type="text" class="scanner-search" id="cryptoSearch" placeholder="Filter ticker..." oninput="filterScanner('crypto',this.value)"/>
-            <button class="btn-primary btn--sm" onclick="loadScanner('crypto')">↻ REFRESH</button>
-          </div>
-        </div>
-        <div class="scanner-stats" id="cryptoStats"></div>
-        <div class="scanner-table-wrap">
-          <table class="data-table scanner-table" id="cryptoTable">
-            <thead>
-              <tr>
-                <th onclick="sortScanner('crypto','ticker')">TICKER ⇅</th>
-                <th>NAME</th>
-                <th onclick="sortScanner('crypto','price')">PRICE (USD) ⇅</th>
-                <th onclick="sortScanner('crypto','change_pct')">24H CHANGE ⇅</th>
-                <th>24H VOLUME</th>
-                <th>MARKET CAP</th>
-                <th>WATCHLIST</th>
-                <th>TRADE</th>
-              </tr>
-            </thead>
-            <tbody id="cryptoTableBody">
-              <tr><td colspan="8" class="scanner-loading">⌛ Loading Crypto data...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
 
     <!-- ─────────────────────────────────────
          TAB 9: COMMODITIES SCANNER
@@ -1479,42 +1442,15 @@
             <span class="panel-title">BROKER &amp; EXCHANGE CONNECTIONS</span>
             <span class="panel-tag">CONFIGURE TO EXECUTE</span>
           </div>
-          <div class="panel-hint">Connect your broker or exchange to enable live trading. Click CONFIGURE to enter API keys, then TEST to verify the connection works, and SAVE to store credentials securely. Australian brokers support ASX trading; crypto exchanges for digital assets.</div>
+          <div class="panel-hint">Connect your broker to enable live trading. Click CONFIGURE to enter API keys, then TEST to verify the connection works, and SAVE to store credentials securely. Australian brokers support ASX trading.</div>
 
           <!-- Category tabs -->
           <div class="broker-tabs">
             <button class="broker-tab active" data-bcat="au" onclick="switchBrokerTab('au',this)">🇦🇺 AUSTRALIAN</button>
-            <button class="broker-tab" data-bcat="crypto" onclick="switchBrokerTab('crypto',this)">₿ CRYPTO EXCHANGES</button>
           </div>
 
           <!-- AU Brokers -->
           <div class="broker-grid" id="bcat-au">
-            <div class="broker-card featured" data-broker="coinspot">
-              <div class="broker-logo api-glow">CS</div>
-              <div class="broker-info">
-                <div class="broker-name">CoinSpot <span class="btag api-tag" style="font-size:11px">FULL API</span></div>
-                <div class="broker-desc">Australia's most popular crypto exchange. 300+ coins. AUD deposits. AUSTRAC registered.</div>
-                <div class="broker-tags"><span class="btag">300+ Coins</span><span class="btag">AUD</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('coinspot')">⚙ CONFIGURE</button>
-                <a class="broker-link" href="https://www.coinspot.com.au" target="_blank">Open →</a>
-              </div>
-            </div>
-            <!-- CoinSpot inline config -->
-            <div class="broker-config-panel hidden" id="brokerCfg-coinspot">
-              <div class="bcfg-title">⚡ COINSPOT — HMAC-SHA512 API</div>
-              <div class="bcfg-desc">Generate keys at coinspot.com.au → My Account → API Keys. Enable Read + Trade permissions. Uses HMAC-SHA512 signed requests. V2 API recommended.</div>
-              <div class="bcfg-fields">
-                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settCoinspotKey" placeholder="CoinSpot API key" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settCoinspotSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('coinspot')">⚡ TEST</button>
-                <button class="btn-ghost" onclick="saveBrokerCreds('coinspot')">💾 SAVE</button>
-                <span class="bcfg-result" id="bcfgResult-coinspot"></span>
-              </div>
-            </div>
             <div class="broker-card featured" data-broker="stake">
               <div class="broker-logo api-glow">STK</div>
               <div class="broker-info">
@@ -1750,220 +1686,6 @@
             </div>
           </div>
 
-          <!-- Crypto Exchanges -->
-          <div class="broker-grid hidden" id="bcat-crypto">
-            <div class="broker-card featured" data-broker="binance">
-              <div class="broker-logo api-glow">BNB</div>
-              <div class="broker-info">
-                <div class="broker-name">Binance <span class="btag api-tag" style="font-size:11px">FULL API</span></div>
-                <div class="broker-desc">World's largest crypto exchange by volume. 350+ coins. Spot, futures, margin. Full REST + WebSocket API.</div>
-                <div class="broker-tags"><span class="btag">350+ Coins</span><span class="btag">Futures</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('binance')">⚙ CONFIGURE</button>
-                <a class="broker-link" href="https://www.binance.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <!-- Binance inline config -->
-            <div class="broker-config-panel hidden" id="brokerCfg-binance">
-              <div class="bcfg-title">⚡ BINANCE — SPOT TRADING API</div>
-              <div class="bcfg-desc">Generate keys at binance.com → API Management. Enable Spot Trading. Never enable Withdrawals.</div>
-              <div class="bcfg-fields">
-                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settBinanceKey" placeholder="Binance API key" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settBinanceSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>MODE</label>
-                  <select class="ctrl-select" id="settBinanceTestnet">
-                    <option value="false">Live (Real Funds)</option>
-                    <option value="true">Testnet (Free Test Funds)</option>
-                  </select>
-                </div>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('binance')">⚡ TEST</button>
-                <button class="btn-ghost" onclick="saveBrokerCreds('binance')">💾 SAVE</button>
-                <span class="bcfg-result" id="bcfgResult-binance"></span>
-              </div>
-            </div>
-            <div class="broker-card featured" data-broker="coinbase">
-              <div class="broker-logo api-glow">CB</div>
-              <div class="broker-info">
-                <div class="broker-name">Coinbase Advanced <span class="btag api-tag" style="font-size:11px">API</span></div>
-                <div class="broker-desc">US-regulated. 250+ coins. Most trusted in US. Advanced Trade API available.</div>
-                <div class="broker-tags"><span class="btag">250+ Coins</span><span class="btag">US Regulated</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('coinbase')">⚙ CONFIGURE</button>
-                <a class="broker-link" href="https://advanced.coinbase.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <!-- Coinbase inline config -->
-            <div class="broker-config-panel hidden" id="brokerCfg-coinbase">
-              <div class="bcfg-title">⚡ COINBASE — ADVANCED TRADE API (JWT / ES256)</div>
-              <div class="bcfg-desc">Generate CDP keys at coinbase.com → Settings → API. Key format: organizations/{org}/apiKeys/{id}. Private key must be ECDSA (ES256) — Ed25519 will NOT work. Enable Trade permission.</div>
-              <div class="bcfg-fields">
-                <div class="bcfg-field"><label>KEY NAME</label><input type="text" class="form-input form-input--sm" id="settCoinbaseKey" placeholder="organizations/xxx/apiKeys/xxx" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>PRIVATE KEY (EC)</label><textarea class="form-input form-input--sm" id="settCoinbaseSecret" rows="3" placeholder="-----BEGIN EC PRIVATE KEY-----&#10;..." style="resize:vertical;font-size:11px;" autocomplete="off"></textarea></div>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('coinbase')">⚡ TEST</button>
-                <button class="btn-ghost" onclick="saveBrokerCreds('coinbase')">💾 SAVE</button>
-                <span class="bcfg-result" id="bcfgResult-coinbase"></span>
-              </div>
-            </div>
-            <div class="broker-card featured" data-broker="kraken">
-              <div class="broker-logo api-glow">KRK</div>
-              <div class="broker-info">
-                <div class="broker-name">Kraken <span class="btag api-tag" style="font-size:11px">API</span></div>
-                <div class="broker-desc">200+ coins. Trusted since 2011. Spot + futures. Full API with WebSocket.</div>
-                <div class="broker-tags"><span class="btag">200+ Coins</span><span class="btag">Futures</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('kraken')">⚙ CONFIGURE</button>
-                <a class="broker-link" href="https://www.kraken.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-config-panel hidden" id="brokerCfg-kraken">
-              <div class="bcfg-title">⚡ KRAKEN — HMAC-SHA512 API</div>
-              <div class="bcfg-desc">Generate keys at kraken.com → Security → API. Enable Query Funds + Create/Modify Orders. Uses nonce-based HMAC-SHA512 signing. Optional 2FA supported.</div>
-              <div class="bcfg-fields">
-                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settKrakenKey" placeholder="Kraken API key" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>PRIVATE KEY (Secret)</label><input type="password" class="form-input form-input--sm" id="settKrakenSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('kraken')">⚡ TEST</button>
-                <button class="btn-ghost" onclick="saveBrokerCreds('kraken')">💾 SAVE</button>
-                <span class="bcfg-result" id="bcfgResult-kraken"></span>
-              </div>
-            </div>
-            <div class="broker-card featured" data-broker="bybit">
-              <div class="broker-logo api-glow">BBT</div>
-              <div class="broker-info">
-                <div class="broker-name">Bybit <span class="btag api-tag" style="font-size:11px">API</span></div>
-                <div class="broker-desc">Top derivatives exchange. Spot, perpetuals, options. Very popular in AU.</div>
-                <div class="broker-tags"><span class="btag">Perpetuals</span><span class="btag">Options</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('bybit')">⚙ CONFIGURE</button>
-                <a class="broker-link" href="https://www.bybit.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-config-panel hidden" id="brokerCfg-bybit">
-              <div class="bcfg-title">⚡ BYBIT — API CONFIGURATION</div>
-              <div class="bcfg-desc">Generate keys at bybit.com → Account → API Management. Enable Trade permission.</div>
-              <div class="bcfg-fields">
-                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settBybitKey" placeholder="Bybit API key" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settBybitSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('bybit')">⚡ TEST</button>
-                <button class="btn-ghost" onclick="saveBrokerCreds('bybit')">💾 SAVE</button>
-                <span class="bcfg-result" id="bcfgResult-bybit"></span>
-              </div>
-            </div>
-            <div class="broker-card featured" data-broker="okx">
-              <div class="broker-logo api-glow">OKX</div>
-              <div class="broker-info">
-                <div class="broker-name">OKX <span class="btag api-tag" style="font-size:11px">API</span></div>
-                <div class="broker-desc">3rd largest exchange. Spot, futures, options, DEX aggregator. Full API.</div>
-                <div class="broker-tags"><span class="btag">350+ Coins</span><span class="btag">DEX</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('okx')">⚙ CONFIGURE</button>
-                <a class="broker-link" href="https://www.okx.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-config-panel hidden" id="brokerCfg-okx">
-              <div class="bcfg-title">⚡ OKX — API CONFIGURATION</div>
-              <div class="bcfg-desc">Generate keys at okx.com → Profile → API. Requires API key, secret, AND passphrase.</div>
-              <div class="bcfg-fields">
-                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settOkxKey" placeholder="OKX API key" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settOkxSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>PASSPHRASE</label><input type="password" class="form-input form-input--sm" id="settOkxPassphrase" placeholder="Your API passphrase" autocomplete="off"/></div>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('okx')">⚡ TEST</button>
-                <button class="btn-ghost" onclick="saveBrokerCreds('okx')">💾 SAVE</button>
-                <span class="bcfg-result" id="bcfgResult-okx"></span>
-              </div>
-            </div>
-            <div class="broker-card featured" data-broker="kucoin">
-              <div class="broker-logo api-glow">KCS</div>
-              <div class="broker-info">
-                <div class="broker-name">KuCoin <span class="btag api-tag" style="font-size:11px">API</span></div>
-                <div class="broker-desc">700+ coins including small-caps. Spot, margin, futures. Popular for altcoins.</div>
-                <div class="broker-tags"><span class="btag">700+ Coins</span><span class="btag">Altcoins</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('kucoin')">⚙ CONFIGURE</button>
-                <a class="broker-link" href="https://www.kucoin.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-config-panel hidden" id="brokerCfg-kucoin">
-              <div class="bcfg-title">⚡ KUCOIN — API CONFIGURATION</div>
-              <div class="bcfg-desc">Generate keys at kucoin.com → API Management. Requires API key, secret, AND passphrase.</div>
-              <div class="bcfg-fields">
-                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settKucoinKey" placeholder="KuCoin API key" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settKucoinSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>PASSPHRASE</label><input type="password" class="form-input form-input--sm" id="settKucoinPassphrase" placeholder="Your API passphrase" autocomplete="off"/></div>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('kucoin')">⚡ TEST</button>
-                <button class="btn-ghost" onclick="saveBrokerCreds('kucoin')">💾 SAVE</button>
-                <span class="bcfg-result" id="bcfgResult-kucoin"></span>
-              </div>
-            </div>
-            <div class="broker-card featured" data-broker="bitget">
-              <div class="broker-logo api-glow">BGT</div>
-              <div class="broker-info">
-                <div class="broker-name">Bitget <span class="btag api-tag" style="font-size:11px">API</span></div>
-                <div class="broker-desc">Copy trading + spot + futures. 700+ coins. Growing AU user base.</div>
-                <div class="broker-tags"><span class="btag">Copy Trade</span><span class="btag">Futures</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('bitget')">⚙ CONFIGURE</button>
-                <a class="broker-link" href="https://www.bitget.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-config-panel hidden" id="brokerCfg-bitget">
-              <div class="bcfg-title">⚡ BITGET — API CONFIGURATION</div>
-              <div class="bcfg-desc">Generate keys at bitget.com → API Management. Requires API key, secret, AND passphrase.</div>
-              <div class="bcfg-fields">
-                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settBitgetKey" placeholder="Bitget API key" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settBitgetSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>PASSPHRASE</label><input type="password" class="form-input form-input--sm" id="settBitgetPassphrase" placeholder="Your API passphrase" autocomplete="off"/></div>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('bitget')">⚡ TEST</button>
-                <button class="btn-ghost" onclick="saveBrokerCreds('bitget')">💾 SAVE</button>
-                <span class="bcfg-result" id="bcfgResult-bitget"></span>
-              </div>
-            </div>
-            <div class="broker-card featured" data-broker="independentreserve">
-              <div class="broker-logo api-glow">IR</div>
-              <div class="broker-info">
-                <div class="broker-name">Independent Reserve <span class="btag api-tag" style="font-size:11px">API</span></div>
-                <div class="broker-desc">AU-regulated crypto exchange. AUSTRAC registered. AUD deposits. API available.</div>
-                <div class="broker-tags"><span class="btag">AU Regulated</span><span class="btag">AUD</span><span class="btag api-tag">API</span></div>
-              </div>
-              <div class="broker-actions">
-                <button class="broker-cfg-btn" onclick="toggleBrokerConfig('independentreserve')">⚙ CONFIGURE</button>
-                <a class="broker-link" href="https://www.independentreserve.com" target="_blank">Open →</a>
-              </div>
-            </div>
-            <div class="broker-config-panel hidden" id="brokerCfg-independentreserve">
-              <div class="bcfg-title">⚡ INDEPENDENT RESERVE — API CONFIGURATION</div>
-              <div class="bcfg-desc">Generate keys at independentreserve.com → Settings → API Keys. Enable trading permissions.</div>
-              <div class="bcfg-fields">
-                <div class="bcfg-field"><label>API KEY</label><input type="text" class="form-input form-input--sm" id="settIndependentreserveKey" placeholder="IR API key" autocomplete="off"/></div>
-                <div class="bcfg-field"><label>API SECRET</label><input type="password" class="form-input form-input--sm" id="settIndependentreserveSecret" placeholder="••••••••••••••••••" autocomplete="off"/></div>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn-primary btn--sm" onclick="connectBrokerFromSettings('independentreserve')">⚡ TEST</button>
-                <button class="btn-ghost" onclick="saveBrokerCreds('independentreserve')">💾 SAVE</button>
-                <span class="bcfg-result" id="bcfgResult-independentreserve"></span>
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- ── GENERAL SETTINGS ── -->
@@ -2330,12 +2052,12 @@
     <div class="search-box">
       <div class="search-header">
         <span class="search-icon">◎</span>
-        <input type="text" id="searchInput" placeholder="Search ASX, crypto, commodities..." oninput="onSearchInput(this.value)" autocomplete="off" spellcheck="false"/>
+        <input type="text" id="searchInput" placeholder="Search ASX, commodities..." oninput="onSearchInput(this.value)" autocomplete="off" spellcheck="false"/>
         <span class="search-kbd">ESC</span>
         <button class="search-close-btn" onclick="closeSearch()">✕</button>
       </div>
       <div id="searchResults">
-        <div class="sr-empty">Type to search 67 assets across ASX, Crypto &amp; Commodities</div>
+        <div class="sr-empty">Type to search assets across ASX &amp; Commodities</div>
       </div>
       <div class="search-footer">
         <span id="searchCount">71 assets available</span>

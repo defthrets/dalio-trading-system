@@ -116,7 +116,6 @@ function _switchTab(id, btn) {
   if (id === 'paper-trading')        initPaperTrading();
   if (id === 'live-trading')         initLiveTrading();
   if (id === 'asx-scanner')         loadScanner('asx');
-  if (id === 'crypto-scanner')      loadScanner('crypto');
   if (id === 'commodities-scanner') loadScanner('commodities');
   if (id === 'command-center')      initCommandCentre();
   if (id === 'comms-config')        initSettingsTab();
@@ -439,13 +438,12 @@ function applyQuadrant(d) {
 async function initSignalOps() {
   // Run signals scan + seed scanner cache in parallel so opportunities populate
   const oppList = el('opportunityList');
-  if (oppList) oppList.innerHTML = '<div style="padding:14px;color:var(--text-muted);font-size:10px;line-height:1.8">⟳ WARMING UP SCANNERS…<br><span style="opacity:.6">Fetching ASX, Crypto &amp; Commodities data for opportunity engine…</span></div>';
+  if (oppList) oppList.innerHTML = '<div style="padding:14px;color:var(--text-muted);font-size:10px;line-height:1.8">⟳ WARMING UP SCANNERS…<br><span style="opacity:.6">Fetching ASX &amp; Commodities data for opportunity engine…</span></div>';
 
   // Fire all three market scans in background to seed the cache
   const seedCache = async () => {
     await Promise.allSettled([
       fetchJSON('/api/markets/asx').catch(() => {}),
-      fetchJSON('/api/markets/crypto').catch(() => {}),
       fetchJSON('/api/markets/commodities').catch(() => {}),
     ]);
     // Once cache is warm, load opportunities
@@ -496,7 +494,6 @@ function renderSignalGrid(signals) {
     }
     if (filterMkt !== 'ALL') {
       if (filterMkt === 'ASX'          && !s.ticker.endsWith('.AX'))                        return false;
-      if (filterMkt === 'CRYPTO'       && !s.ticker.endsWith('-USD'))                       return false;
       if (filterMkt === 'COMMODITIES'  && (s.ticker.endsWith('.AX') || s.ticker.endsWith('-USD'))) return false;
     }
     return true;
@@ -541,9 +538,7 @@ function actionVerb(action) {
   return { BUY: 'BUY NOW', SELL: 'SELL / EXIT', LONG: 'HOLD LONG', SHORT: 'SHORT SELL', HOLD: 'HOLD' }[action] ?? action;
 }
 function fmtSignalPrice(s) {
-  // Crypto can be fractional; stocks use 2dp
   if (!s.price) return '---';
-  if (s.ticker.endsWith('-USD') && s.price > 1000) return '$' + s.price.toLocaleString('en-US', { maximumFractionDigits: 0 });
   return '$' + s.price.toFixed(s.price < 1 ? 4 : 2);
 }
 
@@ -1295,8 +1290,6 @@ function renderTickerStrip(items) {
   function fmtPrice(item) {
     const p = item.price;
     if (p === null || p === undefined) return '---';
-    if (item.category === 'crypto' && p > 1000) return '$' + p.toLocaleString('en-US', { maximumFractionDigits: 0 });
-    if (item.category === 'crypto') return '$' + p.toFixed(p < 1 ? 4 : 2);
     if (item.category === 'fx') return p.toFixed(4);
     if (item.category === 'index') return p.toLocaleString('en-US', { maximumFractionDigits: 0 });
     return '$' + p.toFixed(2);
@@ -1746,7 +1739,7 @@ const SPOTS = {
     { id:'cmd-quadrant', sel:'#quadrantPanel',      arrow:'right',  title:'\ud83d\udcca ECONOMIC QUADRANT',    text:"Shows which economic regime we\'re in right now. The glowing cell tells you what to buy or avoid \u2014 think of it as your GPS for markets." },
     { id:'cmd-chart',    sel:'.panel--cc-chart',    arrow:'bottom', title:'\ud83d\udcc8 LIVE PRICE CHART',      text:"Click any position and it charts right here \u2014 candles, line view, moving averages, RSI, even a 30-day prediction. Basically a crystal ball, but with math." },
     { id:'cmd-vitals',   sel:'.panel--gauges',      arrow:'left',   title:'\u2764 PORTFOLIO VITALS',       text:"Daily P&L and drawdown at a glance. If drawdown hits 10%, the system stops trading. Like a seatbelt for your portfolio \u2014 she\'s got your back." },
-    { id:'cmd-cycle',    sel:'#runCycleBtn',        arrow:'bottom', title:'\u25b6 RUN A SCAN NOW',         text:"Hit this and the system scans every ASX, crypto, and commodity asset for trade opportunities. Fresh signals in seconds." },
+    { id:'cmd-cycle',    sel:'#runCycleBtn',        arrow:'bottom', title:'\u25b6 RUN A SCAN NOW',         text:"Hit this and the system scans every ASX and commodity asset for trade opportunities. Fresh signals in seconds." },
   ],
   'live-trading': [
     { id:'lt-broker',   sel:'.panel--broker-bar',    arrow:'bottom', title:'\ud83d\udd17 BROKER STATUS',         text:"Shows if your broker is connected. Green = good to go, red = something needs attention. Account balance updates live." },
@@ -1757,7 +1750,7 @@ const SPOTS = {
   'signal-ops': [
     { id:'sig-banner',   sel:'#strongSignalInPage', arrow:'bottom', title:'\u26a1 STRONG SIGNAL ALERT',   text:"When confidence hits 82%+, this lights up. The system is very politely yelling at you to pay attention." },
     { id:'sig-grid',     sel:'#signalGrid',         arrow:'top',    title:'\ud83c\udccf SIGNAL CARDS',           text:"Each card is a trade idea. Green = BUY/LONG, Red = SELL/SHORT. Sorted by confidence so the best ones are always on top." },
-    { id:'sig-rr',       sel:'.signal-controls',    arrow:'bottom', title:'\ud83c\udf9a FILTER SIGNALS',         text:"Slide the confidence threshold up to 75%+ for only the high-conviction plays. You can also filter by market \u2014 ASX, Crypto, or everything." },
+    { id:'sig-rr',       sel:'.signal-controls',    arrow:'bottom', title:'\ud83c\udf9a FILTER SIGNALS',         text:"Slide the confidence threshold up to 75%+ for only the high-conviction plays. You can also filter by market \u2014 ASX, Commodities, or everything." },
     { id:'sig-just',     sel:'#justificationPanel', arrow:'left',   title:'\ud83e\udde0 AI JUSTIFICATION',       text:"Click any signal card and the AI explains its reasoning \u2014 economic fit, sentiment, RSI, the whole thesis. No black boxes here." },
   ],
   'intel-center': [
@@ -1784,20 +1777,17 @@ const SPOTS = {
     { id:'asx-table',    sel:'.scanner-wrap',       arrow:'bottom', title:'\ud83c\udde6\ud83c\uddfa ASX SCANNER',            text:"Live ASX prices. Filter by ticker, name, or sector. Green = up today, red = down. Click TRADE to open an order on any stock." },
     { id:'asx-filter',   sel:'#asxSearch',          arrow:'right',  title:'\ud83d\udd0d SEARCH & FILTER',         text:"Type any ticker or company name to filter instantly. You can also narrow by sector \u2014 Banking, Mining, Energy, you name it." },
   ],
-  'crypto-scanner': [
-    { id:'cry-table',    sel:'#cryptoTable',        arrow:'bottom', title:'\u20bf CRYPTO SCANNER',           text:"All the top cryptos with live prices. 24h change, volume, market cap \u2014 the full picture. Click TRADE to jump in or \u2605 to watchlist." },
-  ],
   'commodities-scanner': [
     { id:'com-table',    sel:'#commStats',          arrow:'bottom', title:'\u26cf COMMODITIES',              text:"Gold, silver, oil, gas \u2014 the classic hedges. These tend to shine when inflation picks up or the world gets chaotic. Click TRADE to open a position." },
   ],
   'paper-trading': [
-    { id:'pt-order',    sel:'.panel--paper-order',   arrow:'right',  title:'\ud83d\udcc4 PLACE AN ORDER',         text:"Enter any ticker \u2014 ASX, crypto, commodity \u2014 pick BUY or SELL, set your quantity, hit Execute. Real prices, fake money. Easy as." },
+    { id:'pt-order',    sel:'.panel--paper-order',   arrow:'right',  title:'\ud83d\udcc4 PLACE AN ORDER',         text:"Enter any ticker \u2014 ASX or commodity \u2014 pick BUY or SELL, set your quantity, hit Execute. Real prices, fake money. Easy as." },
     { id:'pt-summary',  sel:'.panel--paper-summary', arrow:'left',   title:'\ud83d\udcbc PORTFOLIO TRACKER',      text:"Your paper trading portfolio. Starts at your configured amount and tracks every move. Total value, P&L, positions \u2014 all updating live." },
     { id:'pt-signals',  sel:'.panel--paper-signals', arrow:'right',  title:'\u26a1 1-CLICK SIGNAL TRADES',   text:"AI\'s top picks, pre-loaded and ready. See something you like? One click and it\'s in your paper portfolio. Fastest way to test ideas." },
     { id:'pt-history',  sel:'.panel--paper-history', arrow:'top',    title:'\ud83d\udccb TRADE HISTORY',           text:"Every closed trade logged with entry, exit, and P&L. Check which signals actually make money over time \u2014 that\'s where the real insights are." },
   ],
   'comms-config': [
-    { id:'cfg-brokers',  sel:'.panel--brokers',     arrow:'top',    title:'\ud83d\udd17 BROKER CONNECTIONS',     text:"Connect your Australian broker or crypto exchange here. CoinSpot and IBKR are great for getting started. Click \'Open\' to visit their site." },
+    { id:'cfg-brokers',  sel:'.panel--brokers',     arrow:'top',    title:'\ud83d\udd17 BROKER CONNECTIONS',     text:"Connect your Australian broker here. IBKR is great for getting started. Click \'Open\' to visit their site." },
     { id:'cfg-discord',  sel:'.panel--discord',     arrow:'right',  title:'\ud83d\udce3 DISCORD ALERTS',         text:"Get trade alerts sent straight to your Discord. Paste in your webhook URL, hit Test, done. Never miss a signal again." },
     { id:'cfg-mode',     sel:'#cfgMode',            arrow:'left',   title:'\u26a0 PAPER vs LIVE MODE',      text:"Start in PAPER mode, always. It\'s play money so you can learn the system risk-free. Only switch to LIVE when you\'re confident. No rush, legend." },
   ],
@@ -1814,7 +1804,7 @@ let _guidedMode  = false;
 const GUIDED_TAB_ORDER = [
   'command-center', 'live-trading', 'signal-ops', 'intel-center',
   'holy-grail', 'risk-matrix', 'backtest-lab',
-  'asx-scanner', 'crypto-scanner', 'commodities-scanner',
+  'asx-scanner', 'commodities-scanner',
   'paper-trading', 'comms-config'
 ];
 
@@ -2116,7 +2106,7 @@ function scrollToTopSignal() {
 function switchBrokerTab(cat, btn) {
   document.querySelectorAll('.broker-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  ['au','crypto'].forEach(c => {
+  ['au'].forEach(c => {
     const g = el(`bcat-${c}`);
     if (g) g.classList.toggle('hidden', c !== cat);
   });
@@ -2216,15 +2206,6 @@ async function _loadSavedBrokerCreds() {
     if (!saved || typeof saved !== 'object') return;
     const fieldMap = {
       ibkr:     { host: 'settIbkrHost', port: 'settIbkrPort', client_id: 'settIbkrClientId' },
-      binance:  { api_key: 'settBinanceKey', api_secret: 'settBinanceSecret' },
-      coinspot: { api_key: 'settCoinspotKey', api_secret: 'settCoinspotSecret' },
-      coinbase: { api_key: 'settCoinbaseKey', api_secret: 'settCoinbaseSecret' },
-      kraken:   { api_key: 'settKrakenKey', api_secret: 'settKrakenSecret' },
-      bybit:    { api_key: 'settBybitKey', api_secret: 'settBybitSecret' },
-      okx:      { api_key: 'settOkxKey', api_secret: 'settOkxSecret', passphrase: 'settOkxPassphrase' },
-      kucoin:   { api_key: 'settKucoinKey', api_secret: 'settKucoinSecret', passphrase: 'settKucoinPassphrase' },
-      bitget:   { api_key: 'settBitgetKey', api_secret: 'settBitgetSecret', passphrase: 'settBitgetPassphrase' },
-      independentreserve: { api_key: 'settIndependentreserveKey', api_secret: 'settIndependentreserveSecret' },
       selfwealth: { api_key: 'settSelfwealthKey', api_secret: 'settSelfwealthSecret' },
       ig:         { api_key: 'settIgKey', api_secret: 'settIgSecret', passphrase: 'settIgPassphrase' },
       cmc:        { api_key: 'settCmcKey', api_secret: 'settCmcSecret', passphrase: 'settCmcPassphrase' },
@@ -2556,12 +2537,12 @@ function renderSearchResults(q) {
     return;
   }
 
-  const catOrder = { ASX: 0, Crypto: 1, Commodity: 2, Unknown: 3 };
+  const catOrder = { ASX: 0, Commodity: 1, Unknown: 2 };
   results.sort((a, b) => (catOrder[a.cat] ?? 3) - (catOrder[b.cat] ?? 3));
 
   list.innerHTML = results.map(a => {
     const price = a.price != null
-      ? `<span class="sr-price">${a.cat === 'Crypto' && a.price > 1000 ? '$' + Math.round(a.price).toLocaleString() : '$' + (a.price).toFixed(2)}</span>`
+      ? `<span class="sr-price">$${(a.price).toFixed(2)}</span>`
       : `<span class="sr-price sr-price--na">N/A</span>`;
     const chg = a.change_pct != null
       ? `<span class="sr-chg ${a.change_pct >= 0 ? 'up' : 'dn'}">${a.change_pct >= 0 ? '+' : ''}${a.change_pct.toFixed(2)}%</span>`
@@ -2749,11 +2730,11 @@ async function fetchPoQuote(ticker) {
     if (res) {
       res.innerHTML = d.price != null
         ? `<span style="color:var(--green)">✓</span> <strong>${d.name}</strong> · ${d.cat} · <span style="color:var(--primary)">${fmt$(d.price)}</span>`
-        : `<span style="color:var(--amber)">⚠ price unavailable — try adding .AX (ASX) or -USD (crypto)</span>`;
+        : `<span style="color:var(--amber)">⚠ price unavailable — try adding .AX (ASX)</span>`;
     }
     updatePoEstimate();
   } catch {
-    if (res) res.innerHTML = `<span style="color:var(--red)">✗ not found — try BTC-USD, BHP.AX, GLD</span>`;
+    if (res) res.innerHTML = `<span style="color:var(--red)">✗ not found — try BHP.AX, GLD</span>`;
   }
 }
 
@@ -3144,7 +3125,7 @@ function confirmTradeNo() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// MARKET SCANNER (ASX / CRYPTO / COMMODITIES)
+// MARKET SCANNER (ASX / COMMODITIES)
 // ═══════════════════════════════════════════════════════════
 
 // ── Mini Sparkline SVG (deterministic from ticker + change%) ──
@@ -3167,12 +3148,11 @@ function miniSparkSVG(ticker, changePct, w = 40, h = 14) {
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="vertical-align:middle;flex-shrink:0"><path d="${path}" fill="none" stroke="${col}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 
-const _scannerData = { asx: [], crypto: [], commodities: [] };
-const _scannerSort = { asx: null, crypto: null, commodities: null };
+const _scannerData = { asx: [], commodities: [] };
+const _scannerSort = { asx: null, commodities: null };
 
 const _SCANNER_IDS = {
   asx:         { tbody: 'asxTableBody',         stats: 'asxStats',    cols: 8 },
-  crypto:      { tbody: 'cryptoTableBody',       stats: 'cryptoStats', cols: 8 },
   commodities: { tbody: 'commoditiesTableBody',  stats: 'commStats',   cols: 7 },
 };
 
@@ -3234,7 +3214,7 @@ function renderScanner(market, filterText = '', filterSector = '') {
       <span class="scanner-stat-item">DOWN <span class="scanner-stat-val down">${down}</span></span>
       <span class="scanner-stat-item">FLAT <span class="scanner-stat-val">${flat}</span></span>
       <span class="scanner-stat-item">AVG CHANGE <span class="scanner-stat-val ${avgChg >= 0 ? 'up' : 'down'}">${avgChg}%</span></span>
-      <span class="scanner-stat-item" style="margin-left:auto;font-size:8px;opacity:.5">CoinGecko${market==='crypto'?' Free API':' / yfinance'}${cacheNote}</span>`;
+      <span class="scanner-stat-item" style="margin-left:auto;font-size:8px;opacity:.5">yfinance${cacheNote}</span>`;
   }
 
   if (!rows.length) {
@@ -3245,7 +3225,6 @@ function renderScanner(market, filterText = '', filterSector = '') {
     return;
   }
 
-  const isCrypto = market === 'crypto';
   const fmtPrice = (p) => p <= 0 ? '—'
                    : p >= 1000 ? `$${Number(p).toLocaleString('en-AU', {minimumFractionDigits:2, maximumFractionDigits:2})}`
                    : p >= 1    ? `$${p.toFixed(2)}`
@@ -3269,7 +3248,7 @@ function renderScanner(market, filterText = '', filterSector = '') {
       const chgStr   = `${r.change_pct >= 0 ? '+' : ''}${r.change_pct.toFixed(2)}%`;
       const priceStr = fmtPrice(r.price);
       const ticker   = r.ticker;
-      const dispName = isCrypto ? ticker.replace('-USD','') : ticker;
+      const dispName = ticker;
       const nameShort = r.name.length > 20 ? r.name.slice(0,20) + '…' : r.name;
       const wlIcon   = r.in_watchlist ? '★' : '☆';
       const wlCls    = r.in_watchlist ? ' in' : '';
@@ -3297,8 +3276,8 @@ function renderScanner(market, filterText = '', filterSector = '') {
     const wlCls    = r.in_watchlist ? 'in' : '';
     const ticker   = r.ticker;
     const sectorCol  = market === 'asx' ? `<td>${r.sector || '—'}</td>` : '';
-    const mktCapCol  = isCrypto ? `<td style="color:var(--text-2);font-size:10px">${r.market_cap_fmt || '—'}</td>` : '';
-    const dispName   = isCrypto ? ticker.replace('-USD','') : ticker;
+    const mktCapCol  = '';
+    const dispName   = ticker;
     const nameShort  = r.name.length > 26 ? r.name.slice(0,26) + '…' : r.name;
     return `<tr class="scanner-row ${dir}" style="display:none">
       <td><strong style="font-family:var(--font-hud)">${dispName}</strong></td>
@@ -3315,7 +3294,7 @@ function renderScanner(market, filterText = '', filterSector = '') {
 }
 
 function filterScanner(market, text) {
-  const sectorSel = el(`${market === 'asx' ? 'asx' : market === 'crypto' ? 'crypto' : 'comm'}SectorFilter`);
+  const sectorSel = el(`${market === 'asx' ? 'asx' : 'comm'}SectorFilter`);
   renderScanner(market, text, sectorSel?.value || '');
 }
 
@@ -3818,14 +3797,11 @@ function _updateBrokerCardStatus(d) {
 }
 
 function onBrokerSelect(val) {
-  ['ibkrFields','binanceFields','coinbaseFields','coinspotFields','stakeFields'].forEach(id => {
+  ['ibkrFields','stakeFields'].forEach(id => {
     const el2 = el(id); if (el2) el2.style.display = 'none';
   });
   const map = {
     ibkr:     'ibkrFields',
-    binance:  'binanceFields',
-    coinbase: 'coinbaseFields',
-    coinspot: 'coinspotFields',
     stake:    'stakeFields',
   };
   if (map[val]) { const el2 = el(map[val]); if (el2) el2.style.display = 'block'; }
@@ -3854,46 +3830,6 @@ async function connectBrokerFromSettings(broker) {
     payload.host      = el('settIbkrHost')?.value || '127.0.0.1';
     payload.port      = parseInt(el('settIbkrPort')?.value || '7497');
     payload.client_id = parseInt(el('settIbkrClientId')?.value || '1');
-  } else if (broker === 'binance') {
-    payload.api_key    = el('settBinanceKey')?.value?.trim();
-    payload.api_secret = el('settBinanceSecret')?.value?.trim();
-    payload.testnet    = el('settBinanceTestnet')?.value === 'true';
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
-  } else if (broker === 'coinspot') {
-    payload.api_key    = el('settCoinspotKey')?.value?.trim();
-    payload.api_secret = el('settCoinspotSecret')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
-  } else if (broker === 'coinbase') {
-    payload.api_key    = el('settCoinbaseKey')?.value?.trim();
-    payload.api_secret = el('settCoinbaseSecret')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">Key name and private key required</span>'; return; }
-  } else if (broker === 'kraken') {
-    payload.api_key    = el('settKrakenKey')?.value?.trim();
-    payload.api_secret = el('settKrakenSecret')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
-  } else if (broker === 'bybit') {
-    payload.api_key    = el('settBybitKey')?.value?.trim();
-    payload.api_secret = el('settBybitSecret')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
-  } else if (broker === 'okx') {
-    payload.api_key    = el('settOkxKey')?.value?.trim();
-    payload.api_secret = el('settOkxSecret')?.value?.trim();
-    payload.passphrase = el('settOkxPassphrase')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret || !payload.passphrase) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key, secret, and passphrase required</span>'; return; }
-  } else if (broker === 'kucoin') {
-    payload.api_key    = el('settKucoinKey')?.value?.trim();
-    payload.api_secret = el('settKucoinSecret')?.value?.trim();
-    payload.passphrase = el('settKucoinPassphrase')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret || !payload.passphrase) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key, secret, and passphrase required</span>'; return; }
-  } else if (broker === 'bitget') {
-    payload.api_key    = el('settBitgetKey')?.value?.trim();
-    payload.api_secret = el('settBitgetSecret')?.value?.trim();
-    payload.passphrase = el('settBitgetPassphrase')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret || !payload.passphrase) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key, secret, and passphrase required</span>'; return; }
-  } else if (broker === 'independentreserve') {
-    payload.api_key    = el('settIndependentreserveKey')?.value?.trim();
-    payload.api_secret = el('settIndependentreserveSecret')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
   } else if (broker === 'selfwealth') {
     payload.api_key    = el('settSelfwealthKey')?.value?.trim();
     payload.api_secret = el('settSelfwealthSecret')?.value?.trim();
@@ -3985,10 +3921,9 @@ async function _populateBrokerPicker() {
   list.innerHTML = '<div class="broker-picker-item bp-empty">Loading...</div>';
 
   const logoMap = {
-    coinspot:'CS', binance:'BNB', coinbase:'CB', ibkr:'IB',
-    kraken:'KRK', bybit:'BBT', okx:'OKX', kucoin:'KCS', bitget:'BGT',
+    ibkr:'IB',
     stake:'STK', moomoo:'MM', ig:'IG', cmc:'CMC',
-    independentreserve:'IR', selfwealth:'SW',
+    selfwealth:'SW',
     nabtrade:'NAB', commsec:'CBA', superhero:'SH',
   };
 
@@ -4079,15 +4014,6 @@ function _getBrokerPayload(broker) {
   const _f = (id) => el(id)?.value?.trim() || '';
   const map = {
     ibkr:     () => ({ host: _f('settIbkrHost') || '127.0.0.1', port: _f('settIbkrPort') || '7497', client_id: _f('settIbkrClientId') || '1' }),
-    binance:  () => ({ api_key: _f('settBinanceKey'), api_secret: _f('settBinanceSecret'), testnet: el('settBinanceTestnet')?.value }),
-    coinspot: () => ({ api_key: _f('settCoinspotKey'), api_secret: _f('settCoinspotSecret') }),
-    coinbase: () => ({ api_key: _f('settCoinbaseKey'), api_secret: _f('settCoinbaseSecret') }),
-    kraken:   () => ({ api_key: _f('settKrakenKey'), api_secret: _f('settKrakenSecret') }),
-    bybit:    () => ({ api_key: _f('settBybitKey'), api_secret: _f('settBybitSecret') }),
-    okx:      () => ({ api_key: _f('settOkxKey'), api_secret: _f('settOkxSecret'), passphrase: _f('settOkxPassphrase') }),
-    kucoin:   () => ({ api_key: _f('settKucoinKey'), api_secret: _f('settKucoinSecret'), passphrase: _f('settKucoinPassphrase') }),
-    bitget:   () => ({ api_key: _f('settBitgetKey'), api_secret: _f('settBitgetSecret'), passphrase: _f('settBitgetPassphrase') }),
-    independentreserve: () => ({ api_key: _f('settIndependentreserveKey'), api_secret: _f('settIndependentreserveSecret') }),
     selfwealth: () => ({ api_key: _f('settSelfwealthKey'), api_secret: _f('settSelfwealthSecret') }),
     ig:         () => ({ api_key: _f('settIgKey'), api_secret: _f('settIgSecret'), passphrase: _f('settIgPassphrase') }),
     cmc:        () => ({ api_key: _f('settCmcKey'), api_secret: _f('settCmcSecret'), passphrase: _f('settCmcPassphrase') }),
@@ -4126,38 +4052,12 @@ async function connectBroker() {
     payload.host      = el('ibkrHost')?.value || '127.0.0.1';
     payload.port      = parseInt(el('ibkrPort')?.value || '7497');
     payload.client_id = parseInt(el('ibkrClientId')?.value || '1');
-  } else if (broker === 'binance') {
-    payload.api_key    = el('binanceKey')?.value?.trim();
-    payload.api_secret = el('binanceSecret')?.value?.trim();
-    payload.testnet    = el('binanceTestnet')?.value === 'true';
-    if (!payload.api_key || !payload.api_secret) {
-      if (res) res.innerHTML = '<span style="color:var(--red)">API key and secret required</span>';
-      if (btn) { btn.textContent = '▶ CONNECT BROKER'; btn.classList.remove('loading'); }
-      return;
-    }
-  } else if (broker === 'coinbase') {
-    payload.api_key    = el('coinbaseKey')?.value?.trim();
-    payload.api_secret = el('coinbaseSecret')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) {
-      if (res) res.innerHTML = '<span style="color:var(--red)">API key name and private key required</span>';
-      if (btn) { btn.textContent = '▶ CONNECT BROKER'; btn.classList.remove('loading'); }
-      return;
-    }
-  } else if (broker === 'coinspot') {
-    payload.api_key    = el('coinspotKey')?.value?.trim();
-    payload.api_secret = el('coinspotSecret')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) {
-      if (res) res.innerHTML = '<span style="color:var(--red)">API key and secret required</span>';
-      if (btn) { btn.textContent = '▶ CONNECT BROKER'; btn.classList.remove('loading'); }
-      return;
-    }
   } else if (broker === 'stake') {
     if (res) res.innerHTML = '<span style="color:var(--amber)">⚠ Stake does not support bot-trading API</span>';
     if (btn) { btn.textContent = '▶ CONNECT BROKER'; btn.classList.remove('loading'); }
     return;
   } else {
-    // For new brokers (kraken, bybit, okx, kucoin, bitget, independentreserve),
-    // load saved credentials — configure them in Settings tab first
+    // For other brokers, load saved credentials — configure them in Settings tab first
     try {
       const saved = await fetchJSON('/api/broker/saved');
       if (saved[broker]) {
@@ -5120,17 +5020,6 @@ const TUTORIAL_PAGES = [
       <p>Data sourced from Yahoo Finance — prices are end-of-day or 15-min delayed.</p>`
   },
   {
-    icon: '₿', title: 'CRYPTO SCANNER',
-    body: `<p>Live scanner for <strong>99 cryptocurrencies</strong>:</p>
-      <ul>
-        <li>Prices from CoinGecko free API (falls back to yfinance)</li>
-        <li>Shows 24h % change, volume and market cap</li>
-        <li>Sorted by trading volume (most liquid first)</li>
-        <li>Covers Layer 1, DeFi, Gaming, Meme coins, AI tokens and more</li>
-      </ul>
-      <p>CoinGecko free tier may rate-limit — yfinance fallback kicks in automatically.</p>`
-  },
-  {
     icon: '🛢', title: 'COMMODITIES SCANNER',
     body: `<p>Live scanner for <strong>commodities and real assets</strong>:</p>
       <ul>
@@ -5187,11 +5076,10 @@ const _TAB_TUT_IDX = {
   'command-center':      0,
   'signal-ops':          1,
   'asx-scanner':         2,
-  'crypto-scanner':      3,
-  'commodities-scanner': 4,
-  'intel-center':        5,
-  'risk-matrix':         6,
-  'backtest-lab':        7,
+  'commodities-scanner': 3,
+  'intel-center':        4,
+  'risk-matrix':         5,
+  'backtest-lab':        6,
 };
 
 function openTutorial(startIdx) {
@@ -5613,10 +5501,8 @@ function renderPriceChart(d) {
 const _OPS_COMMANDS = [
   ['SYS.TICK', 'Heartbeat OK — latency 3ms', ''],
   ['MKT.SCAN', 'Scanning ASX universe (48 tickers)', ''],
-  ['MKT.SCAN', 'Scanning crypto prices via CoinGecko', ''],
   ['SIG.GEN', 'Generating signals — confidence threshold 60%', ''],
   ['SIG.EVAL', 'Evaluating BHP.AX — RSI 42.3, momentum ▲', ''],
-  ['SIG.EVAL', 'Evaluating BTC — RSI 67.1, trend ▲▲', ''],
   ['RISK.CHK', 'Circuit breaker: ARMED — drawdown 0.3%', ''],
   ['QUAD.DET', 'Economic regime: RISING_GROWTH — GDP +2.1%', ''],
   ['PORT.UPD', 'Portfolio NAV recalculated — $1,000.00', ''],
@@ -5683,9 +5569,8 @@ const _RADAR_STATUS_MSGS = [
   () => { const s = STATE.signals?.[0]; return s ? `TOP SIGNAL: ${s.action} ${s.ticker} @ ${(Number(s.confidence)||0).toFixed(0)}% CONF` : 'NO ACTIVE SIGNALS'; },
   () => { const buys = STATE.signals?.filter(s => ['BUY','LONG'].includes(s.action))?.length ?? 0; const sells = STATE.signals?.filter(s => ['SELL','SHORT'].includes(s.action))?.length ?? 0; return `SIGNAL MIX: ${buys} BUYS / ${sells} SELLS`; },
   // Scanner data
-  () => { const a = _scannerData.asx?.length ?? 0; const c = _scannerData.crypto?.length ?? 0; const m = _scannerData.commodities?.length ?? 0; return `UNIVERSE: ${a} ASX | ${c} CRYPTO | ${m} COMMODITIES`; },
-  () => { const all = [...(_scannerData.asx||[]),...(_scannerData.crypto||[]),...(_scannerData.commodities||[])]; const up = all.filter(r=>r.change_pct>0).length; return all.length ? `MARKET PULSE: ${up}/${all.length} ASSETS GREEN (${(up/all.length*100).toFixed(0)}%)` : 'MARKET DATA LOADING'; },
-  () => { const c = _scannerData.crypto || []; const top = c[0]; return top ? `CRYPTO LEAD: ${top.ticker.replace('-USD','')} $${Number(top.price).toLocaleString()} ${top.change_pct>=0?'+':''}${top.change_pct}%` : 'CRYPTO FEED STANDBY'; },
+  () => { const a = _scannerData.asx?.length ?? 0; const m = _scannerData.commodities?.length ?? 0; return `UNIVERSE: ${a} ASX | ${m} COMMODITIES`; },
+  () => { const all = [...(_scannerData.asx||[]),...(_scannerData.commodities||[])]; const up = all.filter(r=>r.change_pct>0).length; return all.length ? `MARKET PULSE: ${up}/${all.length} ASSETS GREEN (${(up/all.length*100).toFixed(0)}%)` : 'MARKET DATA LOADING'; },
   () => { const a = _scannerData.asx || []; const top = [...a].sort((x,y)=>y.change_pct-x.change_pct)[0]; return top ? `ASX MOVER: ${top.ticker} ${top.change_pct>=0?'+':''}${top.change_pct}%` : 'ASX FEED STANDBY'; },
   // System health
   () => `UPTIME: ${((performance.now()/1000/60)).toFixed(0)} MIN | MEM: ${(performance.memory?.usedJSHeapSize/1024/1024)?.toFixed(0) ?? '?'}MB`,
@@ -5715,9 +5600,7 @@ function cycleRadarStatus() {
 const _TELEMETRY_LINES = [
   // Data feeds
   () => { const n = _scannerData.asx?.length ?? 0; return { txt: `ASX.FEED ${n} TICKERS LOADED`, cls: n > 0 ? 'fast' : 'slow' }; },
-  () => { const n = _scannerData.crypto?.length ?? 0; return { txt: `CRYPTO.WS ${n} PAIRS STREAMING`, cls: n > 0 ? 'fast' : 'slow' }; },
   () => { const n = _scannerData.commodities?.length ?? 0; return { txt: `COMMOD.FEED ${n} ASSETS ACTIVE`, cls: n > 0 ? 'fast' : 'slow' }; },
-  () => { const ms = (Math.random()*30+2).toFixed(0); return { txt: `COINGECKO API ${ms}ms OK`, cls: 'fast' }; },
   () => { const ms = (Math.random()*40+5).toFixed(0); return { txt: `YAHOO.FIN POLL ${ms}ms OK`, cls: 'fast' }; },
   // Signal engine
   () => { const n = STATE.signals?.length ?? 0; return { txt: `SIGNAL.GEN ${n} SIGNALS ACTIVE`, cls: n > 0 ? 'fast' : '' }; },
@@ -6006,7 +5889,7 @@ const _LEGAL_CONTENT = {
       <h2>Broker API Credentials</h2>
       <p>API keys and secrets you provide for broker connections are stored locally on your device using basic encryption. They are never transmitted to DaliosATF servers or any third party. Credentials are used solely to communicate directly between your device and your chosen broker.</p>
       <h2>Market Data</h2>
-      <p>Market data is fetched from public APIs (Yahoo Finance, CoinGecko, Binance) directly from your device. These services may log your IP address per their own privacy policies. We recommend reviewing their terms independently.</p>
+      <p>Market data is fetched from public APIs (Yahoo Finance) directly from your device. These services may log your IP address per their own privacy policies. We recommend reviewing their terms independently.</p>
       <h2>Notifications</h2>
       <p>If you configure Discord webhooks or Telegram bot tokens, messages are sent directly from your device to those services. DaliosATF does not proxy or store notification content.</p>
       <h2>Analytics &amp; Telemetry</h2>
@@ -6028,7 +5911,7 @@ const _LEGAL_CONTENT = {
       <p>Nothing in this Software constitutes financial, investment, tax, or legal advice. All signals, recommendations, and analysis generated by DaliosATF are algorithmic outputs and should not be treated as professional advice. Always consult a qualified financial advisor before making investment decisions.</p>
       <h2>Risk Disclosure</h2>
       <ul>
-        <li>Trading stocks, commodities, and cryptocurrencies involves substantial risk of loss.</li>
+        <li>Trading stocks and commodities involves substantial risk of loss.</li>
         <li>Past performance of any algorithm does not guarantee future results.</li>
         <li>You may lose some or all of your invested capital.</li>
         <li>Automated trading systems can malfunction, execute unintended trades, or fail to execute intended trades.</li>
@@ -6065,8 +5948,6 @@ const _LEGAL_CONTENT = {
       <h2>Data Sources</h2>
       <ul>
         <li><strong>Yahoo Finance</strong> — ASX stock and commodity price data (delayed).</li>
-        <li><strong>CoinGecko</strong> — cryptocurrency prices (real-time, free tier).</li>
-        <li><strong>Binance</strong> — cryptocurrency spot prices (real-time, public API).</li>
       </ul>
       <h2>Limitations</h2>
       <ul>
@@ -6260,7 +6141,7 @@ function checkPriceAlerts() {
   if (!untriggered.length) return;
 
   // Check against scanner data
-  const allData = [...(_scannerData.asx || []), ...(_scannerData.crypto || []), ...(_scannerData.commodities || [])];
+  const allData = [...(_scannerData.asx || []), ...(_scannerData.commodities || [])];
   untriggered.forEach(a => {
     const row = allData.find(r => r.ticker === a.ticker || r.ticker.replace('-USD','') === a.ticker);
     if (!row) return;
