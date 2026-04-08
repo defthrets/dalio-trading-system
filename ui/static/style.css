@@ -20,55 +20,55 @@
 
 /* ─── Variables ─── */
 :root {
-  /* ── Backgrounds: warm off-white (dark mode = default) ── */
-  --bg-0:        #f5f5f4;
-  --bg-1:        #eeeeee;
-  --bg-2:        #e5e5e5;
-  --bg-panel:    #ffffff;
-  --bg-panel-2:  #fafaf9;
-  --bg-card:     #ffffff;
-  --bg-row-hover:#f5f5f4;
+  /* ── Backgrounds: dark terminal (default) ── */
+  --bg-0:        #0c0a09;
+  --bg-1:        #1c1917;
+  --bg-2:        #292524;
+  --bg-panel:    #1c1917;
+  --bg-panel-2:  #211f1d;
+  --bg-card:     #211f1d;
+  --bg-row-hover:#292524;
 
   /* ── Glass & Modern Effects ── */
-  --glass: rgba(0,0,0,0.03);
-  --glass-border: rgba(0,0,0,0.06);
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.10);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+  --glass: rgba(255,255,255,0.03);
+  --glass-border: rgba(255,255,255,0.06);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.30);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.40);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.50);
   --radius: 8px;
   --radius-sm: 5px;
   --radius-lg: 12px;
 
   /* ── Primary accent: WARM ORANGE ── */
-  --primary:     #d97706;
-  --primary-dim: #b45309;
+  --primary:     #f59e0b;
+  --primary-dim: #d97706;
   --primary-dark:#fef3c7;
-  --primary-glow:rgba(217,119,6,0.12);
+  --primary-glow:rgba(245,158,11,0.15);
 
-  /* ── Semantic: muted for light backgrounds ── */
-  --green:       #16a34a;
-  --green-dim:   #15803d;
+  /* ── Semantic: bright on dark backgrounds ── */
+  --green:       #22c55e;
+  --green-dim:   #16a34a;
   --green-dark:  #dcfce7;
-  --green-glow:  rgba(22,163,74,0.10);
-  --amber:       #d97706;
-  --amber-dim:   #b45309;
-  --amber-glow:  rgba(217,119,6,0.10);
-  --red:         #dc2626;
-  --red-dim:     #b91c1c;
-  --red-glow:    rgba(220,38,38,0.10);
-  --cyan:        #0369a1;
-  --cyan-glow:   rgba(3,105,161,0.10);
+  --green-glow:  rgba(34,197,94,0.15);
+  --amber:       #f59e0b;
+  --amber-dim:   #d97706;
+  --amber-glow:  rgba(245,158,11,0.15);
+  --red:         #ef4444;
+  --red-dim:     #dc2626;
+  --red-glow:    rgba(239,68,68,0.15);
+  --cyan:        #22d3ee;
+  --cyan-glow:   rgba(34,211,238,0.15);
 
-  /* ── Text: dark on light ── */
-  --text-primary:#1c1917;
-  --text-1:      #292524;
-  --text-2:      #78716c;
-  --text-muted:  #a8a29e;
+  /* ── Text: light on dark ── */
+  --text-primary:#fafaf9;
+  --text-1:      #e7e5e4;
+  --text-2:      #a8a29e;
+  --text-muted:  #78716c;
 
-  /* ── Borders: subtle warm gray ── */
-  --border:      #d6d3d1;
-  --border-hi:   #c4c0bc;
-  --border-act:  #d97706;
+  /* ── Borders: subtle warm dark gray ── */
+  --border:      #3d3835;
+  --border-hi:   #57534e;
+  --border-act:  #f59e0b;
 
   --font-mono:   'JetBrains Mono', 'Share Tech Mono', 'Courier New', monospace;
   --font-hud:    'Orbitron', 'Share Tech Mono', monospace;
@@ -4916,7 +4916,7 @@ body.cli-expanded { padding-bottom: 272px; }
 .light-theme .panel {
   background: var(--bg-panel);
   border-color: var(--border);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 .light-theme .panel-header { border-color: var(--border); }
 .light-theme .app-header { background: var(--bg-panel); border-color: var(--border); }
@@ -4939,9 +4939,9 @@ body.cli-expanded { padding-bottom: 272px; }
 .light-theme .badge--green { border-color: var(--green); }
 .light-theme .badge--red   { border-color: var(--red);   }
 .light-theme .badge--cyan  { border-color: var(--cyan); }
-.light-theme .cli-bar { background: #f5f5f4; border-color: var(--border); }
+.light-theme .cli-bar { background: #f8fafc; border-color: var(--border); }
 .light-theme .cli-input { background: transparent; color: var(--text-1); }
-.light-theme .cli-output { background: #fafaf9; color: var(--text-1); }
+.light-theme .cli-output { background: #f1f5f9; color: var(--text-1); }
 .light-theme .holo-brain-svg path,
 .light-theme .holo-brain-svg circle { opacity: 0.7; }
 .light-theme .mode-dropdown-menu { background: var(--bg-panel); border-color: var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.10); }
@@ -4955,6 +4955,10 @@ body.cli-expanded { padding-bottom: 272px; }
 .light-theme .opp-card:hover { border-color: var(--primary); }
 .light-theme .paper-summary-grid .ps-stat { background: var(--bg-1); border-color: var(--border); }
 .light-theme .tutorial-overlay { background: rgba(255,255,255,0.85); }
+.light-theme .btn-primary { color: #fff; }
+.light-theme .scanner-toolbar { background: var(--bg-panel); }
+.light-theme .scanner-search { background: var(--bg-1); color: var(--text-1); }
+.light-theme .broker-picker-dropdown { background: var(--bg-panel); border-color: var(--border); }
 
 /* ═══════════════════════════════════════════════════════════
    MULTI-TIMEFRAME BADGES
