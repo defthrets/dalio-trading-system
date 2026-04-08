@@ -1346,9 +1346,10 @@
               <span id="brokerBarLabel" style="font-weight:700;letter-spacing:1px">NO BROKER CONNECTED</span>
             </div>
             <div class="broker-bar-stats" id="brokerBarStats" style="display:none">
-              <span class="bbs-item"><span class="bbs-label">ACCT</span> <span class="bbs-val" id="bbsAcctVal">—</span></span>
+              <span class="bbs-item"><span class="bbs-label">ACCOUNT VALUE</span> <span class="bbs-val" id="bbsAcctVal">—</span></span>
               <span class="bbs-item"><span class="bbs-label">BUYING POWER</span> <span class="bbs-val" id="bbsBuyPow">—</span></span>
               <span class="bbs-item"><span class="bbs-label">CASH</span> <span class="bbs-val" id="bbsCash">—</span></span>
+              <span class="bbs-item" style="opacity:0.6"><span id="bbsCurrency"></span></span>
             </div>
             <div id="brokerBarQuickConnect" style="display:flex;gap:6px;align-items:center;position:relative">
               <button class="btn-ghost btn--sm" onclick="_toggleBrokerPicker()">⚡ CONNECT BROKER</button>
@@ -2297,7 +2298,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=20260408e"></script>
+  <script src="/static/app.js?v=20260408f"></script>
 
   <!-- ═══════════════════════════════════════════════
        SPEECH BUBBLE SPOTLIGHT TOOLTIP

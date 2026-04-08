@@ -1333,7 +1333,14 @@ async def broker_connect(payload: dict):
     except Exception as e:
         logger.warning(f"Failed to auto-save credentials: {e}")
 
-    return {"status": "connected", "broker": broker_name}
+    # Fetch account info to return with connect response
+    acct_info = {}
+    try:
+        acct_info = await broker.get_account()
+    except Exception as e:
+        acct_info = {"error": str(e)}
+
+    return {"status": "connected", "broker": broker_name, **acct_info}
 
 
 _heartbeat_task_started = False

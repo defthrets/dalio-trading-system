@@ -3727,12 +3727,20 @@ async function loadBrokerStatus() {
     const barQuickConnect = el('brokerBarQuickConnect');
     if (d.connected) {
       if (barDot) barDot.style.color = 'var(--green)';
-      if (barLabel) barLabel.textContent = `${(d.broker||'').toUpperCase()} CONNECTED`;
+      if (d.error) {
+        if (barLabel) barLabel.textContent = `${(d.broker||'').toUpperCase()} CONNECTED (API error)`;
+        if (barDot) barDot.style.color = 'var(--amber)';
+      } else {
+        if (barLabel) barLabel.textContent = `${(d.broker||'').toUpperCase()} CONNECTED`;
+      }
       if (barStats) {
         barStats.style.display = 'flex';
-        setEl('bbsAcctVal', fmt$(d.account_value || 0));
-        setEl('bbsBuyPow', fmt$(d.buying_power || 0));
-        setEl('bbsCash', fmt$(d.cash || 0));
+        setEl('bbsAcctVal', d.account_value ? fmt$(d.account_value) : '—');
+        setEl('bbsBuyPow', d.buying_power ? fmt$(d.buying_power) : '—');
+        setEl('bbsCash', d.cash ? fmt$(d.cash) : '—');
+        // Show currency if available
+        const currEl = el('bbsCurrency');
+        if (currEl && d.currency) currEl.textContent = d.currency;
       }
       if (barQuickConnect) barQuickConnect.style.display = 'none';
       updateModeUI(_tradingMode, true);
@@ -3797,9 +3805,21 @@ function _updateBrokerCardStatus(d) {
       badge.style.cssText = 'color:var(--green);font-size:10px;font-weight:700;letter-spacing:1px;margin-left:auto;';
       card.style.borderColor = 'var(--green)';
       card.style.boxShadow = '0 0 12px rgba(0,200,80,0.15)';
-      // Update config panel result
+      // Update config panel result with account stats
       const resultEl = el(`bcfgResult-${brokerId}`);
-      if (resultEl) resultEl.innerHTML = `<span style="color:var(--green)">● CONNECTED — ready to trade</span>`;
+      if (resultEl) {
+        let statsHtml = `<span style="color:var(--green)">● CONNECTED</span>`;
+        if (d.account_value || d.buying_power || d.cash) {
+          statsHtml += `<span style="color:var(--text-2);font-size:10px;margin-left:8px">`;
+          if (d.account_value) statsHtml += `ACCT: ${fmt$(d.account_value)} `;
+          if (d.buying_power) statsHtml += `BP: ${fmt$(d.buying_power)} `;
+          if (d.cash) statsHtml += `CASH: ${fmt$(d.cash)}`;
+          if (d.currency) statsHtml += ` (${d.currency})`;
+          statsHtml += `</span>`;
+        }
+        if (d.error) statsHtml += `<br><span style="color:var(--amber);font-size:9px">⚠ ${escHtml(d.error)}</span>`;
+        resultEl.innerHTML = statsHtml;
+      }
     } else {
       if (badge) badge.remove();
       if (savedBadge) savedBadge.style.display = '';
@@ -3930,7 +3950,17 @@ async function connectBrokerFromSettings(broker) {
 
   try {
     const d = await postJSON('/api/broker/connect', payload);
-    if (resultEl) resultEl.innerHTML = `<span style="color:var(--green)">✓ ${d.broker.toUpperCase()} connected & saved — will auto-reconnect on restart</span>`;
+    let statusMsg = `<span style="color:var(--green)">✓ ${d.broker.toUpperCase()} connected & saved</span>`;
+    if (d.account_value || d.buying_power || d.cash) {
+      statusMsg += `<br><span style="color:var(--text-2);font-size:10px">`;
+      if (d.account_value) statusMsg += `ACCT: ${fmt$(d.account_value)} `;
+      if (d.buying_power) statusMsg += `BP: ${fmt$(d.buying_power)} `;
+      if (d.cash) statusMsg += `CASH: ${fmt$(d.cash)}`;
+      if (d.currency) statusMsg += ` (${d.currency})`;
+      statusMsg += `</span>`;
+    }
+    if (d.error) statusMsg += `<br><span style="color:var(--amber);font-size:9px">⚠ API: ${escHtml(d.error)}</span>`;
+    if (resultEl) resultEl.innerHTML = statusMsg;
     pushAlert('BROKER', `${d.broker.toUpperCase()} connected & saved`, 'info');
     sendNotification('Broker Connected', `${d.broker.toUpperCase()} is now connected and saved.`);
     // sync to live trading tab dropdowns
@@ -3996,7 +4026,10 @@ async function _populateBrokerPicker() {
     list.innerHTML = brokers.map(b => {
       const isConnected = status.connected && status.broker?.toLowerCase() === b;
       const statusClass = isConnected ? 'online' : '';
-      const statusText = isConnected ? '● CONNECTED' : '○ SAVED — click to connect';
+      let statusText = isConnected ? '● CONNECTED' : '○ SAVED — click to connect';
+      if (isConnected && status.account_value) {
+        statusText += ` — ${fmt$(status.account_value)}`;
+      }
       return `<div class="broker-picker-item" onclick="_pickBroker('${escHtml(b)}')">
         <div class="bp-logo">${logoMap[b] || b.substring(0,3).toUpperCase()}</div>
         <div class="bp-info">
@@ -4013,15 +4046,24 @@ async function _populateBrokerPicker() {
 async function _pickBroker(broker) {
   _closeBrokerPicker();
   const label = el('brokerBarLabel');
+  const barDot = el('brokerBarDot');
   if (label) label.textContent = `⌛ CONNECTING ${broker.toUpperCase()}...`;
+  if (barDot) barDot.style.color = 'var(--amber)';
 
   try {
-    // Connect using saved creds (backend loads them automatically)
     const d = await postJSON('/api/broker/connect', { broker });
+    // Show immediate feedback with account stats
+    if (label) {
+      let msg = `${d.broker.toUpperCase()} CONNECTED`;
+      if (d.account_value) msg += ` — ${fmt$(d.account_value)}`;
+      label.textContent = msg;
+    }
+    if (barDot) barDot.style.color = 'var(--green)';
     pushAlert('BROKER', `${d.broker.toUpperCase()} connected`, 'info');
     await loadBrokerStatus();
     await loadRealPortfolio();
   } catch (e) {
+    if (barDot) barDot.style.color = 'var(--red)';
     if (label) label.textContent = `✗ ${broker.toUpperCase()} — ${e.message || 'connection failed'}`;
     setTimeout(() => loadBrokerStatus(), 3000);
   }
@@ -4238,7 +4280,15 @@ async function loadRealPortfolio() {
         }).join('');
       }
     }
-  } catch (e) { console.debug('loadRealPortfolio failed:', e); }
+  } catch (e) {
+    // Show meaningful status when broker isn't connected
+    const body = el('livePositionsBody');
+    if (body && e.message?.includes('503')) {
+      body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:16px">Connect a broker to see live positions</td></tr>`;
+    } else if (body && e.message) {
+      body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--amber);padding:16px">⚠ ${escHtml(e.message)}</td></tr>`;
+    }
+  }
 }
 
 async function loadRealHistory() {
