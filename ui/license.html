@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>DALIOS — Activate License</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: #1c1917;
+  color: #fafaf9;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle grid background */
+body::before {
+  content: '';
+  position: fixed;
+  top:0;left:0;right:0;bottom:0;
+  background-image:
+    linear-gradient(rgba(245,158,11,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(245,158,11,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+/* Radial glow */
+body::after {
+  content: '';
+  position: fixed;
+  top: 30%; left: 50%;
+  width: 600px; height: 600px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 460px;
+  padding: 0 1.5rem;
+}
+
+.card {
+  background: #2a2523;
+  border: 1px solid #3d3835;
+  border-radius: 12px;
+  padding: 2.5rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.50);
+}
+
+.logo {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.logo h1 {
+  font-family: 'Orbitron', monospace;
+  font-size: 2rem;
+  font-weight: 900;
+  color: #f59e0b;
+  letter-spacing: 4px;
+  margin-bottom: 0.25rem;
+}
+
+.logo .version {
+  font-size: 0.7rem;
+  color: #78716c;
+  letter-spacing: 2px;
+}
+
+.logo .subtitle {
+  font-size: 0.75rem;
+  color: #a8a29e;
+  margin-top: 0.75rem;
+}
+
+.field {
+  margin-bottom: 1.25rem;
+}
+
+.field label {
+  display: block;
+  font-size: 0.7rem;
+  letter-spacing: 1px;
+  color: #a8a29e;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.field input {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  background: #1c1917;
+  border: 1px solid #3d3835;
+  border-radius: 8px;
+  color: #fafaf9;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.field input:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245,158,11,0.15);
+}
+
+.field input::placeholder {
+  color: #57534e;
+}
+
+.btn {
+  width: 100%;
+  padding: 0.9rem;
+  background: #f59e0b;
+  color: #1c1917;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Orbitron', monospace;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  margin-top: 0.5rem;
+}
+
+.btn:hover {
+  background: #d97706;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn:disabled {
+  background: #57534e;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.message {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  text-align: center;
+  display: none;
+}
+
+.message.error {
+  display: block;
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.3);
+  color: #ef4444;
+}
+
+.message.success {
+  display: block;
+  background: rgba(34,197,94,0.1);
+  border: 1px solid rgba(34,197,94,0.3);
+  color: #22c55e;
+}
+
+.message.loading {
+  display: block;
+  background: rgba(245,158,11,0.1);
+  border: 1px solid rgba(245,158,11,0.3);
+  color: #f59e0b;
+}
+
+.help {
+  text-align: center;
+  margin-top: 1.5rem;
+  font-size: 0.7rem;
+  color: #78716c;
+  line-height: 1.6;
+}
+
+.help a {
+  color: #f59e0b;
+  text-decoration: none;
+}
+
+.help a:hover {
+  text-decoration: underline;
+}
+
+.lock-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Pulsing animation for loading */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.message.loading {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="card">
+    <div class="logo">
+      <div class="lock-icon">&#128274;</div>
+      <h1>DALIOS</h1>
+      <span class="version">AUTONOMOUS TRADING FRAMEWORK</span>
+      <p class="subtitle">Enter your license key to activate</p>
+    </div>
+
+    <div class="field">
+      <label>License Key</label>
+      <input type="text" id="licenseKey" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX" autofocus
+             spellcheck="false" autocomplete="off">
+    </div>
+
+    <button class="btn" id="activateBtn" onclick="activateLicense()">
+      ACTIVATE LICENSE
+    </button>
+
+    <div class="message" id="message"></div>
+
+    <div class="help">
+      Don't have a license key?<br>
+      <a href="https://defthrets.github.io/dalios-website/buy.html" target="_blank">Purchase DALIOS — $29 AUD</a>
+      <br><br>
+      Your key was emailed after purchase.<br>
+      Check your inbox and spam folder.
+    </div>
+  </div>
+</div>
+
+<script>
+const keyInput = document.getElementById('licenseKey');
+const btn = document.getElementById('activateBtn');
+const msg = document.getElementById('message');
+
+// Allow Enter key to submit
+keyInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') activateLicense();
+});
+
+async function activateLicense() {
+  const key = keyInput.value.trim();
+  if (!key) {
+    showMsg('error', 'Please enter your license key.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'ACTIVATING...';
+  showMsg('loading', 'Contacting activation server...');
+
+  try {
+    const resp = await fetch('/api/license/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ license_key: key }),
+    });
+
+    const data = await resp.json();
+
+    if (resp.ok && data.success) {
+      showMsg('success', 'License activated! Loading DALIOS...');
+      // Redirect to main app after brief delay
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1500);
+    } else {
+      showMsg('error', data.detail || data.message || 'Activation failed.');
+      btn.disabled = false;
+      btn.textContent = 'ACTIVATE LICENSE';
+    }
+  } catch (err) {
+    showMsg('error', 'Connection error. Check your internet and try again.');
+    btn.disabled = false;
+    btn.textContent = 'ACTIVATE LICENSE';
+  }
+}
+
+function showMsg(type, text) {
+  msg.className = 'message ' + type;
+  msg.textContent = text;
+}
+</script>
+
+</body>
+</html>
