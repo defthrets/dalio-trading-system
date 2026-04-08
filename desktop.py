@@ -97,7 +97,7 @@ def main():
     api = Api(window, port)
     window.expose(api.boot_complete)
 
-    webview.start()
+    webview.start(debug=False, private_mode=False)
 
 
 if __name__ == "__main__":
