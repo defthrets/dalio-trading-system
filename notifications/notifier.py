@@ -66,7 +66,13 @@ class NotificationManager:
             logger.error(f"Notification dispatch failed: {e}")
 
     def send_trade_signal(self, signal_dict: dict):
-        """Send a single trade signal alert."""
+        """Send a single trade signal alert. Only sends if confidence >= 60%."""
+        confidence = signal_dict.get("confidence", 0)
+        # Normalize: if confidence looks like a percentage (>1), convert to fraction
+        if confidence > 1:
+            confidence = confidence / 100.0
+        if confidence < 0.60:
+            return  # Skip low-confidence signals
         action = signal_dict.get("action", "HOLD")
         ticker = signal_dict.get("ticker", "?")
         color = COLORS.get(action, COLORS["DEFAULT"])
@@ -146,8 +152,9 @@ class NotificationManager:
         for signal_dict in data.get("top_signals", [])[:3]:
             self.send_trade_signal(signal_dict)
 
-        # New opportunities
-        ops = data.get("new_opportunities_detail", [])
+        # New opportunities (only 60%+ confidence)
+        ops = [o for o in data.get("new_opportunities_detail", [])
+               if (o.get('confidence', 0) if o.get('confidence', 0) <= 1 else o.get('confidence', 0) / 100) >= 0.60]
         if ops:
             self._telegram_text(
                 "🔍 *New Opportunities Identified:*\n" +
