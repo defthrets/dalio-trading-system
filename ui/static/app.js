@@ -5553,7 +5553,7 @@ function initOpsTerminal() {
 
 const _RADAR_TICKERS = [
   'BHP.AX','CBA.AX','CSL.AX','WBC.AX','NAB.AX','RIO.AX','FMG.AX','WES.AX',
-  'BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','PEPE','BONK','FARTCOIN','SHIB',
+  'MQG.AX','TLS.AX','WDS.AX','ANZ.AX','GMG.AX','ALL.AX','TCL.AX',
   'GLD','SLV','USO','UNG','GOLD','SILVER','CRUDE',
   'ASX200','S&P500','NASDAQ','VIX','AUD/USD'
 ];
