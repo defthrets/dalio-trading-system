@@ -64,8 +64,13 @@ from api.signals import (
     _gen_portfolio_health, _gen_backtest_results, dalio_analyse_trade,
 )
 from api.brokers import (
-    BrokerBase, ACTIVE_BROKER, _load_broker_creds, _save_broker_creds, BROKER_MAP,
+    BrokerBase, _load_broker_creds, _save_broker_creds, BROKER_MAP,
 )
+import api.brokers as _brokers_mod_ref
+
+def _get_broker():
+    """Always read _get_broker() from the module to get the current value."""
+    return _brokers_mod_ref.ACTIVE_BROKER
 from api.agent import (
     AGENT_CONFIG, _save_agent_config,
     _autonomous_agent_loop, _sl_tp_monitor_loop,
@@ -311,7 +316,7 @@ async def toggle_pause(body: dict):
 @app.get("/api/portfolio/health")
 async def portfolio_health():
     if _current_mode() == "live":
-        if ACTIVE_BROKER and ACTIVE_BROKER.is_connected():
+        if _get_broker() and _get_broker().is_connected():
             try:
                 data = await _gen_live_portfolio_health()
             except Exception:
@@ -333,8 +338,8 @@ async def portfolio_health():
 
 async def _gen_live_portfolio_health() -> dict:
     """Portfolio health from connected broker."""
-    acct = await ACTIVE_BROKER.get_account()
-    positions = await ACTIVE_BROKER.get_positions()
+    acct = await _get_broker().get_account()
+    positions = await _get_broker().get_positions()
     equity = float(acct.get("account_value") or acct.get("equity") or 0)
     cash = float(acct.get("cash") or acct.get("buying_power") or 0)
     initial = float(acct.get("initial_equity") or equity)
@@ -459,9 +464,9 @@ async def get_sentiment():
 async def get_correlation():
     # Pass mode-appropriate positions to correlation engine
     mode = _current_mode()
-    if mode == "live" and ACTIVE_BROKER and ACTIVE_BROKER.is_connected():
+    if mode == "live" and _get_broker() and _get_broker().is_connected():
         try:
-            live_positions = await ACTIVE_BROKER.get_positions()
+            live_positions = await _get_broker().get_positions()
             live_tickers = [p.get("symbol", p.get("ticker", "")) for p in (live_positions or [])]
             real = await _real_correlation_matrix(override_tickers=live_tickers)
             return real if real else _gen_correlation_matrix_demo(override_tickers=live_tickers)
@@ -1298,8 +1303,8 @@ async def watchlist_remove(payload: dict):
 async def get_trading_mode():
     return {
         "mode":      _current_mode(),
-        "broker":    ACTIVE_BROKER.name if ACTIVE_BROKER else None,
-        "connected": ACTIVE_BROKER.is_connected() if ACTIVE_BROKER else False,
+        "broker":    _get_broker().name if _get_broker() else None,
+        "connected": _get_broker().is_connected() if _get_broker() else False,
     }
 
 
@@ -1309,7 +1314,7 @@ async def set_trading_mode(payload: dict):
     new_mode = payload.get("mode", "").lower()
     if new_mode not in ("paper", "live"):
         raise HTTPException(400, "mode must be 'paper' or 'live'")
-    broker_connected = ACTIVE_BROKER is not None and ACTIVE_BROKER.is_connected()
+    broker_connected = _get_broker() is not None and _get_broker().is_connected()
     async with _MODE_LOCK:
         _state_mod.TRADING_MODE = new_mode
         _save_trading_mode(new_mode)
@@ -1437,15 +1442,15 @@ def _broker_required_fields(broker_name: str) -> list[str]:
 
 @app.get("/api/broker/status")
 async def broker_status():
-    if ACTIVE_BROKER is None:
+    if _get_broker() is None:
         return {"broker": None, "connected": False}
-    if not ACTIVE_BROKER.is_connected():
-        return {"broker": ACTIVE_BROKER.name, "connected": False}
+    if not _get_broker().is_connected():
+        return {"broker": _get_broker().name, "connected": False}
     try:
-        acct = await ACTIVE_BROKER.get_account()
-        return {"broker": ACTIVE_BROKER.name, "connected": True, **acct}
+        acct = await _get_broker().get_account()
+        return {"broker": _get_broker().name, "connected": True, **acct}
     except Exception as e:
-        return {"broker": ACTIVE_BROKER.name, "connected": True, "error": str(e)}
+        return {"broker": _get_broker().name, "connected": True, "error": str(e)}
 
 
 @app.post("/api/broker/save")
@@ -1480,7 +1485,7 @@ async def broker_saved():
 # ─────────────────────────────────────────────
 
 def _require_live():
-    if ACTIVE_BROKER is None or not ACTIVE_BROKER.is_connected():
+    if _get_broker() is None or not _get_broker().is_connected():
         raise HTTPException(503, "No broker connected")
     if _current_mode() != "live":
         raise HTTPException(403, "Switch to live mode first")
@@ -1488,12 +1493,12 @@ def _require_live():
 
 @app.get("/api/real/portfolio")
 async def get_real_portfolio():
-    if ACTIVE_BROKER is None or not ACTIVE_BROKER.is_connected():
+    if _get_broker() is None or not _get_broker().is_connected():
         raise HTTPException(503, "No broker connected")
     try:
-        positions = await ACTIVE_BROKER.get_positions()
-        acct      = await ACTIVE_BROKER.get_account()
-        return {"broker": ACTIVE_BROKER.name, "positions": positions,
+        positions = await _get_broker().get_positions()
+        acct      = await _get_broker().get_account()
+        return {"broker": _get_broker().name, "positions": positions,
                 "account_value": acct.get("account_value"), "buying_power": acct.get("buying_power"),
                 "cash": acct.get("cash"), "timestamp": datetime.utcnow().isoformat()}
     except Exception as e:
@@ -1503,14 +1508,14 @@ async def get_real_portfolio():
 @app.get("/api/real/suggested_qty")
 async def get_suggested_qty(ticker: str = "", confidence: float = 50):
     """Suggest position size based on broker buying power and signal confidence."""
-    if ACTIVE_BROKER is None or not ACTIVE_BROKER.is_connected():
+    if _get_broker() is None or not _get_broker().is_connected():
         raise HTTPException(503, "No broker connected")
     ticker = ticker.upper().strip()
     if not ticker:
         raise HTTPException(400, "ticker required")
     confidence = max(0, min(100, confidence))
     try:
-        acct = await ACTIVE_BROKER.get_account()
+        acct = await _get_broker().get_account()
         buying_power = float(acct.get("buying_power") or acct.get("cash") or 0)
     except Exception as e:
         raise HTTPException(502, f"Broker error: {e}")
@@ -1553,13 +1558,13 @@ async def place_real_order(payload: dict):
     if side not in ("BUY", "SELL"): raise HTTPException(400, "side must be BUY or SELL")
     if qty <= 0: raise HTTPException(400, "qty must be positive")
     try:
-        result = await ACTIVE_BROKER.place_order(ticker, side, qty, price)
+        result = await _get_broker().place_order(ticker, side, qty, price)
     except Exception as e:
         raise HTTPException(502, f"Broker order failed: {e}")
 
     import api.state as _state_mod
     try:
-        acct = await ACTIVE_BROKER.get_account()
+        acct = await _get_broker().get_account()
         current_equity = acct.get("account_value", 0)
         _state_mod.REAL_EQUITY_CURVE.append({"t": datetime.utcnow().isoformat(), "v": current_equity})
         _save_real_equity(_state_mod.REAL_EQUITY_CURVE[-2000:])
@@ -1585,10 +1590,10 @@ async def place_real_order(payload: dict):
 
 @app.get("/api/real/history")
 async def get_real_history():
-    if ACTIVE_BROKER is None or not ACTIVE_BROKER.is_connected():
+    if _get_broker() is None or not _get_broker().is_connected():
         raise HTTPException(503, "No broker connected")
     try:
-        return {"history": await ACTIVE_BROKER.get_history(), "broker": ACTIVE_BROKER.name}
+        return {"history": await _get_broker().get_history(), "broker": _get_broker().name}
     except Exception as e:
         raise HTTPException(502, f"Broker error: {e}")
 
@@ -1599,7 +1604,7 @@ async def close_real_position(payload: dict):
     ticker = payload.get("ticker", "").upper().strip()
     if not ticker: raise HTTPException(400, "ticker required")
     try:
-        result = await ACTIVE_BROKER.close_position(ticker)
+        result = await _get_broker().close_position(ticker)
     except ValueError as e:
         raise HTTPException(404, str(e))
     except Exception as e:
@@ -1607,7 +1612,7 @@ async def close_real_position(payload: dict):
 
     import api.state as _state_mod
     try:
-        acct = await ACTIVE_BROKER.get_account()
+        acct = await _get_broker().get_account()
         eq_val = acct.get("account_value", 0)
         _state_mod.REAL_EQUITY_CURVE.append({"t": datetime.utcnow().isoformat(), "v": eq_val})
         _save_real_equity(_state_mod.REAL_EQUITY_CURVE[-2000:])
