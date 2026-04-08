@@ -2750,9 +2750,10 @@ canvas { display: block; max-width: 100%; }
   padding-top: 8px;
 }
 .spot-count {
-  font-size: 13px;
+  font-size: 8px;
   color: var(--text-muted);
   font-family: var(--font-hud);
+  letter-spacing: 1px;
   letter-spacing: 1px;
 }
 .spot-btns { display: flex; gap: 6px; }
