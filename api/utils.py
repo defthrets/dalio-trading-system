@@ -88,8 +88,10 @@ class RateLimiter:
 
     # Endpoints with stricter limits (10 req/min)
     TRADING_PATHS = {"/api/paper/order", "/api/real/order", "/api/broker/connect"}
+    # Exempt auto-refresh endpoints from rate limiting
+    EXEMPT_PATHS = {"/api/status", "/api/portfolio/health", "/api/alerts", "/api/market/summary"}
 
-    def __init__(self, general_limit: int = 60, trading_limit: int = 10, window: int = 60):
+    def __init__(self, general_limit: int = 120, trading_limit: int = 10, window: int = 60):
         self.general_limit = general_limit
         self.trading_limit = trading_limit
         self.window = window          # seconds
@@ -98,6 +100,8 @@ class RateLimiter:
 
     def _key(self, ip: str, path: str) -> tuple[str, int]:
         """Return (bucket_key, max_allowed) for this request."""
+        if path in self.EXEMPT_PATHS:
+            return f"exempt:{ip}", 999  # effectively unlimited
         for tp in self.TRADING_PATHS:
             if path == tp:
                 return f"trade:{ip}", self.trading_limit
