@@ -1366,7 +1366,6 @@ def _broker_required_fields(broker_name: str) -> list[str]:
     """Return required credential fields for a broker."""
     FIELDS = {
         "ibkr": ["host", "port", "client_id"],
-        "alpaca": ["api_key", "api_secret"],
     }
     return FIELDS.get(broker_name, ["api_key", "api_secret"])
 

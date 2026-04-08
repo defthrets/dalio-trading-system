@@ -10,9 +10,9 @@
 
 ## What It Does
 
-DALIOS is a self-contained trading intelligence platform built around All-Weather portfolio principles. It scans ASX equities, cryptocurrencies, and commodities in real time, generates RSI + trend-based signals, tracks paper and live trades, and monitors portfolio risk — all from a single military-style web UI.
+DALIOS is a self-contained trading intelligence platform built around All-Weather portfolio principles. It scans ASX equities and commodities in real time, generates RSI + trend-based signals, tracks paper and live trades, and monitors portfolio risk — all from a single military-style web UI.
 
-- **Signal scanner** across 200+ tickers (ASX, Crypto, Commodities)
+- **Signal scanner** across 200+ tickers (ASX, Commodities)
 - **Economic quadrant engine** — detects the current macro regime (rising/falling growth + inflation) and scores every signal against it
 - **Paper trading** with live P&L tracking, position management, and equity curve
 - **Intel Center** — live RSS news from 12 financial feeds, keyword sentiment scoring, geopolitical risk monitor
@@ -58,7 +58,6 @@ python -m uvicorn api.server:app --host 0.0.0.0 --port 8000 --reload
 | **Risk Matrix** | Sharpe ratio, max drawdown, circuit breaker, win rate, per-position risk table |
 | **Backtest Lab** | Walk-forward backtest across 8 periods with total return, Sharpe, and drawdown metrics |
 | **ASX Scanner** | Live scanner for 93 ASX stocks across banking, mining, healthcare, tech, and REITs |
-| **Crypto Scanner** | Live scanner for 99 cryptocurrencies via CoinGecko + yfinance fallback |
 | **Commodities Scanner** | Gold, silver, oil, gas, wheat, copper and more via yfinance |
 | **Paper Trading** | Simulated trading with live P&L, portfolio history, equity curve, and position management |
 | **Live Trading** | Broker integration for real money trading (requires broker connection) |
@@ -95,7 +94,6 @@ dalio-trading-system/
 | Feature | Source | Refresh Rate |
 |---------|--------|-------------|
 | ASX Scanner | Yahoo Finance (yfinance) | 90s cache |
-| Crypto Scanner | CoinGecko API → yfinance fallback | 90s cache |
 | Commodities | Yahoo Finance (yfinance) | 90s cache |
 | Signal Ops | yfinance 3-month price history | On demand |
 | Live P&L | yfinance per-position price fetch | Every 15s |
@@ -136,9 +134,9 @@ Start with configurable cash (default $1,000). Place BUY/LONG and SELL/SHORT pap
 | `python-multipart` | Form data parsing |
 | `numpy` | RSI, Sharpe, statistical calculations |
 | `pandas` | Data frames (required by yfinance) |
-| `yfinance` | Live ASX / crypto / commodities prices |
+| `yfinance` | Live ASX / commodities prices |
 | `requests` | HTTP client |
-| `aiohttp` | Async HTTP (CoinGecko API) |
+| `aiohttp` | Async HTTP client |
 | `loguru` | Structured logging |
 | `feedparser` | RSS feed parsing (Intel Center) |
 

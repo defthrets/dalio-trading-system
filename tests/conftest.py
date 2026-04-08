@@ -19,7 +19,7 @@ _STUB_MODULES = [
     "yfinance", "feedparser", "apscheduler", "apscheduler.schedulers",
     "apscheduler.schedulers.asyncio", "apscheduler.triggers",
     "apscheduler.triggers.interval",
-    "ib_insync", "alpaca_trade_api",
+    "ib_insync",
 ]
 
 for mod_name in _STUB_MODULES:

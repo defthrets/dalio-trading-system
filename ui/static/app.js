@@ -2721,7 +2721,7 @@ async function fetchPoQuote(ticker) {
     const d = await fetchJSON(`/api/paper/quote?ticker=${encodeURIComponent(ticker)}`);
     if (_poTicker !== ticker) return; // stale response
     _poPrice  = d.price;
-    // Update the input field if the server normalised the ticker (e.g. BTC → BTC-USD)
+    // Update the input field if the server normalised the ticker (e.g. BHP → BHP.AX)
     if (d.ticker && d.ticker !== ticker) {
       _poTicker = d.ticker;
       const inp = el('poTicker');

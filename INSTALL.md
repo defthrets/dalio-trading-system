@@ -24,7 +24,7 @@ Copy the credential template:
 ```
 copy data\broker_credentials.json.template data\broker_credentials.json
 ```
-Edit with your CoinSpot/Binance API keys. **Never commit this file to git.**
+Edit with your ASX broker API keys. **Never commit this file to git.**
 
 ### Step 4 — Start the server
 Double-click `start.bat` or run:
@@ -66,14 +66,14 @@ python main.py
 | fastapi | Web framework / API server |
 | uvicorn | ASGI server (runs FastAPI) |
 | numpy / pandas | Numerical + data frame ops |
-| yfinance | Live ASX / commodities / crypto prices |
-| aiohttp | Async HTTP (CoinGecko API) |
+| yfinance | Live ASX / commodities prices |
+| aiohttp | Async HTTP client |
 | loguru | Logging |
 | feedparser | Financial news RSS feeds |
 | pydantic-settings | Configuration management |
 | sqlalchemy | Database ORM (trade/signal logging) |
 | ta | Technical analysis indicators (RSI, MACD, BB) |
-| transformers + torch | FinBERT sentiment (optional, ~2GB) |
+| transformers + torch | Sentiment analysis (optional, ~2GB) |
 
 ---
 

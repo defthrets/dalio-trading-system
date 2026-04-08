@@ -9,7 +9,6 @@ const fmtCur = (n) => n != null ? `$${Number(n).toLocaleString('en-AU', { minimu
 
 const TABS = [
   { id: 'asx', label: 'ASX' },
-  { id: 'crypto', label: 'Crypto' },
   { id: 'commodities', label: 'Commodities' },
 ];
 
