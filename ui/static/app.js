@@ -1613,21 +1613,31 @@ function initCharts() {
     _seedPredictionChart();
   }
 
-  // Sentiment radar/bar
+  // Sentiment doughnut
   const sctx = el('sentimentChart')?.getContext('2d');
   if (sctx) {
     charts.sentiment = new Chart(sctx, {
-      type: 'bar',
+      type: 'doughnut',
       data: {
         labels: ['RISING GROWTH','FALLING GROWTH','RISING INFLATION','FALLING INFLATION'],
         datasets: [{
           data: [0,0,0,0],
-          backgroundColor: ['rgba(0,204,68,0.5)','rgba(255,34,34,0.5)','rgba(255,179,0,0.5)','rgba(0,212,255,0.5)'],
-          borderColor:      ['#00cc44','#ff2222','#ffb300','#00d4ff'],
-          borderWidth: 1,
+          backgroundColor: ['#00cc44','#ff2222','#ffb300','#00d4ff'],
+          borderColor: 'rgba(0,0,0,0.3)',
+          borderWidth: 2,
+          hoverOffset: 8,
         }],
       },
-      options: { ...CHART_DEFAULTS, maintainAspectRatio: false, indexAxis: 'y' },
+      options: {
+        ...CHART_DEFAULTS,
+        maintainAspectRatio: false,
+        cutout: '55%',
+        plugins: {
+          ...CHART_DEFAULTS.plugins,
+          legend: { display: true, position: 'bottom', labels: { color: '#a8a29e', font: { size: 9 }, padding: 8, boxWidth: 10 } },
+          tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw} articles` } },
+        },
+      },
     });
   }
 
