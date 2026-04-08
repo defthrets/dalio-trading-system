@@ -1206,11 +1206,14 @@ async def _gen_sentiment_data() -> dict:
 
 # ── Correlation matrix ─────────────────────────────────
 
-def _gen_correlation_matrix_demo() -> dict:
+def _gen_correlation_matrix_demo(override_tickers: list = None) -> dict:
     """Fallback correlation matrix — uses real yfinance price data with
     default tickers when portfolio + watchlist have too few assets.
     Returns synthetic random only if yfinance fetch fails entirely."""
-    portfolio_tickers = list(PAPER.positions.keys())
+    if override_tickers:
+        portfolio_tickers = [t for t in override_tickers if t]
+    else:
+        portfolio_tickers = list(PAPER.positions.keys())
     watchlist_tickers = list(WATCHLIST) if WATCHLIST else []
     tickers = list(dict.fromkeys(portfolio_tickers + watchlist_tickers))
     has_portfolio = len(portfolio_tickers) > 0
@@ -1266,17 +1269,22 @@ def _gen_correlation_matrix_demo() -> dict:
     }
 
 
-async def _real_correlation_matrix() -> Optional[dict]:
+async def _real_correlation_matrix(override_tickers: list = None) -> Optional[dict]:
     """Correlation matrix of portfolio holdings + watchlist.
     Holy Grail count measures how many of YOUR assets have mean
-    correlation < 0.3 — not the entire ticker universe."""
+    correlation < 0.3 — not the entire ticker universe.
+    override_tickers: if provided (e.g. from live broker), use these instead of PAPER."""
     # Use actual portfolio positions + watchlist for meaningful correlation
-    portfolio_tickers = list(PAPER.positions.keys())
+    if override_tickers:
+        portfolio_tickers = [t for t in override_tickers if t]
+    else:
+        portfolio_tickers = list(PAPER.positions.keys())
     watchlist_tickers = list(WATCHLIST) if WATCHLIST else []
     # Combine, deduplicate, preserving order
     tickers = list(dict.fromkeys(portfolio_tickers + watchlist_tickers))
-    # If too few, pad with representative tickers from each market
-    if len(tickers) < 6:
+    has_positions = len(portfolio_tickers) > 0
+    # Only pad with defaults if user has NO positions at all
+    if not has_positions and len(tickers) < 6:
         defaults = [
             "CBA.AX", "BHP.AX", "CSL.AX", "WDS.AX", "GMG.AX",  # ASX
             "GC=F", "CL=F", "SI=F",                               # Commodities
@@ -1286,17 +1294,22 @@ async def _real_correlation_matrix() -> Optional[dict]:
                 tickers.append(t)
             if len(tickers) >= 15:
                 break
+    if len(tickers) < 2:
+        return None
     prices_map = await _get_prices(tickers[:30], "3mo")
-    if not prices_map or len(prices_map) < 4: return None
+    if not prices_map or len(prices_map) < 2: return None
     valid = [t for t in tickers if t in prices_map and len(prices_map[t]) >= 20]
-    if len(valid) < 4: return None
+    if len(valid) < 2: return None
     min_len = min(len(prices_map[t]) for t in valid)
     closes = np.array([prices_map[t][-min_len:] for t in valid], dtype=float)
     returns = np.diff(closes, axis=1) / closes[:, :-1]
     corr = np.round(np.corrcoef(returns), 3)
+    # Handle single asset case (corrcoef returns scalar)
+    if corr.ndim == 0:
+        corr = np.array([[1.0]])
     n = len(valid)
     upper = np.triu_indices(n, k=1)
-    hg_count = sum(1 for i in range(n) if float(np.mean(np.abs(corr[i][np.arange(n) != i]))) < 0.3)
+    hg_count = sum(1 for i in range(n) if float(np.mean(np.abs(corr[i][np.arange(n) != i]))) < 0.3) if n > 1 else 0
     # Include real portfolio position data for weight calculation
     portfolio_info = {}
     total_value = PAPER.cash
@@ -1307,12 +1320,13 @@ async def _real_correlation_matrix() -> Optional[dict]:
                              "market_value": round(mv, 2), "side": pos.get("side", "LONG")}
     for t in portfolio_info:
         portfolio_info[t]["weight_pct"] = round(portfolio_info[t]["market_value"] / max(total_value, 1) * 100, 2)
+    source = "LIVE" if has_positions else ("DEFAULTS" if not has_positions else "PORTFOLIO")
     return {
         "tickers": valid, "matrix": corr.tolist(),
-        "mean_correlation": round(float(np.mean(corr[upper])), 3),
-        "max_correlation": round(float(np.max(corr[upper])), 3),
+        "mean_correlation": round(float(np.mean(corr[upper])), 3) if len(upper[0]) > 0 else 0.0,
+        "max_correlation": round(float(np.max(corr[upper])), 3) if len(upper[0]) > 0 else 0.0,
         "holy_grail_count": hg_count, "threshold": 0.3,
-        "data_source": "LIVE", "timestamp": datetime.utcnow().isoformat(),
+        "data_source": source, "timestamp": datetime.utcnow().isoformat(),
         "portfolio_positions": portfolio_info,
     }
 

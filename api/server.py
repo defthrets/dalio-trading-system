@@ -457,6 +457,16 @@ async def get_sentiment():
 
 @app.get("/api/correlation")
 async def get_correlation():
+    # Pass mode-appropriate positions to correlation engine
+    mode = _current_mode()
+    if mode == "live" and ACTIVE_BROKER and ACTIVE_BROKER.is_connected():
+        try:
+            live_positions = await ACTIVE_BROKER.get_positions()
+            live_tickers = [p.get("symbol", p.get("ticker", "")) for p in (live_positions or [])]
+            real = await _real_correlation_matrix(override_tickers=live_tickers)
+            return real if real else _gen_correlation_matrix_demo(override_tickers=live_tickers)
+        except Exception:
+            pass
     real = await _real_correlation_matrix()
     return real if real else _gen_correlation_matrix_demo()
 
@@ -742,7 +752,9 @@ async def chart_data(ticker: str, period: str = "6mo", interval: str = "1d"):
 
 @app.get("/api/markets/{market}")
 async def market_scanner(market: str):
-    """Scan a market: asx | commodities. Uses cache (90s TTL)."""
+    """Scan a market: asx | commodities. Uses cache (90s TTL).
+    Scanner uses curated ASX_TICKERS (~300 most liquid).
+    Full ~1,900 ASX universe available via /api/asx/universe for search."""
     market = market.lower()
     ticker_map = {
         "asx":         ASX_TICKERS,
@@ -777,6 +789,51 @@ async def asx_universe():
     from api.scanners import get_asx_universe
     universe = get_asx_universe()
     return {"tickers": universe, "count": len(universe)}
+
+
+# ── Broker-asset compatibility (cached, fetched once) ────
+_BROKER_COMPAT = {
+    "ibkr":        {"asx": True, "commodities": True, "us_etf": True, "fx": True, "options": True, "futures": True},
+    "ig":          {"asx": True, "commodities": True, "us_etf": False, "fx": True, "options": False, "futures": False},
+    "cmc":         {"asx": True, "commodities": True, "us_etf": False, "fx": True, "options": False, "futures": False},
+    "saxo":        {"asx": True, "commodities": True, "us_etf": True, "fx": True, "options": True, "futures": True},
+    "tiger":       {"asx": True, "commodities": False, "us_etf": True, "fx": False, "options": True, "futures": False},
+    "moomoo":      {"asx": True, "commodities": False, "us_etf": True, "fx": False, "options": True, "futures": False},
+    "pepperstone": {"asx": True, "commodities": True, "us_etf": False, "fx": True, "options": False, "futures": False},
+    "finclear":    {"asx": True, "commodities": False, "us_etf": False, "fx": False, "options": False, "futures": False},
+    "openmarkets": {"asx": True, "commodities": False, "us_etf": False, "fx": False, "options": False, "futures": False},
+    "marketech":   {"asx": True, "commodities": False, "us_etf": False, "fx": False, "options": False, "futures": False},
+    "opentrader":  {"asx": True, "commodities": False, "us_etf": False, "fx": False, "options": False, "futures": False},
+    "iress":       {"asx": True, "commodities": True, "us_etf": False, "fx": True, "options": True, "futures": True},
+    "cqg":         {"asx": False, "commodities": True, "us_etf": False, "fx": True, "options": True, "futures": True},
+    "flextrade":   {"asx": True, "commodities": True, "us_etf": True, "fx": True, "options": True, "futures": True},
+    "tradingview": {"asx": True, "commodities": True, "us_etf": True, "fx": True, "options": False, "futures": False},
+    "eodhd":       {"asx": False, "commodities": False, "us_etf": False, "fx": False, "options": False, "futures": False},
+}
+
+def _get_asset_type(ticker: str) -> str:
+    """Determine asset type from ticker symbol."""
+    t = ticker.upper()
+    if t.endswith(".AX"):
+        return "asx"
+    if "=F" in t:
+        return "commodities" if t not in ("AUDUSD=X","GBPUSD=X","EURUSD=X") else "fx"
+    if t in ("GLD","TLT","IEF","TIP","DBC","SPY","QQQ","IVV","VTI"):
+        return "us_etf"
+    if "=X" in t:
+        return "fx"
+    return "us_etf"  # default for unlisted
+
+@app.get("/api/broker/compatible")
+async def broker_compatible(ticker: str = ""):
+    """Return which brokers can trade a given ticker."""
+    asset_type = _get_asset_type(ticker)
+    compatible = [name for name, caps in _BROKER_COMPAT.items() if caps.get(asset_type, False)]
+    return {
+        "ticker": ticker, "asset_type": asset_type,
+        "brokers": compatible,
+        "all_compat": _BROKER_COMPAT,
+    }
 
 
 # ─────────────────────────────────────────────

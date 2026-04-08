@@ -113,25 +113,45 @@ ASX_TICKERS = [
 CRYPTO_TICKERS = []  # Crypto removed -- ASX + commodities only
 
 COMMODITY_TICKERS = [
-    # -- ASX Precious Metal ETFs --
-    "PMGOLD.AX", "QAU.AX", "MNRS.AX",
-    # -- ASX Crude Oil ETF --
-    "OOO.AX",
+    # -- ASX Precious Metal ETFs & Producers --
+    "PMGOLD.AX", "QAU.AX", "MNRS.AX", "GOLD.AX",
+    # -- ASX Crude Oil & Energy ETFs --
+    "OOO.AX", "FUEL.AX",
     # -- ASX Broad Commodity ETFs --
     "QCB.AX", "COMB.AX",
     # -- ASX Copper & Base Metals --
-    "OZL.AX", "29M.AX",
-    # -- ASX Uranium (additional, not in ASX_TICKERS) --
+    "OZL.AX", "29M.AX", "SFR.AX",
+    # -- ASX Iron Ore (commodity proxy) --
+    "BHP.AX", "FMG.AX", "RIO.AX", "MIN.AX", "GRR.AX", "MGX.AX",
+    # -- ASX Uranium --
     "BMN.AX", "LOT.AX", "DYL.AX",
-    "BKY.AX", "TOE.AX", "GTR.AX",
+    "BKY.AX", "TOE.AX", "GTR.AX", "PDN.AX", "BOE.AX",
+    # -- ASX Lithium & Battery --
+    "PLS.AX", "LTR.AX", "IGO.AX", "SYA.AX", "CXO.AX", "GL1.AX",
+    # -- ASX Rare Earths --
+    "LYC.AX", "ARU.AX", "VML.AX", "HAS.AX", "NTU.AX",
+    # -- ASX Nickel & Cobalt --
+    "NIC.AX", "WSA.AX",
     # -- ASX Agriculture & Soft Commodities --
-    "FOOD.AX", "QAG.AX",
-    # -- Global Futures (commodity price exposure) --
-    "GC=F", "SI=F", "CL=F", "BZ=F", "NG=F",
-    "HG=F", "PL=F", "PA=F",
-    "ZC=F", "ZW=F", "ZS=F",
-    "KC=F", "SB=F", "CC=F",
+    "FOOD.AX", "QAG.AX", "GNC.AX", "NUF.AX", "ELD.AX",
+    "AAC.AX", "TGR.AX", "CGC.AX",
+    # -- ASX Coal --
+    "WHC.AX", "NHC.AX", "CRN.AX",
+    # -- ASX Aluminium --
+    "AWC.AX", "S32.AX",
+    # -- Global Precious Metals Futures --
+    "GC=F", "SI=F", "PL=F", "PA=F",
+    # -- Global Energy Futures --
+    "CL=F", "BZ=F", "NG=F", "RB=F", "HO=F",
+    # -- Global Base & Industrial Metals --
+    "HG=F", "ALI=F",
+    # -- Global Agriculture & Soft Commodities --
+    "ZC=F", "ZW=F", "ZS=F", "ZM=F", "ZL=F",
+    "KC=F", "SB=F", "CC=F", "CT=F", "OJ=F",
+    "RS=F", "ZO=F",
+    # -- Global Livestock --
     "LE=F", "GF=F", "HE=F",
+    # -- Global Lumber & Other --
     "LBS=F",
 ]
 
@@ -237,11 +257,61 @@ _ASSET_META = {
     "ARU.AX":    {"name": "Arafura Rare Earths",   "cat": "Commodity", "sector": "Rare Earths"},
     "VML.AX":    {"name": "Vital Metals",          "cat": "Commodity", "sector": "Rare Earths"},
     "HAS.AX":    {"name": "Hastings Technology",   "cat": "Commodity", "sector": "Rare Earths"},
-    "GC=F":      {"name": "Gold Futures",           "cat": "Commodity", "sector": "Precious Metals"},
-    "SI=F":      {"name": "Silver Futures",         "cat": "Commodity", "sector": "Precious Metals"},
-    "CL=F":      {"name": "Crude Oil Futures",      "cat": "Commodity", "sector": "Energy"},
-    "BZ=F":      {"name": "Brent Crude Futures",    "cat": "Commodity", "sector": "Energy"},
-    "NG=F":      {"name": "Natural Gas Futures",    "cat": "Commodity", "sector": "Energy"},
+    # -- ASX Commodity Producers (additional) --
+    "SFR.AX":    {"name": "Sandfire Resources",     "cat": "Commodity", "sector": "Copper"},
+    "NIC.AX":    {"name": "Nickel Industries",      "cat": "Commodity", "sector": "Nickel"},
+    "WSA.AX":    {"name": "Western Areas (Nickel)", "cat": "Commodity", "sector": "Nickel"},
+    "AWC.AX":    {"name": "Alumina Limited",        "cat": "Commodity", "sector": "Aluminium"},
+    "WHC.AX":    {"name": "Whitehaven Coal",        "cat": "Commodity", "sector": "Coal"},
+    "NHC.AX":    {"name": "New Hope Coal",          "cat": "Commodity", "sector": "Coal"},
+    "CRN.AX":    {"name": "Coronado Global Coal",   "cat": "Commodity", "sector": "Coal"},
+    "GRR.AX":    {"name": "Grange Resources",       "cat": "Commodity", "sector": "Iron Ore"},
+    "MGX.AX":    {"name": "Mount Gibson Iron",      "cat": "Commodity", "sector": "Iron Ore"},
+    "PLS.AX":    {"name": "Pilbara Minerals",       "cat": "Commodity", "sector": "Lithium"},
+    "LTR.AX":    {"name": "Liontown Resources",     "cat": "Commodity", "sector": "Lithium"},
+    "IGO.AX":    {"name": "IGO Limited",            "cat": "Commodity", "sector": "Lithium/Nickel"},
+    "NTU.AX":    {"name": "Northern Minerals",      "cat": "Commodity", "sector": "Rare Earths"},
+    "BOE.AX":    {"name": "Boss Energy",            "cat": "Commodity", "sector": "Uranium"},
+    "AAC.AX":    {"name": "Australian Agri",        "cat": "Commodity", "sector": "Agriculture"},
+    "GNC.AX":    {"name": "GrainCorp",              "cat": "Commodity", "sector": "Agriculture"},
+    "NUF.AX":    {"name": "Nufarm (Agri-Chem)",     "cat": "Commodity", "sector": "Agriculture"},
+    "ELD.AX":    {"name": "Elders (Farming)",       "cat": "Commodity", "sector": "Agriculture"},
+    "TGR.AX":    {"name": "Tassal (Salmon)",        "cat": "Commodity", "sector": "Agriculture"},
+    "CGC.AX":    {"name": "Costa Group (Produce)",   "cat": "Commodity", "sector": "Agriculture"},
+    # -- Global Precious Metals Futures --
+    "GC=F":      {"name": "Gold Futures",            "cat": "Commodity", "sector": "Precious Metals"},
+    "SI=F":      {"name": "Silver Futures",          "cat": "Commodity", "sector": "Precious Metals"},
+    "PL=F":      {"name": "Platinum Futures",        "cat": "Commodity", "sector": "Precious Metals"},
+    "PA=F":      {"name": "Palladium Futures",       "cat": "Commodity", "sector": "Precious Metals"},
+    # -- Global Energy Futures --
+    "CL=F":      {"name": "Crude Oil WTI",           "cat": "Commodity", "sector": "Energy"},
+    "BZ=F":      {"name": "Brent Crude Oil",         "cat": "Commodity", "sector": "Energy"},
+    "NG=F":      {"name": "Natural Gas",             "cat": "Commodity", "sector": "Energy"},
+    "RB=F":      {"name": "Gasoline (RBOB)",         "cat": "Commodity", "sector": "Energy"},
+    "HO=F":      {"name": "Heating Oil",             "cat": "Commodity", "sector": "Energy"},
+    # -- Global Base & Industrial Metals --
+    "HG=F":      {"name": "Copper Futures",          "cat": "Commodity", "sector": "Industrial Metals"},
+    "ALI=F":     {"name": "Aluminium Futures",       "cat": "Commodity", "sector": "Industrial Metals"},
+    # -- Global Agriculture & Grains --
+    "ZC=F":      {"name": "Corn Futures",            "cat": "Commodity", "sector": "Agriculture"},
+    "ZW=F":      {"name": "Wheat Futures",           "cat": "Commodity", "sector": "Agriculture"},
+    "ZS=F":      {"name": "Soybean Futures",         "cat": "Commodity", "sector": "Agriculture"},
+    "ZM=F":      {"name": "Soybean Meal",            "cat": "Commodity", "sector": "Agriculture"},
+    "ZL=F":      {"name": "Soybean Oil",             "cat": "Commodity", "sector": "Agriculture"},
+    "ZO=F":      {"name": "Oat Futures",             "cat": "Commodity", "sector": "Agriculture"},
+    "RS=F":      {"name": "Canola (Rapeseed)",       "cat": "Commodity", "sector": "Agriculture"},
+    # -- Global Soft Commodities --
+    "KC=F":      {"name": "Coffee Futures",          "cat": "Commodity", "sector": "Soft Commodities"},
+    "SB=F":      {"name": "Sugar Futures",           "cat": "Commodity", "sector": "Soft Commodities"},
+    "CC=F":      {"name": "Cocoa Futures",           "cat": "Commodity", "sector": "Soft Commodities"},
+    "CT=F":      {"name": "Cotton Futures",          "cat": "Commodity", "sector": "Soft Commodities"},
+    "OJ=F":      {"name": "Orange Juice Futures",    "cat": "Commodity", "sector": "Soft Commodities"},
+    # -- Global Livestock --
+    "LE=F":      {"name": "Live Cattle Futures",     "cat": "Commodity", "sector": "Livestock"},
+    "GF=F":      {"name": "Feeder Cattle Futures",   "cat": "Commodity", "sector": "Livestock"},
+    "HE=F":      {"name": "Lean Hogs Futures",       "cat": "Commodity", "sector": "Livestock"},
+    # -- Global Other --
+    "LBS=F":     {"name": "Lumber Futures",          "cat": "Commodity", "sector": "Materials"},
 }
 
 

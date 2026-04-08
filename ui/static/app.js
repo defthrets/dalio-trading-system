@@ -521,6 +521,18 @@ function renderSignalGrid(signals) {
       showJustification(filtered[i]);
     });
   });
+  // Populate broker compatibility text on signal cards
+  _populateBrokerCompatText();
+}
+
+async function _populateBrokerCompatText() {
+  const compat = await _ensureBrokerCompat();
+  document.querySelectorAll('.sc-brokers[data-ticker]').forEach(div => {
+    const ticker = div.dataset.ticker;
+    if (!ticker) return;
+    const brokers = _getCompatibleBrokers(ticker, compat);
+    div.textContent = brokers.length > 0 ? `Trade via: ${brokers.join(', ')}` : '';
+  });
 }
 
 // Translate raw numbers into plain-English labels
@@ -729,6 +741,7 @@ function signalCardHTML(s) {
         <strong style="font-size:13px">${fmtSignalPrice(s)}</strong>
         &nbsp;<span style="color:var(--text-2);font-size:9px">entry price</span>
       </div>
+      <div class="sc-brokers" style="font-size:8px;color:var(--text-muted);margin-top:1px;letter-spacing:0.3px" data-ticker="${s.ticker}"></div>
       <div class="sc-price" style="margin-top:2px">
         <span style="color:var(--red);font-size:9px">⬇ Stop Loss ${s.stop_loss != null ? '$'+(+s.stop_loss).toFixed(2) : '--'}</span>
         &nbsp;&nbsp;
@@ -3169,6 +3182,34 @@ function setOmSide(side, btn) {
   el('omSellBtn')?.classList.toggle('active', side === 'SELL');
 }
 
+// Broker compatibility cache (fetched once)
+let _brokerCompatCache = null;
+
+async function _ensureBrokerCompat() {
+  if (_brokerCompatCache) return _brokerCompatCache;
+  try {
+    const d = await fetchJSON('/api/broker/compatible?ticker=BHP.AX');
+    _brokerCompatCache = d.all_compat || {};
+  } catch { _brokerCompatCache = {}; }
+  return _brokerCompatCache;
+}
+
+function _getAssetType(ticker) {
+  const t = ticker.toUpperCase();
+  if (t.endsWith('.AX')) return 'asx';
+  if (t.includes('=F')) return 'commodities';
+  if (t.includes('=X')) return 'fx';
+  if (['GLD','TLT','IEF','TIP','DBC','SPY','QQQ','IVV','VTI'].includes(t)) return 'us_etf';
+  return 'us_etf';
+}
+
+function _getCompatibleBrokers(ticker, compat) {
+  const type = _getAssetType(ticker);
+  return Object.entries(compat)
+    .filter(([_, caps]) => caps[type])
+    .map(([name]) => name.toUpperCase());
+}
+
 async function onOmTickerInput(val) {
   const ticker = val.trim().toUpperCase();
   _omTicker = ticker;
@@ -3176,11 +3217,18 @@ async function onOmTickerInput(val) {
   const res = el('omQuoteResult');
   if (!ticker || ticker.length < 1) { if (res) res.innerHTML = ''; return; }
   try {
-    const d = await fetchJSON(`/api/paper/quote?ticker=${encodeURIComponent(ticker)}`);
+    const [d, compat] = await Promise.all([
+      fetchJSON(`/api/paper/quote?ticker=${encodeURIComponent(ticker)}`),
+      _ensureBrokerCompat(),
+    ]);
     if (_omTicker !== ticker) return; // stale response
     _omQuotePrice = d.price || 0;
     if (res && _omQuotePrice > 0) {
-      res.innerHTML = `<span style="color:var(--green)">${ticker} — ${fmt$(_omQuotePrice)}</span>`;
+      const brokers = _getCompatibleBrokers(ticker, compat);
+      const brokerText = brokers.length > 0
+        ? `<div style="font-size:9px;color:var(--text-2);margin-top:2px">Trade via: ${brokers.join(', ')}</div>`
+        : '';
+      res.innerHTML = `<span style="color:var(--green)">${ticker} — ${fmt$(_omQuotePrice)}</span>${brokerText}`;
     }
     updateOmEstimate();
   } catch (e) { console.debug('onOmTickerInput failed:', e); }
@@ -3397,6 +3445,7 @@ function renderScanner(market, filterText = '', filterSector = '') {
         <span class="sc-price">${priceStr}</span>
         ${miniSparkSVG(ticker, r.change_pct)}
         <span class="sc-change ${dir}">${chgStr}</span>
+        <div class="sc-brokers" style="font-size:7.5px;color:var(--text-muted);letter-spacing:0.3px;width:100%;margin-top:2px" data-ticker="${escHtml(ticker)}"></div>
         <span class="sc-actions">
           <button class="sc-star-btn${wlCls}" onclick="event.stopPropagation();toggleWatchlist('${escHtml(ticker)}',this)">${wlIcon}</button>
           <button class="sc-trade-btn" onclick="event.stopPropagation();scannerOpenTrade('${escHtml(ticker)}',${r.price})">▶</button>
@@ -3430,6 +3479,8 @@ function renderScanner(market, filterText = '', filterSector = '') {
       <td><button class="scan-trade-btn" onclick="scannerOpenTrade('${ticker}',${r.price})">▶ TRADE</button></td>
     </tr>`;
   }).join('');
+  // Populate broker compatibility on scanner cards
+  _populateBrokerCompatText();
 }
 
 function filterScanner(market, text) {
