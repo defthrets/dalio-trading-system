@@ -6,7 +6,6 @@ Stores activation locally in data/license.json.
 
 import hashlib
 import json
-import os
 import platform
 import uuid
 from datetime import datetime, timedelta
@@ -30,8 +29,13 @@ LEMON_DEACTIVATE_URL = "https://api.lemonsqueezy.com/v1/licenses/deactivate"
 # Revalidate online every 30 days
 REVALIDATION_DAYS = 30
 
-# ── Master admin key (from env, bypasses LemonSqueezy) ──────
-MASTER_KEY = os.environ.get("DALIOS_MASTER_KEY", "")
+# ── Master admin key (hash-verified, bypasses LemonSqueezy) ──────
+_MASTER_KEY_HASH = "37751075d8e5a5360d510ea22095409bdb5d0de8e533a053b1789b9faac4c520"
+
+
+def _is_master_key(key: str) -> bool:
+    """Check if the provided key matches the master key via hash comparison."""
+    return hashlib.sha256(key.strip().encode()).hexdigest() == _MASTER_KEY_HASH
 
 
 def _machine_fingerprint() -> str:
@@ -106,7 +110,7 @@ async def activate_license(key: str) -> dict:
     fingerprint = _machine_fingerprint()
 
     # Master key — instant activation, no internet needed
-    if MASTER_KEY and key.strip() == MASTER_KEY:
+    if _is_master_key(key):
         _save_license({
             "license_key": key,
             "instance_id": "master",
