@@ -37,6 +37,7 @@ pyinstaller ^
     --name "DALIOS" ^
     --onedir ^
     --windowed ^
+    --icon "ui/static/favicon.ico" ^
     --add-data "ui;ui" ^
     --add-data "config;config" ^
     --add-data "api;api" ^

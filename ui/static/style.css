@@ -597,8 +597,8 @@ a:hover { color: var(--primary); text-decoration: underline; }
   color: var(--primary);
 }
 
-/* ── Hologram 𝔇 Logo ── */
-.holo-d {
+/* ── Hologram Cash Stack Logo ── */
+.holo-cash {
   width: 68px;
   height: 68px;
   display: flex;
@@ -607,108 +607,96 @@ a:hover { color: var(--primary); text-decoration: underline; }
   text-shadow: none;
   position: relative;
 }
-.holo-d-scene {
+.holo-cash-scene {
   width: 64px;
   height: 64px;
   perspective: 400px;
   position: relative;
 }
-.holo-d-rotator {
+.holo-cash-rotator {
   width: 100%;
   height: 100%;
-  animation: holoDSpin 6s linear infinite;
+  animation: holoCashSpin 7s linear infinite;
   transform-style: preserve-3d;
-  position: relative;
 }
-@keyframes holoDSpin {
+@keyframes holoCashSpin {
   0%   { transform: rotateY(0deg); }
   100% { transform: rotateY(360deg); }
 }
-
-/* Front and back faces */
-.holo-d-face {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backface-visibility: hidden;
-}
-.holo-d-back {
-  transform: rotateY(180deg);
+.holo-cash-svg {
+  width: 64px;
+  height: 64px;
+  filter: drop-shadow(0 0 6px rgba(0,212,255,0.5)) drop-shadow(0 0 16px rgba(0,255,170,0.25));
+  backface-visibility: visible;
 }
 
-/* Main glyph */
-.holo-d-glyph {
-  font-size: 52px;
-  line-height: 1;
-  color: #00d4ff;
-  text-shadow:
-    0 0 8px rgba(0,212,255,0.8),
-    0 0 20px rgba(0,212,255,0.4),
-    0 0 40px rgba(0,255,170,0.2);
-  animation: dGlyphFlicker 4s ease-in-out infinite;
-  position: relative;
-  z-index: 2;
+/* Note stack shimmer */
+.cash-note { animation: cashNoteShimmer 4s ease-in-out infinite; }
+.cash-n1 { animation-delay: 0s; }
+.cash-n2 { animation-delay: 0.3s; }
+.cash-n3 { animation-delay: 0.6s; }
+@keyframes cashNoteShimmer {
+  0%, 100% { opacity: var(--base-opacity, 0.9); }
+  50%      { opacity: 1; filter: drop-shadow(0 0 4px rgba(0,255,170,0.4)); }
+}
+.cash-n1 { --base-opacity: 0.35; }
+.cash-n2 { --base-opacity: 0.55; }
+.cash-n3 { --base-opacity: 0.9; }
+
+/* Dollar sign pulse */
+.cash-dollar {
+  animation: cashDollarPulse 2s ease-in-out infinite;
+}
+@keyframes cashDollarPulse {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1; font-size: 19px; }
 }
 
-/* RGB ghost layers for glitch effect */
-.holo-d-ghost {
-  position: absolute;
-  font-size: 52px;
-  line-height: 1;
-  pointer-events: none;
-  z-index: 1;
-}
-.holo-d-ghost-r {
-  color: #ff0040;
-  opacity: 0;
-  animation: dGhostR 5s ease-in-out infinite;
-}
-.holo-d-ghost-g {
-  color: #00ff88;
-  opacity: 0;
-  animation: dGhostG 5s ease-in-out infinite 0.15s;
+/* Floating coins bob */
+.cash-coin { animation: cashCoinBob 3s ease-in-out infinite; }
+.cash-coin.c1 { animation-delay: 0s; }
+.cash-coin.c2 { animation-delay: 0.8s; }
+.cash-coin.c3 { animation-delay: 1.6s; }
+@keyframes cashCoinBob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
 }
 
-/* Glyph subtle flicker */
-@keyframes dGlyphFlicker {
-  0%, 100% { opacity: 0.95; text-shadow: 0 0 8px rgba(0,212,255,0.8), 0 0 20px rgba(0,212,255,0.4), 0 0 40px rgba(0,255,170,0.2); }
-  15%      { opacity: 1; }
-  30%      { opacity: 0.85; }
-  50%      { opacity: 1; text-shadow: 0 0 12px rgba(0,212,255,1), 0 0 30px rgba(0,255,170,0.5); }
-  70%      { opacity: 0.9; }
-  85%      { opacity: 1; }
+/* RGB glitch ghosts */
+.cash-ghost-r { animation: cashGlitchR 6s ease-in-out infinite; }
+.cash-ghost-g { animation: cashGlitchG 6s ease-in-out infinite 0.1s; }
+@keyframes cashGlitchR {
+  0%, 88%, 100% { opacity: 0; transform: none; }
+  89%  { opacity: 0.7; transform: translate(2px, -1px) skewX(-3deg); }
+  90%  { opacity: 0; transform: translate(-1px, 1px); }
+  91%  { opacity: 0.5; transform: translate(1px, 0); }
+  92%  { opacity: 0; transform: none; }
+  95%  { opacity: 0.6; transform: translate(2px, -1px) skewX(-4deg); }
+  96%  { opacity: 0; transform: none; }
 }
-
-/* Red ghost glitch — snaps in offset */
-@keyframes dGhostR {
-  0%, 86%, 100% { opacity: 0; transform: translate(0, 0); }
-  87%  { opacity: 0.7; transform: translate(3px, -1px) skewX(-4deg); }
-  88%  { opacity: 0; transform: translate(-2px, 1px); }
-  89%  { opacity: 0.5; transform: translate(2px, 0) skewX(3deg); }
-  90%  { opacity: 0; transform: none; }
-  94%  { opacity: 0; }
-  95%  { opacity: 0.6; transform: translate(2px, -2px) skewX(-6deg); }
+@keyframes cashGlitchG {
+  0%, 88%, 100% { opacity: 0; transform: none; }
+  89%  { opacity: 0.5; transform: translate(-2px, 1px) skewX(3deg); }
+  90%  { opacity: 0; transform: translate(1px, -1px); }
+  91%  { opacity: 0.4; transform: translate(-1px, 0); }
+  92%  { opacity: 0; transform: none; }
+  95%  { opacity: 0.5; transform: translate(-2px, 1px) skewX(3deg); }
   96%  { opacity: 0; transform: none; }
 }
 
-/* Green ghost glitch */
-@keyframes dGhostG {
-  0%, 86%, 100% { opacity: 0; transform: translate(0, 0); }
-  87%  { opacity: 0.6; transform: translate(-3px, 1px) skewX(5deg); }
-  88%  { opacity: 0; transform: translate(1px, -1px); }
-  89%  { opacity: 0.4; transform: translate(-2px, 0) skewX(-3deg); }
-  90%  { opacity: 0; transform: none; }
-  94%  { opacity: 0; }
-  95%  { opacity: 0.5; transform: translate(-2px, 2px) skewX(4deg); }
-  96%  { opacity: 0; transform: none; }
+/* Scan line sweeps */
+.cash-scanline {
+  animation: cashScan 4s ease-in-out infinite;
+}
+@keyframes cashScan {
+  0%   { y1: 5; y2: 5; opacity: 0; }
+  10%  { opacity: 0.4; }
+  90%  { opacity: 0.4; }
+  100% { y1: 75; y2: 75; opacity: 0; }
 }
 
-/* Holographic scanline overlay */
-.holo-d-scene::after {
+/* Holographic flicker overlay */
+.holo-cash-scene::after {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -5365,13 +5353,21 @@ body.cli-expanded { padding-bottom: 272px; }
   animation: none !important;
 }
 .light-theme .logo-sub { color: #000000 !important; }
-.light-theme .holo-d-glyph {
-  color: #1a1a1a !important;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.15) !important;
-  animation: none !important;
+.light-theme .holo-cash-svg {
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.15)) !important;
 }
-.light-theme .holo-d-ghost { display: none; }
-.light-theme .holo-d-scene::after { display: none; }
+.light-theme .holo-cash-svg path,
+.light-theme .holo-cash-svg rect,
+.light-theme .holo-cash-svg circle,
+.light-theme .holo-cash-svg text,
+.light-theme .holo-cash-svg line {
+  stroke: #1a1a1a !important;
+  fill: none !important;
+}
+.light-theme .holo-cash-svg text { fill: #1a1a1a !important; }
+.light-theme .cash-ghost-r,
+.light-theme .cash-ghost-g { display: none; }
+.light-theme .holo-cash-scene::after { display: none; }
 
 /* ── Misc ── */
 .light-theme .sent-center-label { color: #2a2218 !important; }
