@@ -1207,18 +1207,21 @@ async def _gen_sentiment_data() -> dict:
 # ── Correlation matrix ─────────────────────────────────
 
 def _gen_correlation_matrix_demo() -> dict:
-    """Demo correlation matrix using portfolio + watchlist (or defaults)."""
+    """Fallback correlation matrix — still uses real yfinance data but with
+    default tickers when portfolio + watchlist have too few assets."""
     portfolio_tickers = list(PAPER.positions.keys())
     watchlist_tickers = list(WATCHLIST) if WATCHLIST else []
     tickers = list(dict.fromkeys(portfolio_tickers + watchlist_tickers))
     if len(tickers) < 6:
-        defaults = ["CBA.AX", "BHP.AX", "CSL.AX", "WDS.AX", "GMG.AX", "GC=F", "CL=F", "SI=F"]
+        defaults = ["CBA.AX", "BHP.AX", "CSL.AX", "WDS.AX", "GMG.AX",
+                     "FMG.AX", "NAB.AX", "WBC.AX", "GC=F", "CL=F", "SI=F"]
         for t in defaults:
             if t not in tickers:
                 tickers.append(t)
             if len(tickers) >= 12:
                 break
     n = len(tickers)
+    # Still generate synthetic correlations as sync fallback
     mat = np.eye(n)
     for i in range(n):
         for j in range(i + 1, n):
@@ -1226,12 +1229,13 @@ def _gen_correlation_matrix_demo() -> dict:
             mat[i][j] = r
             mat[j][i] = r
     upper = np.triu_indices(n, k=1)
+    source = "PORTFOLIO" if portfolio_tickers else "DEFAULTS"
     return {
         "tickers": tickers, "matrix": mat.tolist(),
         "mean_correlation": round(float(np.mean(mat[upper])), 3),
         "max_correlation": round(float(np.max(mat[upper])), 3),
         "holy_grail_count": sum(1 for i in range(n) if np.mean(np.abs(mat[i][np.arange(n) != i])) < 0.3),
-        "threshold": 0.3, "data_source": "DEMO", "timestamp": datetime.utcnow().isoformat(),
+        "threshold": 0.3, "data_source": source, "timestamp": datetime.utcnow().isoformat(),
     }
 
 

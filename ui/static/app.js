@@ -1098,9 +1098,17 @@ function applyCorrelation(d) {
   // Show data source badge
   const srcEl = el('corrDataSource');
   if (srcEl) {
-    const live = d.data_source === 'LIVE';
-    srcEl.textContent = live ? '● LIVE DATA' : '● DEMO DATA';
-    srcEl.style.color = live ? 'var(--green)' : 'var(--amber)';
+    const src = d.data_source;
+    if (src === 'LIVE') {
+      srcEl.textContent = '● LIVE — YOUR ASSETS';
+      srcEl.style.color = 'var(--green)';
+    } else if (src === 'PORTFOLIO') {
+      srcEl.textContent = '● PORTFOLIO DATA';
+      srcEl.style.color = 'var(--green)';
+    } else {
+      srcEl.textContent = '● DEFAULT ASSETS — ADD POSITIONS OR WATCHLIST';
+      srcEl.style.color = 'var(--amber)';
+    }
   }
 
   drawCorrelationHeatmap(d.tickers, d.matrix);
