@@ -10,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1/dist/chartjs-chart-financial.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260408d" />
+  <link rel="stylesheet" href="/static/style.css?v=20260408e" />
 </head>
 <body>
   <!-- Scanline overlay -->
@@ -75,6 +75,7 @@
             <button class="mode-drop-opt" id="modeOptLive"  onclick="selectMode('live')">🔴 LIVE</button>
           </div>
         </div>
+        <span class="badge" id="brokerBadge" style="cursor:pointer;color:#666;border-color:#444;background:rgba(100,100,100,0.08)" onclick="document.querySelector('[data-tab=comms-config]')?.click()" title="Broker connection status — click to configure">⊘ NO BROKER</span>
         <span class="badge badge--cyan" id="uptimeBadge" style="cursor:default;animation:none">UPTIME: --</span>
       </div>
     </div>
@@ -1349,9 +1350,16 @@
               <span class="bbs-item"><span class="bbs-label">BUYING POWER</span> <span class="bbs-val" id="bbsBuyPow">—</span></span>
               <span class="bbs-item"><span class="bbs-label">CASH</span> <span class="bbs-val" id="bbsCash">—</span></span>
             </div>
-            <div id="brokerBarQuickConnect" style="display:flex;gap:6px;align-items:center">
-              <button class="btn-primary btn--sm" onclick="document.querySelector('[data-tab=comms-config]').click()" style="background:var(--primary)">⚡ CONNECT BROKER</button>
+            <div id="brokerBarQuickConnect" style="display:flex;gap:6px;align-items:center;position:relative">
+              <button class="btn-ghost btn--sm" onclick="_toggleBrokerPicker()">⚡ CONNECT BROKER</button>
               <button class="btn-ghost btn--sm" onclick="_quickReconnectSaved()">↻ RECONNECT</button>
+              <div class="broker-picker-dropdown" id="brokerPickerDropdown" style="display:none">
+                <div class="broker-picker-header">SELECT BROKER</div>
+                <div class="broker-picker-list" id="brokerPickerList"></div>
+                <div class="broker-picker-footer">
+                  <button class="btn-ghost btn--sm" onclick="document.querySelector('[data-tab=comms-config]').click();_closeBrokerPicker()" style="width:100%;text-align:center">⚙ MANAGE IN SETTINGS</button>
+                </div>
+              </div>
             </div>
             <button class="btn-ghost btn--sm" onclick="document.querySelector('[data-tab=comms-config]').click()">⚙ SETTINGS</button>
           </div>
@@ -2289,7 +2297,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=20260408d"></script>
+  <script src="/static/app.js?v=20260408e"></script>
 
   <!-- ═══════════════════════════════════════════════
        SPEECH BUBBLE SPOTLIGHT TOOLTIP

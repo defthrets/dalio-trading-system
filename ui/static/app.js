@@ -3752,13 +3752,29 @@ async function loadBrokerStatus() {
 function _updateCcBrokerStatus(d) {
   const dot = el('ccBrokerDot');
   const label = el('ccBrokerLabel');
-  if (!dot && !label) return;
+  const badge = el('brokerBadge');
   if (d.connected) {
     if (dot) { dot.textContent = '●'; dot.style.color = 'var(--green)'; }
     if (label) label.textContent = `${(d.broker||'').toUpperCase()} LIVE`;
+    if (badge) {
+      badge.textContent = `● ${(d.broker||'').toUpperCase()} ONLINE`;
+      badge.style.color = 'var(--primary)';
+      badge.style.borderColor = 'var(--primary)';
+      badge.style.background = 'rgba(255,140,0,0.1)';
+      badge.style.boxShadow = '0 0 8px rgba(255,140,0,0.25), 0 0 16px rgba(255,140,0,0.1)';
+      badge.style.animation = 'badgeBorderPulse 3s ease infinite';
+    }
   } else {
     if (dot) { dot.textContent = '●'; dot.style.color = 'var(--text-muted)'; }
     if (label) label.textContent = 'NO BROKER';
+    if (badge) {
+      badge.textContent = '⊘ NO BROKER';
+      badge.style.color = '#666';
+      badge.style.borderColor = '#444';
+      badge.style.background = 'rgba(100,100,100,0.08)';
+      badge.style.boxShadow = 'none';
+      badge.style.animation = 'none';
+    }
   }
 }
 
@@ -3924,6 +3940,90 @@ async function connectBrokerFromSettings(broker) {
     await loadRealPortfolio();
   } catch (e) {
     if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ ${escHtml(e.message || 'Connection failed')}</span>`;
+  }
+}
+
+function _toggleBrokerPicker() {
+  const dd = el('brokerPickerDropdown');
+  if (!dd) return;
+  if (dd.style.display === 'none') {
+    _populateBrokerPicker();
+    dd.style.display = '';
+  } else {
+    dd.style.display = 'none';
+  }
+}
+
+function _closeBrokerPicker() {
+  const dd = el('brokerPickerDropdown');
+  if (dd) dd.style.display = 'none';
+}
+
+// Close picker when clicking outside
+document.addEventListener('click', e => {
+  const dd = el('brokerPickerDropdown');
+  const btn = e.target.closest('[onclick*="_toggleBrokerPicker"]');
+  if (dd && dd.style.display !== 'none' && !dd.contains(e.target) && !btn) {
+    dd.style.display = 'none';
+  }
+});
+
+async function _populateBrokerPicker() {
+  const list = el('brokerPickerList');
+  if (!list) return;
+  list.innerHTML = '<div class="broker-picker-item bp-empty">Loading...</div>';
+
+  const logoMap = {
+    coinspot:'CS', alpaca:'ALP', binance:'BNB', coinbase:'CB', ibkr:'IB',
+    kraken:'KRK', bybit:'BBT', okx:'OKX', kucoin:'KCS', bitget:'BGT',
+    stake:'STK', moomoo:'MM', ig:'IG', cmc:'CMC', schwab:'SCH',
+    robinhood:'RH', webull:'WB', independentreserve:'IR', selfwealth:'SW',
+    nabtrade:'NAB', commsec:'CBA', superhero:'SH',
+  };
+
+  try {
+    const [saved, status] = await Promise.all([
+      fetchJSON('/api/broker/saved'),
+      fetchJSON('/api/broker/status'),
+    ]);
+    const brokers = Object.keys(saved || {}).filter(k => k !== '_last_active');
+
+    if (!brokers.length) {
+      list.innerHTML = '<div class="broker-picker-item bp-empty">Oops, no brokers saved yet!<br><span style="font-size:9px;opacity:0.7">Set one up in Settings first</span></div>';
+      return;
+    }
+
+    list.innerHTML = brokers.map(b => {
+      const isConnected = status.connected && status.broker?.toLowerCase() === b;
+      const statusClass = isConnected ? 'online' : '';
+      const statusText = isConnected ? '● CONNECTED' : '○ SAVED — click to connect';
+      return `<div class="broker-picker-item" onclick="_pickBroker('${escHtml(b)}')">
+        <div class="bp-logo">${logoMap[b] || b.substring(0,3).toUpperCase()}</div>
+        <div class="bp-info">
+          <div class="bp-name">${escHtml(b.toUpperCase())}</div>
+          <div class="bp-status ${statusClass}">${statusText}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch {
+    list.innerHTML = '<div class="broker-picker-item bp-empty">Failed to load brokers</div>';
+  }
+}
+
+async function _pickBroker(broker) {
+  _closeBrokerPicker();
+  const label = el('brokerBarLabel');
+  if (label) label.textContent = `⌛ CONNECTING ${broker.toUpperCase()}...`;
+
+  try {
+    // Connect using saved creds (backend loads them automatically)
+    const d = await postJSON('/api/broker/connect', { broker });
+    pushAlert('BROKER', `${d.broker.toUpperCase()} connected`, 'info');
+    await loadBrokerStatus();
+    await loadRealPortfolio();
+  } catch (e) {
+    if (label) label.textContent = `✗ ${broker.toUpperCase()} — ${e.message || 'connection failed'}`;
+    setTimeout(() => loadBrokerStatus(), 3000);
   }
 }
 
