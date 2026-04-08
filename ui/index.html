@@ -10,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1/dist/chartjs-chart-financial.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260408q" />
+  <link rel="stylesheet" href="/static/style.css?v=20260408r" />
 </head>
 <body>
   <!-- Scanline overlay -->
@@ -45,7 +45,7 @@
                   <span class="bill-100">100</span>
                 </div>
               </div>
-              <!-- Right edge (stack thickness) -->
+              <!-- Right edge (stack thickness — shows bill lines) -->
               <div class="cash3d-face cash3d-right">
                 <div class="stack-edge"></div>
               </div>
@@ -53,12 +53,19 @@
               <div class="cash3d-face cash3d-left">
                 <div class="stack-edge"></div>
               </div>
-              <!-- Top edge -->
-              <div class="cash3d-face cash3d-top"></div>
+              <!-- Top edge (narrow long side of stack) -->
+              <div class="cash3d-face cash3d-top">
+                <div class="stack-edge-h"></div>
+              </div>
               <!-- Bottom edge -->
-              <div class="cash3d-face cash3d-bottom"></div>
-              <!-- Money band -->
-              <div class="cash3d-band"></div>
+              <div class="cash3d-face cash3d-bottom">
+                <div class="stack-edge-h"></div>
+              </div>
+              <!-- Money band — wraps vertically (short way) as 4 faces -->
+              <div class="band-face band-front"></div>
+              <div class="band-face band-back"></div>
+              <div class="band-face band-top"></div>
+              <div class="band-face band-bottom"></div>
             </div>
           </div>
         </span>
