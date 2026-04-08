@@ -2768,6 +2768,19 @@ canvas { display: block; max-width: 100%; }
   transition: all var(--transition);
 }
 .spot-btn-skip:hover { border-color: var(--red); color: var(--red); }
+.spot-btn-stop {
+  background: none;
+  border: 1px solid var(--red);
+  color: var(--red);
+  font-size: 10px;
+  padding: 3px 7px;
+  cursor: pointer;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  opacity: 0.7;
+  transition: all var(--transition);
+}
+.spot-btn-stop:hover { opacity: 1; background: rgba(255,0,0,0.1); }
 .spot-btn-next {
   background: var(--cyan-glow);
   border: 1px solid var(--cyan);

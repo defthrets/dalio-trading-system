@@ -2074,15 +2074,9 @@ function _positionMascot(bubble, idx) {
   const mascot = el('spotMascot');
   if (!mascot) return;
   const br = bubble.getBoundingClientRect();
-  const isRight = idx % 2 !== 0;
-  // Place Rex behind the bubble, offset to one side
-  if (isRight) {
-    mascot.style.top  = `${br.top - 60}px`;
-    mascot.style.left = `${br.left - 100}px`;
-  } else {
-    mascot.style.top  = `${br.top - 60}px`;
-    mascot.style.left = `${br.right - 100}px`;
-  }
+  // Center Rex horizontally behind the bubble, poking up above it
+  mascot.style.left = `${br.left + (br.width / 2) - 100}px`;
+  mascot.style.top  = `${br.top - 120}px`;
 }
 
 function _guidedAdvanceSpot() {
@@ -2152,6 +2146,12 @@ function openCurrentTutorial() {
 }
 
 function closeTutorial() { skipAllSpots(); }
+
+function stopTutorialForever() {
+  skipAllSpots();
+  _saveSetting('tutorials_off', true);
+  pushAlert('SETTINGS', 'Tutorials disabled — re-enable in Settings tab', 'info');
+}
 
 // ─── Welcome Popup & Guided Tutorial ─────────────────────
 
