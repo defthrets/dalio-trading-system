@@ -15,11 +15,11 @@ from loguru import logger
 from api.utils import (
     _cache_get, _cache_set, _get_prices, _EXECUTOR,
     _calc_rsi, _calc_trend, _calc_atr, _calc_macd, _calc_bollinger,
-    YF_AVAILABLE, _is_crypto, _to_trade_ticker, _usd_to_aud,
+    YF_AVAILABLE,
 )
-from api.state import STATE
+from api.state import STATE, WATCHLIST
 from api.scanners import (
-    ASX_TICKERS, CRYPTO_TICKERS, COMMODITY_TICKERS, CORR_TICKERS,
+    ASX_TICKERS, COMMODITY_TICKERS, CORR_TICKERS,
     _scanner_cache, _ASSET_META, _live_price,
 )
 from api.portfolio import PAPER, PAPER_STARTING_CASH, _get_fee_pct
@@ -69,7 +69,6 @@ ASSET_CLASS_MAP: dict = {
     "MML.AX":"gold","RSG.AX":"gold","PRU.AX":"gold","SDG.AX":"gold","BDC.AX":"gold",
     "SKY.AX":"gold","MAU.AX":"gold",
     "GC=F":"gold","SI=F":"gold","PL=F":"gold","PA=F":"gold",
-    "PAXG-USD":"gold",
     # ── Commodities — Energy ──
     "OOO.AX":"commodities","WDS.AX":"commodities","STO.AX":"commodities","BPT.AX":"commodities",
     "APA.AX":"commodities","KAR.AX":"commodities","CVN.AX":"commodities","STX.AX":"commodities",
@@ -186,8 +185,6 @@ def _get_asset_class(ticker: str) -> str:
     added to scanner universes get reasonable classification."""
     if ticker in ASSET_CLASS_MAP:
         return ASSET_CLASS_MAP[ticker]
-    if ticker.endswith("-USD") or ticker.endswith("-AUD"):
-        return "crypto"
     if ticker.endswith("=F"):
         return "commodities"
     if ticker.endswith(".AX"):
@@ -197,30 +194,29 @@ def _get_asset_class(ticker: str) -> str:
 QUADRANT_PLAYBOOK: dict = {
     "rising_growth": {
         "strong_buy": ["equities","commodities"],
-        "buy":        ["crypto","real_assets","corporate_bonds"],
+        "buy":        ["real_assets","corporate_bonds"],
         "avoid":      ["long_bonds","gold","tips"],
         "narrative":  (
             "Rising Growth: economic expansion lifts earnings and risk appetite. "
             "Dalio tilts heavily toward equities and commodities -- cyclicals, EM equities, "
-            "and industrial metals outperform. Duration risk in nominal bonds rises. "
-            "Crypto can participate as a high-beta risk asset."
+            "and industrial metals outperform. Duration risk in nominal bonds rises."
         ),
     },
     "falling_growth": {
         "strong_buy": ["long_bonds","gold"],
         "buy":        ["tips","real_assets"],
-        "avoid":      ["equities","commodities","crypto"],
+        "avoid":      ["equities","commodities"],
         "narrative":  (
             "Falling Growth: recessionary pressure compresses corporate earnings. "
             "Safe havens dominate -- long-duration Treasuries rally as yields fall. "
             "Gold preserves wealth as central banks ease. "
-            "Reduce cyclicals, commodities, and speculative crypto aggressively."
+            "Reduce cyclicals and commodities aggressively."
         ),
     },
     "rising_inflation": {
         "strong_buy": ["gold","commodities","tips"],
         "buy":        ["real_assets","equities"],
-        "avoid":      ["long_bonds","crypto"],
+        "avoid":      ["long_bonds"],
         "narrative":  (
             "Rising Inflation: purchasing power erosion favours hard assets. "
             "Gold is the primary hedge -- Dalio's cornerstone in this quadrant. "
@@ -239,103 +235,6 @@ QUADRANT_PLAYBOOK: dict = {
         ),
     },
 }
-
-# ── Crypto-Specific Trading Principles ──────────────────
-# Crypto markets follow different dynamics from traditional macro regimes.
-# We use Dalio-compatible concepts where they apply (risk-on/risk-off, inflation
-# hedging for BTC) but layer on crypto-native signals: BTC dominance cycle,
-# momentum/mean-reversion, volatility regime, and altcoin rotation.
-
-CRYPTO_REGIME_PLAYBOOK: dict = {
-    # BTC trending up + low vol → risk-on, altcoins rally
-    "crypto_bull": {
-        "strong_buy": ["crypto"],
-        "buy":        ["gold"],          # BTC as digital gold narrative
-        "avoid":      ["long_bonds"],
-        "narrative":  (
-            "Crypto Bull: BTC in confirmed uptrend with expanding momentum. "
-            "Altcoins typically outperform BTC in this phase. Layer-1s and DeFi "
-            "tokens see highest beta. Trend-follow with wider stops — crypto "
-            "volatility rewards patience. HODL mentality dominates."
-        ),
-    },
-    # BTC trending down → risk-off, capital flees to stables/BTC
-    "crypto_bear": {
-        "strong_buy": [],
-        "buy":        ["gold"],
-        "avoid":      ["crypto"],
-        "narrative":  (
-            "Crypto Bear: BTC in confirmed downtrend, altcoins bleed harder. "
-            "Capital rotates to stablecoins or exits crypto entirely. "
-            "Only counter-trend scalps on extreme oversold — no swing longs. "
-            "Preserve capital, wait for trend reversal confirmation."
-        ),
-    },
-    # BTC sideways / consolidation → mean-reversion, range trading
-    "crypto_range": {
-        "strong_buy": [],
-        "buy":        ["crypto"],
-        "avoid":      [],
-        "narrative":  (
-            "Crypto Range: BTC consolidating in a range — volatility compression. "
-            "Mean-reversion setups work: buy oversold RSI, sell overbought. "
-            "Breakout watch — range compression often precedes explosive moves. "
-            "Position sizing smaller until direction is confirmed."
-        ),
-    },
-    # High volatility spike (crash or euphoria) → reduce exposure, wait
-    "crypto_volatile": {
-        "strong_buy": [],
-        "buy":        [],
-        "avoid":      ["crypto"],
-        "narrative":  (
-            "Crypto Volatile: extreme volatility regime — liquidation cascades or "
-            "blow-off tops. Not a time to initiate new positions. "
-            "Wait for vol to compress. If already positioned, tighten stops. "
-            "Historically, buying extreme fear (RSI < 25) has been profitable on BTC."
-        ),
-    },
-}
-
-
-def _detect_crypto_regime(btc_closes: list | None) -> str:
-    """Determine current crypto market regime from BTC price action.
-    Uses trend direction + volatility to classify into one of four states."""
-    if not btc_closes or len(btc_closes) < 20:
-        return "crypto_range"
-
-    trend = _calc_trend(btc_closes)
-    # 20-day realised volatility (annualised)
-    rets = [btc_closes[i] / btc_closes[i - 1] - 1 for i in range(1, len(btc_closes))]
-    recent_rets = rets[-20:]
-    vol_20d = float(np.std(recent_rets)) * (252 ** 0.5) if len(recent_rets) >= 10 else 0.5
-
-    if vol_20d > 1.2:       # > 120% annualised vol = extreme
-        return "crypto_volatile"
-    if trend == "uptrend":
-        return "crypto_bull"
-    if trend == "downtrend":
-        return "crypto_bear"
-    return "crypto_range"
-
-
-def _get_playbook(ticker: str, btc_closes: list | None = None) -> tuple:
-    """Return (playbook_dict, regime_name, is_crypto) for a ticker.
-    ASX/commodities use Dalio quadrant. Crypto uses crypto regime."""
-    ac = _get_asset_class(ticker)
-    if ac == "crypto":
-        regime = _detect_crypto_regime(btc_closes)
-        return CRYPTO_REGIME_PLAYBOOK[regime], regime, True
-    # Dalio macro regime for everything else
-    qdata = STATE.last_quadrant or {}
-    quadrant = qdata.get("quadrant", "rising_growth")
-    pb = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
-    return pb, quadrant, False
-
-
-# Cache for BTC closes (shared across signal generation)
-_btc_closes_cache: list | None = None
-
 
 def _gen_price_history_demo(price: float, trend: str, n_points: int = 30) -> list:
     """Seeded random-walk ending at `price`, shaped by trend direction."""
@@ -356,8 +255,8 @@ async def _gen_signals(n: int = 12) -> list[dict]:
     if cached is not None:
         return cached
 
-    cached_by_market: dict = {"asx": [], "crypto": [], "commodities": []}
-    for mkt in ("asx", "crypto", "commodities"):
+    cached_by_market: dict = {"asx": [], "commodities": []}
+    for mkt in ("asx", "commodities"):
         sc = _scanner_cache.get(mkt)
         if sc:
             rows = sorted(sc["rows"], key=lambda r: abs(r.get("change_pct", 0)), reverse=True)
@@ -366,12 +265,11 @@ async def _gen_signals(n: int = 12) -> list[dict]:
     n_each = max(4, (n * 2) // 3)
     fresh = {
         "asx":         random.sample(ASX_TICKERS,        min(n_each, len(ASX_TICKERS))),
-        "crypto":      random.sample(CRYPTO_TICKERS,     min(n_each, len(CRYPTO_TICKERS))),
         "commodities": random.sample(COMMODITY_TICKERS,  min(n_each, len(COMMODITY_TICKERS))),
     }
 
     market_candidates = {}
-    for mkt in ("asx", "crypto", "commodities"):
+    for mkt in ("asx", "commodities"):
         market_candidates[mkt] = list(dict.fromkeys(
             cached_by_market[mkt] + fresh[mkt]
         ))[:n_each]
@@ -390,64 +288,17 @@ async def _gen_signals(n: int = 12) -> list[dict]:
         if comm_prices:
             prices_map.update(comm_prices)
 
-    crypto_cands = market_candidates["crypto"][:10]
-    if crypto_cands:
-        crypto_prices = await _get_prices(crypto_cands, "3mo")
-        if crypto_prices:
-            prices_map.update(crypto_prices)
-
-    crypto_missing = [t for t in crypto_cands if t not in prices_map]
-    if crypto_missing and YF_AVAILABLE:
-        logger.info(f"Crypto signal fallback: fetching {len(crypto_missing)} tickers individually")
-        loop = asyncio.get_running_loop()
-        import yfinance as _yf_sig
-
-        def _fetch_single_crypto(tkr):
-            try:
-                hist = _yf_sig.Ticker(tkr).history(period="3mo", interval="1d", auto_adjust=True)
-                if hist is not None and not hist.empty and "Close" in hist.columns:
-                    closes = hist["Close"].dropna().tolist()
-                    if len(closes) >= 10:
-                        return (tkr, [float(c) for c in closes[-90:]])
-            except Exception:
-                pass
-            return None
-
-        tasks = [loop.run_in_executor(_EXECUTOR, _fetch_single_crypto, t) for t in crypto_missing[:8]]
-        results = await asyncio.gather(*tasks)
-        for res in results:
-            if res:
-                prices_map[res[0]] = res[1]
-
     candidates = list(dict.fromkeys(
-        market_candidates["asx"] + market_candidates["crypto"] + market_candidates["commodities"]
+        market_candidates["asx"] + market_candidates["commodities"]
     ))
 
     cache_prices: dict = {}
-    for mkt in ("asx", "crypto", "commodities"):
+    for mkt in ("asx", "commodities"):
         sc = _scanner_cache.get(mkt)
         if sc:
             for r in sc["rows"]:
                 if r.get("price", 0) > 0:
                     cache_prices[r["ticker"]] = r["price"]
-
-    # Grab BTC closes for crypto regime detection
-    btc_closes = prices_map.get("BTC-USD")
-    if not btc_closes and YF_AVAILABLE:
-        try:
-            loop = asyncio.get_running_loop()
-            import yfinance as _yf_btc
-            def _fetch_btc():
-                h = _yf_btc.Ticker("BTC-USD").history(period="3mo", interval="1d", auto_adjust=True)
-                if h is not None and not h.empty and "Close" in h.columns:
-                    return [float(c) for c in h["Close"].dropna().tolist()[-90:]]
-                return None
-            btc_closes = await loop.run_in_executor(_EXECUTOR, _fetch_btc)
-        except Exception:
-            btc_closes = None
-
-    crypto_regime = _detect_crypto_regime(btc_closes)
-    crypto_pb = CRYPTO_REGIME_PLAYBOOK[crypto_regime]
 
     signals = []
     for ticker in candidates:
@@ -455,8 +306,7 @@ async def _gen_signals(n: int = 12) -> list[dict]:
         if not closes or len(closes) < 10:
             continue
 
-        is_crypto_ticker = ticker in CRYPTO_TICKERS or _is_crypto(ticker)
-        price  = round(closes[-1], 4 if "USD" in ticker else 2)
+        price  = round(closes[-1], 2)
         rsi    = _calc_rsi(closes)
         trend  = _calc_trend(closes)
         atr    = _calc_atr(closes)
@@ -466,136 +316,52 @@ async def _gen_signals(n: int = 12) -> list[dict]:
         score = 0.0
         signal_reasons = []
 
-        # ── Crypto-specific scoring ──
-        if is_crypto_ticker:
-            rsi_oversold, rsi_overbought = 38, 62
+        # ── ASX / Commodities — Dalio principles ──
+        rsi_oversold, rsi_overbought = 32, 68
 
-            # Crypto principle 1: Momentum matters more than mean-reversion
-            # In crypto bull, trend-following gets extra weight
-            if crypto_regime == "crypto_bull":
-                if trend == "uptrend":
-                    score += 2.5  # Stronger than ASX (trend-follow)
-                    signal_reasons.append("Uptrend in crypto bull market — ride the wave")
-                elif trend == "downtrend":
-                    score -= 1.5  # Less penalty — dips get bought in bulls
-                    signal_reasons.append("Dip in bull market — watch for reversal")
-            elif crypto_regime == "crypto_bear":
-                if trend == "downtrend":
-                    score -= 3.0  # Harsh — don't catch falling knives
-                    signal_reasons.append("Downtrend in crypto bear — avoid")
-                elif trend == "uptrend":
-                    score += 1.0  # Tepid — bear market rallies fade
-                    signal_reasons.append("Bear market rally — lower conviction")
-            elif crypto_regime == "crypto_volatile":
-                # Only extreme oversold gets a buy in high-vol regime
-                if rsi < 25:
-                    score += 2.5
-                    signal_reasons.append(f"Extreme fear RSI {rsi:.0f} in vol spike — contrarian buy")
-                elif rsi > 75:
-                    score -= 2.5
-                    signal_reasons.append(f"Euphoria RSI {rsi:.0f} in vol spike — take profit")
-                else:
-                    score *= 0.5  # Halve conviction in volatile regime
-                    signal_reasons.append("High volatility — reduced conviction")
-            else:  # crypto_range
-                # Mean-reversion works in ranges
-                if trend == "uptrend":
-                    score += 1.5
-                    signal_reasons.append("Range-bound uptrend")
-                elif trend == "downtrend":
-                    score -= 1.5
-                    signal_reasons.append("Range-bound downtrend")
+        if rsi < rsi_oversold:
+            score += 2.0
+            signal_reasons.append(f"RSI oversold ({rsi:.0f})")
+        elif rsi > rsi_overbought:
+            score -= 2.0
+            signal_reasons.append(f"RSI overbought ({rsi:.0f})")
+        elif rsi < 45:
+            score += 0.5
+        elif rsi > 55:
+            score -= 0.5
 
-            # Crypto principle 2: RSI thresholds (tighter than traditional)
-            if rsi < rsi_oversold:
-                score += 2.0
-                signal_reasons.append(f"RSI oversold ({rsi:.0f})")
-            elif rsi > rsi_overbought:
-                score -= 2.0
-                signal_reasons.append(f"RSI overbought ({rsi:.0f})")
-            elif rsi < 45:
-                score += 0.5
-            elif rsi > 55:
-                score -= 0.5
-
-            # Crypto principle 3: MACD — same logic, works well for crypto
-            if macd_data["macd_signal"] == "bullish":
-                score += 1.5
-                signal_reasons.append("MACD bullish")
-            else:
-                score -= 1.5
-                signal_reasons.append("MACD bearish")
-            if macd_data["macd_crossover"]:
-                score += 1.5 if crypto_regime == "crypto_bull" else 0.8
-                signal_reasons.append("Fresh MACD crossover")
-
-            # Crypto principle 4: Bollinger — wider bands matter more
-            if bb_data["bb_position"] == "below_lower":
-                score += 2.0 if crypto_regime != "crypto_bear" else 1.0
-                signal_reasons.append("Below lower Bollinger Band")
-            elif bb_data["bb_position"] == "above_upper":
-                score -= 2.0 if crypto_regime != "crypto_bull" else 1.0
-                signal_reasons.append("Above upper Bollinger Band")
-
-            # Crypto principle 5: Rate of change — momentum is king
-            if len(closes) >= 10:
-                roc = (closes[-1] / closes[-10] - 1) * 100
-                if roc > 8:
-                    score += 1.0 if crypto_regime == "crypto_bull" else 0.3
-                    signal_reasons.append(f"Strong 10d momentum ({roc:+.1f}%)")
-                elif roc < -8:
-                    score -= 1.0 if crypto_regime == "crypto_bear" else 0.3
-                    signal_reasons.append(f"Weak 10d momentum ({roc:+.1f}%)")
-
-            # Crypto principle 6: Wider stop-losses (crypto is volatile)
-            sl_mult, tp_mult = 2.0, 3.5
+        if macd_data["macd_signal"] == "bullish":
+            score += 1.5
+            signal_reasons.append("MACD bullish")
         else:
-            # ── ASX / Commodities — Dalio principles ──
-            rsi_oversold, rsi_overbought = 32, 68
+            score -= 1.5
+            signal_reasons.append("MACD bearish")
+        if macd_data["macd_crossover"]:
+            score += 1.0
+            signal_reasons.append("Fresh MACD crossover")
 
-            if rsi < rsi_oversold:
-                score += 2.0
-                signal_reasons.append(f"RSI oversold ({rsi:.0f})")
-            elif rsi > rsi_overbought:
-                score -= 2.0
-                signal_reasons.append(f"RSI overbought ({rsi:.0f})")
-            elif rsi < 45:
+        if bb_data["bb_position"] == "below_lower":
+            score += 1.5
+            signal_reasons.append("Below lower Bollinger Band")
+        elif bb_data["bb_position"] == "above_upper":
+            score -= 1.5
+            signal_reasons.append("Above upper Bollinger Band")
+
+        if trend == "uptrend":
+            score += 2.0
+            signal_reasons.append("Confirmed uptrend")
+        elif trend == "downtrend":
+            score -= 2.0
+            signal_reasons.append("Confirmed downtrend")
+
+        if len(closes) >= 10:
+            roc = (closes[-1] / closes[-10] - 1) * 100
+            if roc > 5:
                 score += 0.5
-            elif rsi > 55:
+            elif roc < -5:
                 score -= 0.5
 
-            if macd_data["macd_signal"] == "bullish":
-                score += 1.5
-                signal_reasons.append("MACD bullish")
-            else:
-                score -= 1.5
-                signal_reasons.append("MACD bearish")
-            if macd_data["macd_crossover"]:
-                score += 1.0
-                signal_reasons.append("Fresh MACD crossover")
-
-            if bb_data["bb_position"] == "below_lower":
-                score += 1.5
-                signal_reasons.append("Below lower Bollinger Band")
-            elif bb_data["bb_position"] == "above_upper":
-                score -= 1.5
-                signal_reasons.append("Above upper Bollinger Band")
-
-            if trend == "uptrend":
-                score += 2.0
-                signal_reasons.append("Confirmed uptrend")
-            elif trend == "downtrend":
-                score -= 2.0
-                signal_reasons.append("Confirmed downtrend")
-
-            if len(closes) >= 10:
-                roc = (closes[-1] / closes[-10] - 1) * 100
-                if roc > 5:
-                    score += 0.5
-                elif roc < -5:
-                    score -= 0.5
-
-            sl_mult, tp_mult = 1.5, 2.5
+        sl_mult, tp_mult = 1.5, 2.5
 
         if score >= 3.0:
             action = "BUY"
@@ -608,22 +374,17 @@ async def _gen_signals(n: int = 12) -> list[dict]:
         else:
             action = "HOLD"
 
-        price_history = [round(c, 4 if "USD" in ticker else 2) for c in closes[-30:]]
+        price_history = [round(c, 2) for c in closes[-30:]]
 
         sl_offset = max(atr * sl_mult, price * 0.025)
         tp_offset = atr * tp_mult
 
         conf = round(min(95, max(50.0, 50 + abs(score) * 6)), 1)
 
-        # Use crypto playbook for crypto, Dalio quadrant for ASX/commodities
         ac = _get_asset_class(ticker)
-        if is_crypto_ticker:
-            pb = crypto_pb
-            quadrant = crypto_regime
-        else:
-            qdata = STATE.last_quadrant or {}
-            quadrant = qdata.get("quadrant", "rising_growth")
-            pb = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
+        qdata = STATE.last_quadrant or {}
+        quadrant = qdata.get("quadrant", "rising_growth")
+        pb = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
 
         if ac in pb["strong_buy"]:   q_fit = "strong"
         elif ac in pb["buy"]:         q_fit = "moderate"
@@ -633,9 +394,7 @@ async def _gen_signals(n: int = 12) -> list[dict]:
         predicted_days = max(3, min(60, int(tp_offset / max(price * 0.008, 0.01))))
         pos_size_pct = round(min(5.0, max(1.0, (conf - 50) / 9)), 1)
 
-        if is_crypto_ticker:
-            sig_market = "crypto"
-        elif ticker in COMMODITY_TICKERS:
+        if ticker in COMMODITY_TICKERS:
             sig_market = "commodities"
         else:
             sig_market = "asx"
@@ -643,8 +402,8 @@ async def _gen_signals(n: int = 12) -> list[dict]:
         rr_ratio = round(tp_offset / sl_offset, 2)
         sig = {
             "ticker": ticker,
-            "trade_ticker": _to_trade_ticker(ticker) if is_crypto_ticker else ticker,
-            "currency": "AUD" if is_crypto_ticker else "USD",
+            "trade_ticker": ticker,
+            "currency": "AUD",
             "market": sig_market,
             "action": action,
             "confidence": conf,
@@ -678,20 +437,15 @@ async def _gen_signals(n: int = 12) -> list[dict]:
             "timestamp": datetime.utcnow().isoformat(),
         }
 
-        if is_crypto_ticker:
-            sig["price_aud"] = _usd_to_aud(price)
-            sig["stop_loss_aud"] = _usd_to_aud(sig["stop_loss"])
-            sig["take_profit_aud"] = _usd_to_aud(sig["take_profit"])
-
         signals.append(sig)
 
     active = [s for s in signals if s["action"] != "HOLD"]
     if not active:
         active = sorted(signals, key=lambda s: s["confidence"], reverse=True)
 
-    per_market = max(2, n // 3)
+    per_market = max(2, n // 2)
     balanced = []
-    for mkt in ("asx", "crypto", "commodities"):
+    for mkt in ("asx", "commodities"):
         mkt_sigs = sorted(
             [s for s in active if s.get("market") == mkt],
             key=lambda s: s["confidence"], reverse=True
@@ -708,7 +462,6 @@ async def _gen_signals(n: int = 12) -> list[dict]:
     _cache_set(cache_key, result)
     logger.info(f"Signals generated: {len(result)} total -- "
                 f"ASX:{sum(1 for s in result if s.get('market')=='asx')} "
-                f"Crypto:{sum(1 for s in result if s.get('market')=='crypto')} "
                 f"Commodities:{sum(1 for s in result if s.get('market')=='commodities')}")
     return result
 
@@ -717,29 +470,18 @@ def _opp_from_signal_fallback(sigs: list, quadrant: str, playbook: dict,
                                qdata: dict, existing_classes: list, n: int) -> list:
     """Fallback when no scanner cache exists."""
     regime_label = qdata.get("label", quadrant.replace("_"," ").title())
-    crypto_regime = _detect_crypto_regime(None)
-    crypto_pb_fb = CRYPTO_REGIME_PLAYBOOK[crypto_regime]
     results = []
     for s in sigs:
         if s["action"] in ("HOLD", "SELL", "SHORT"):
             continue
         ac    = _get_asset_class(s["ticker"])
-        # Crypto uses its own playbook
-        if ac == "crypto":
-            pb = crypto_pb_fb
-            s_regime = crypto_regime
-            s_regime_label = crypto_regime.replace("_", " ").title()
-        else:
-            pb = playbook
-            s_regime = quadrant
-            s_regime_label = regime_label
-        q_fit = ("strong"   if ac in pb["strong_buy"] else
-                 "moderate" if ac in pb["buy"]        else
-                 "avoid"    if ac in pb["avoid"]      else "neutral")
+        q_fit = ("strong"   if ac in playbook["strong_buy"] else
+                 "moderate" if ac in playbook["buy"]        else
+                 "avoid"    if ac in playbook["avoid"]      else "neutral")
         q_w   = {"strong": 1.4, "moderate": 1.0, "neutral": 0.6, "avoid": 0.2}[q_fit]
         score = round(s["confidence"] * q_w, 1)
         jus   = s.get("dalio_justification", {})
-        reason_0 = (f"Regime: {s_regime_label} -- {ac.replace('_',' ').title()} is "
+        reason_0 = (f"Regime: {regime_label} -- {ac.replace('_',' ').title()} is "
                     f"{'favoured' if q_fit in ('strong','moderate') else 'on avoid list'}.")
         reason_1 = f"RSI {s['rsi']:.0f} | trend: {s['trend']} | signal: {s['action']}"
         reasoning = [reason_0, reason_1]
@@ -761,7 +503,7 @@ def _opp_from_signal_fallback(sigs: list, quadrant: str, playbook: dict,
             "data_source": s["data_source"],
             "reasoning": reasoning,
             "volume_fmt": "--", "sector": "--",
-            "quadrant": s_regime, "regime_label": s_regime_label,
+            "quadrant": quadrant, "regime_label": regime_label,
         })
     results.sort(key=lambda o: o["score"], reverse=True)
     return results[:n]
@@ -774,19 +516,8 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
     dalio_pb = QUADRANT_PLAYBOOK.get(quadrant, QUADRANT_PLAYBOOK["rising_growth"])
     existing_classes = [_get_asset_class(t) for t in PAPER.positions]
 
-    # Detect crypto regime from BTC price action
-    btc_closes = None
-    crypto_sc = _scanner_cache.get("crypto")
-    if crypto_sc:
-        btc_row = next((r for r in crypto_sc["rows"] if r["ticker"] == "BTC-USD"), None)
-        if btc_row:
-            btc_prices = await _get_prices(["BTC-USD"], "3mo")
-            btc_closes = btc_prices.get("BTC-USD") if btc_prices else None
-    crypto_regime = _detect_crypto_regime(btc_closes)
-    crypto_pb = CRYPTO_REGIME_PLAYBOOK[crypto_regime]
-
     all_rows: list[dict] = []
-    for mkt in ("crypto", "asx", "commodities"):
+    for mkt in ("asx", "commodities"):
         cached = _scanner_cache.get(mkt)
         if cached:
             for r in cached["rows"]:
@@ -804,31 +535,23 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
             return -999.0
         ac  = _get_asset_class(tkr)
         chg = r.get("change_pct", 0.0)
-        # Use crypto playbook for crypto, Dalio for everything else
-        pb = crypto_pb if ac == "crypto" else dalio_pb
-        q_s = (100 if ac in pb["strong_buy"] else
-               70  if ac in pb["buy"]        else
-               10  if ac in pb["avoid"]      else 45)
-        # Crypto principle: momentum weighted higher than macro fit
-        if ac == "crypto":
-            mom = min(abs(chg) * 4.0, 40.0)  # Higher momentum weight
-            dir_b = (20 if crypto_regime == "crypto_bull" and chg > 0 else
-                     15 if crypto_regime == "crypto_bear" and chg < 0 else 0)
-            return q_s * 0.25 + mom * 0.40 + dir_b * 0.20 + max(0.0, 20.0 - existing_classes.count(ac) * 5) * 0.15
-        else:
-            mom = min(abs(chg) * 3.0, 30.0)
-            dir_b = (15 if ac in pb["strong_buy"] and chg > 0 else
-                     10 if ac in pb["avoid"] and chg < 0      else 0)
-            div_b = max(0.0, 20.0 - existing_classes.count(ac) * 5)
-            return q_s * 0.40 + mom * 0.25 + dir_b * 0.20 + div_b * 0.15
+        q_s = (100 if ac in dalio_pb["strong_buy"] else
+               70  if ac in dalio_pb["buy"]        else
+               10  if ac in dalio_pb["avoid"]      else 45)
+        mom = min(abs(chg) * 3.0, 30.0)
+        dir_b = (15 if ac in dalio_pb["strong_buy"] and chg > 0 else
+                 10 if ac in dalio_pb["avoid"] and chg < 0      else 0)
+        div_b = max(0.0, 20.0 - existing_classes.count(ac) * 5)
+        return q_s * 0.40 + mom * 0.25 + dir_b * 0.20 + div_b * 0.15
 
     all_rows.sort(key=_prescore, reverse=True)
     candidates = [r for r in all_rows if r["ticker"] not in PAPER.positions][:30]
 
-    cand_by_mkt: dict = {"asx": [], "crypto": [], "commodities": []}
+    cand_by_mkt: dict = {"asx": [], "commodities": []}
     for r in candidates[:24]:
         mkt = r.get("_market", "asx")
-        cand_by_mkt[mkt].append(r["ticker"])
+        if mkt in cand_by_mkt:
+            cand_by_mkt[mkt].append(r["ticker"])
 
     history_map: dict = {}
     for mkt, tkrs in cand_by_mkt.items():
@@ -837,28 +560,6 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
         chunk = await _get_prices(tkrs[:10], "3mo")
         if chunk:
             history_map.update(chunk)
-
-    crypto_missing = [t for t in cand_by_mkt.get("crypto", []) if t not in history_map]
-    if crypto_missing and YF_AVAILABLE:
-        loop = asyncio.get_running_loop()
-        import yfinance as _yf_opp
-
-        def _fetch_one_opp(tkr):
-            try:
-                hist = _yf_opp.Ticker(tkr).history(period="3mo", interval="1d", auto_adjust=True)
-                if hist is not None and not hist.empty and "Close" in hist.columns:
-                    closes = hist["Close"].dropna().tolist()
-                    if len(closes) >= 10:
-                        return (tkr, [float(c) for c in closes[-90:]])
-            except Exception:
-                pass
-            return None
-
-        tasks = [loop.run_in_executor(_EXECUTOR, _fetch_one_opp, t) for t in crypto_missing[:8]]
-        results = await asyncio.gather(*tasks)
-        for res in results:
-            if res:
-                history_map[res[0]] = res[1]
 
     opportunities: list[dict] = []
 
@@ -900,10 +601,8 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
         else:                                   action = "WATCH"
 
         is_short_signal = action in ("SELL", "SHORT")
-        # Select the right playbook based on asset class
-        is_crypto = ac == "crypto"
-        tkr_pb = crypto_pb if is_crypto else dalio_pb
-        tkr_regime = crypto_regime if is_crypto else quadrant
+        tkr_pb = dalio_pb
+        tkr_regime = quadrant
 
         is_avoid_class  = ac in tkr_pb["avoid"]
         if is_short_signal and not is_avoid_class:
@@ -924,29 +623,18 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
         mom_score  = min(abs(chg) * 2.5, 25.0)
         div_score  = max(0.0, 20.0 - existing_classes.count(ac) * 5.0)
 
-        # Crypto: momentum-heavy weighting; ASX/Commodities: quadrant-heavy (Dalio)
-        if is_crypto:
-            composite = round(
-                q_score   * 0.20 +     # Regime fit matters less for crypto
-                rsi_score * 0.25 +
-                mom_score * 0.40 +     # Momentum is king in crypto
-                div_score * 0.15,
-                1
-            )
-        else:
-            composite = round(
-                q_score   * 0.35 +     # Dalio quadrant fit is primary driver
-                rsi_score * 0.30 +
-                mom_score * 0.20 +
-                div_score * 0.15,
-                1
-            )
+        composite = round(
+            q_score   * 0.35 +     # Dalio quadrant fit is primary driver
+            rsi_score * 0.30 +
+            mom_score * 0.20 +
+            div_score * 0.15,
+            1
+        )
 
         atr = max(vol_d * price * 14, price * 0.01)
-        # Wider stops for crypto (more volatile)
-        sl_m = 2.0 if is_crypto else 1.5
+        sl_m = 1.5
         sl  = round(price - atr * sl_m, 4)
-        tp_m = 3.5 if is_crypto else 2.5
+        tp_m = 2.5
         tp  = round(price + atr * tp_m, 4)
         rr  = round((tp - price) / max(price - sl, 1e-6), 2)
 
@@ -1002,10 +690,10 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
     opportunities.sort(key=lambda o: o["score"], reverse=True)
 
     # ── Per-market balancing: guarantee minimum representation ──
-    # Each market gets at least floor(n/3) slots, rest filled by best score
-    per_mkt = max(1, n // 3)
+    # Each market gets at least floor(n/2) slots, rest filled by best score
+    per_mkt = max(1, n // 2)
     balanced = []
-    for mkt in ("asx", "crypto", "commodities"):
+    for mkt in ("asx", "commodities"):
         mkt_opps = [o for o in opportunities if o.get("market") == mkt]
         balanced.extend(mkt_opps[:per_mkt])
 
@@ -1016,16 +704,12 @@ async def _gen_opportunities(n: int = 8) -> list[dict]:
 
     logger.info(f"Opportunities: {len(balanced[:n])} total -- "
                 f"ASX:{sum(1 for o in balanced[:n] if o.get('market')=='asx')} "
-                f"Crypto:{sum(1 for o in balanced[:n] if o.get('market')=='crypto')} "
                 f"Commodities:{sum(1 for o in balanced[:n] if o.get('market')=='commodities')}")
     return balanced[:n]
 
 
 def _gen_justification(ticker: str, action: str, **kwargs) -> dict:
-    """Generate framework justification — Dalio for ASX/commodities, crypto-native for crypto."""
-    ac = _get_asset_class(ticker)
-    is_crypto = ac == "crypto"
-
+    """Generate Dalio framework justification for ASX/commodities."""
     rsi_val = kwargs.get("rsi", 50.0)
     rr = kwargs.get("rr", 2.0)
     macd_sig = kwargs.get("macd_signal", "neutral")
@@ -1043,86 +727,50 @@ def _gen_justification(ticker: str, action: str, **kwargs) -> dict:
 
     rsi_desc = "oversold" if rsi_val < 35 else "overbought" if rsi_val > 65 else "neutral"
 
-    if is_crypto:
-        # Crypto-native justification
-        crypto_regime = _detect_crypto_regime(None)
-        regime_label = crypto_regime.replace("_", " ").title()
-        crypto_pb = CRYPTO_REGIME_PLAYBOOK.get(crypto_regime, CRYPTO_REGIME_PLAYBOOK["crypto_range"])
-        narrative = crypto_pb.get("narrative", "")
+    qdata = STATE.last_quadrant or {}
+    quadrant = qdata.get("quadrant", "rising_growth")
+    meta = QUADRANT_META.get(quadrant, QUADRANT_META["rising_growth"])
+    quadrant_label = quadrant.replace("_", " ").title()
 
-        ai_overview = (
-            f"{ticker} presents a {action.lower()} opportunity in the current {regime_label} regime. "
-            f"RSI reads {rsi_val:.0f} ({rsi_desc}), MACD is {macd_sig}, "
-            f"BB position: {bb_pos}, trend: {trend}. "
-            f"Risk/reward ratio is {rr}:1. "
-            f"Crypto regime fit: {q_fit}. "
-            f"Strategy: {'trend-follow with momentum' if crypto_regime == 'crypto_bull' else 'defensive — capital preservation' if crypto_regime == 'crypto_bear' else 'mean-reversion in range' if crypto_regime == 'crypto_range' else 'wait for volatility to compress'}."
-        )
-        reasons = [
-            f"Crypto regime: {regime_label} — {q_fit} alignment",
-            f"RSI {rsi_val:.0f} — {rsi_desc} zone (crypto thresholds 38/62)",
-            f"MACD {macd_sig} | Bollinger: {bb_pos} | Trend: {trend}",
-            f"Momentum weight 40% — crypto rewards trend-following",
-            f"Correlation delta {corr_estimate:+.3f} — portfolio diversification",
-        ]
-        return {
-            "quadrant": crypto_regime,
-            "quadrant_description": narrative[:200],
-            "sentiment_score": sent_score,
-            "sentiment_model": sent_source,
-            "sharpe_improvement": sharpe_est,
-            "correlation_delta": corr_estimate,
-            "risk_contribution_pct": risk_contrib,
-            "ai_overview": ai_overview,
-            "reasons": reasons,
-            "data_source": "LIVE",
-        }
-    else:
-        # Dalio framework for ASX/commodities
-        qdata = STATE.last_quadrant or {}
-        quadrant = qdata.get("quadrant", "rising_growth")
-        meta = QUADRANT_META.get(quadrant, QUADRANT_META["rising_growth"])
-        quadrant_label = quadrant.replace("_", " ").title()
+    if STATE.last_sentiment:
+        qs = STATE.last_sentiment.get("quadrant_sentiment", {})
+        q_sent = qs.get(quadrant, {})
+        sent_score = q_sent.get("avg_score", 0.0)
+        sent_source = STATE.last_sentiment.get("sentiment_model", "keyword")
 
-        if STATE.last_sentiment:
-            qs = STATE.last_sentiment.get("quadrant_sentiment", {})
-            q_sent = qs.get(quadrant, {})
-            sent_score = q_sent.get("avg_score", 0.0)
-            sent_source = STATE.last_sentiment.get("sentiment_model", "keyword")
+    sentiment_word = "positive" if sent_score > 0.1 else "negative" if sent_score < -0.1 else "neutral"
 
-        sentiment_word = "positive" if sent_score > 0.1 else "negative" if sent_score < -0.1 else "neutral"
+    ai_overview = (
+        f"{ticker} presents a {action.lower()} opportunity under the current {quadrant_label} regime. "
+        f"Sentiment ({sent_source}) is {sentiment_word} (score {sent_score:+.3f}), "
+        f"RSI reads {rsi_val:.0f} ({rsi_desc}), MACD is {macd_sig}, "
+        f"BB position: {bb_pos}, trend: {trend}. "
+        f"Risk/reward ratio is {rr}:1. "
+        f"Estimated correlation delta {corr_estimate:+.3f} -- within Holy Grail threshold. "
+        f"Quadrant fit: {q_fit}. "
+        f"Dalio framework favours {', '.join(meta['favoured'][:3])} in this environment."
+    )
 
-        ai_overview = (
-            f"{ticker} presents a {action.lower()} opportunity under the current {quadrant_label} regime. "
-            f"Sentiment ({sent_source}) is {sentiment_word} (score {sent_score:+.3f}), "
-            f"RSI reads {rsi_val:.0f} ({rsi_desc}), MACD is {macd_sig}, "
-            f"BB position: {bb_pos}, trend: {trend}. "
-            f"Risk/reward ratio is {rr}:1. "
-            f"Estimated correlation delta {corr_estimate:+.3f} -- within Holy Grail threshold. "
-            f"Quadrant fit: {q_fit}. "
-            f"Dalio framework favours {', '.join(meta['favoured'][:3])} in this environment."
-        )
+    reasons = [
+        f"Asset has {q_fit} alignment with {quadrant_label} environment",
+        f"Sentiment ({sent_source}): {sentiment_word} ({sent_score:+.3f}) for {ticker}",
+        f"RSI {rsi_val:.0f} -- {rsi_desc} zone",
+        f"MACD {macd_sig} | Bollinger: {bb_pos} | Trend: {trend}",
+        f"Correlation delta {corr_estimate:+.3f} -- within Holy Grail threshold",
+    ]
 
-        reasons = [
-            f"Asset has {q_fit} alignment with {quadrant_label} environment",
-            f"Sentiment ({sent_source}): {sentiment_word} ({sent_score:+.3f}) for {ticker}",
-            f"RSI {rsi_val:.0f} -- {rsi_desc} zone",
-            f"MACD {macd_sig} | Bollinger: {bb_pos} | Trend: {trend}",
-            f"Correlation delta {corr_estimate:+.3f} -- within Holy Grail threshold",
-        ]
-
-        return {
-            "quadrant": quadrant,
-            "quadrant_description": meta["description"],
-            "sentiment_score": sent_score,
-            "sentiment_model": sent_source,
-            "sharpe_improvement": sharpe_est,
-            "correlation_delta": corr_estimate,
-            "risk_contribution_pct": risk_contrib,
-            "ai_overview": ai_overview,
-            "reasons": reasons,
-            "data_source": "LIVE",
-        }
+    return {
+        "quadrant": quadrant,
+        "quadrant_description": meta["description"],
+        "sentiment_score": sent_score,
+        "sentiment_model": sent_source,
+        "sharpe_improvement": sharpe_est,
+        "correlation_delta": corr_estimate,
+        "risk_contribution_pct": risk_contrib,
+        "ai_overview": ai_overview,
+        "reasons": reasons,
+        "data_source": "LIVE",
+    }
 
 
 def _gen_quadrant_data() -> dict:
@@ -1172,14 +820,6 @@ def _classify_quadrant_from_market_data() -> dict:
                 confidence_factors += 1
                 data_sources.append("Oil price")
                 break
-
-    crypto_cache = _scanner_cache.get("crypto")
-    if crypto_cache and crypto_cache.get("rows"):
-        rows = crypto_cache["rows"]
-        avg_chg = np.mean([r.get("change_pct", 0) for r in rows[:5]])
-        growth_score += min(max(avg_chg * 0.3, -1.5), 1.5)
-        confidence_factors += 1
-        data_sources.append("Crypto sentiment")
 
     if STATE.last_sentiment:
         sent = STATE.last_sentiment
@@ -1566,7 +1206,7 @@ def _gen_correlation_matrix_demo() -> dict:
     watchlist_tickers = list(WATCHLIST) if WATCHLIST else []
     tickers = list(dict.fromkeys(portfolio_tickers + watchlist_tickers))
     if len(tickers) < 6:
-        defaults = ["CBA.AX", "BHP.AX", "CSL.AX", "WDS.AX", "BTC-USD", "ETH-USD", "GC=F", "CL=F"]
+        defaults = ["CBA.AX", "BHP.AX", "CSL.AX", "WDS.AX", "GMG.AX", "GC=F", "CL=F", "SI=F"]
         for t in defaults:
             if t not in tickers:
                 tickers.append(t)
@@ -1602,7 +1242,6 @@ async def _real_correlation_matrix() -> Optional[dict]:
     if len(tickers) < 6:
         defaults = [
             "CBA.AX", "BHP.AX", "CSL.AX", "WDS.AX", "GMG.AX",  # ASX
-            "BTC-USD", "ETH-USD", "SOL-USD",                      # Crypto
             "GC=F", "CL=F", "SI=F",                               # Commodities
         ]
         for t in defaults:
@@ -1727,7 +1366,6 @@ def dalio_analyse_trade(ticker: str, side: str, quadrant: str,
     if asset_class in playbook["avoid"] and side == "BUY":
         risk_flags.append(f"{asset_class.replace('_',' ').title()} is on the avoid list for {quadrant.replace('_',' ').title()}")
     if total_pv > 0 and cash / total_pv < 0.05: risk_flags.append("Cash below 5% of portfolio -- liquidity risk")
-    if asset_class == "crypto" and side == "BUY": risk_flags.append("Crypto: high volatility and regulatory risk")
     sig = next((s for s in current_signals if s.get("ticker") == ticker), None)
     if sig and sig.get("action") in ("SELL","SHORT") and side == "BUY":
         risk_flags.append(f"Signal engine recommends {sig['action']} on {ticker}")
