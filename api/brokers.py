@@ -120,68 +120,6 @@ class IBKRBroker(BrokerBase):
         return await self.place_order(ticker, side, abs(pos["qty"]), None)
 
 
-class AlpacaBroker(BrokerBase):
-    name = "alpaca"
-
-    def __init__(self):
-        self._api = None
-        self._connected = False
-
-    def is_connected(self) -> bool:
-        return self._connected and self._api is not None
-
-    async def connect(self, api_key: str, api_secret: str,
-                      base_url: str = "https://paper-api.alpaca.markets", **kwargs) -> None:
-        try:
-            import alpaca_trade_api as tradeapi
-        except ImportError:
-            raise ImportError("alpaca-trade-api not installed. Run: pip install alpaca-trade-api")
-        api = tradeapi.REST(api_key, api_secret, base_url, api_version="v2")
-        await asyncio.get_running_loop().run_in_executor(_EXECUTOR, api.get_account)
-        self._api = api
-        self._connected = True
-        self._store_credentials(api_key=api_key, api_secret=api_secret, base_url=base_url)
-        logger.info(f"Alpaca connected -- {base_url}")
-
-    async def get_account(self) -> dict:
-        if not self.is_connected(): raise RuntimeError("Alpaca not connected")
-        acct = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._api.get_account)
-        return {"broker": "alpaca", "account_value": float(acct.portfolio_value),
-                "buying_power": float(acct.buying_power), "cash": float(acct.cash),
-                "currency": "USD", "status": acct.status}
-
-    async def place_order(self, ticker: str, side: str, qty: float, price: Optional[float] = None) -> dict:
-        if not self.is_connected(): raise RuntimeError("Alpaca not connected")
-        order = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._api.submit_order(
-            symbol=ticker, qty=qty, side=side.lower(),
-            type="limit" if price else "market",
-            time_in_force="gtc",
-            limit_price=str(price) if price else None,
-        ))
-        return {"order_id": str(order.id), "ticker": ticker, "side": side, "qty": qty,
-                "price": price, "status": order.status, "timestamp": datetime.utcnow().isoformat()}
-
-    async def get_positions(self) -> list:
-        if not self.is_connected(): raise RuntimeError("Alpaca not connected")
-        raw = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, self._api.list_positions)
-        return [{"ticker": p.symbol, "qty": float(p.qty), "avg_cost": float(p.avg_entry_price),
-                 "market_val": float(p.market_value), "pnl": float(p.unrealized_pl),
-                 "pnl_pct": round(float(p.unrealized_plpc) * 100, 2), "side": p.side} for p in raw]
-
-    async def get_history(self) -> list:
-        if not self.is_connected(): raise RuntimeError("Alpaca not connected")
-        raw = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._api.list_orders(status="filled", limit=100))
-        return [{"ticker": o.symbol, "side": o.side, "qty": float(o.filled_qty or 0),
-                 "price": float(o.filled_avg_price) if o.filled_avg_price else None,
-                 "timestamp": o.filled_at.isoformat() if o.filled_at else None} for o in raw]
-
-    async def close_position(self, ticker: str) -> dict:
-        if not self.is_connected(): raise RuntimeError("Alpaca not connected")
-        order = await asyncio.get_running_loop().run_in_executor(_EXECUTOR, lambda: self._api.close_position(ticker))
-        return {"order_id": str(order.id), "ticker": ticker, "side": "SELL",
-                "status": order.status, "timestamp": datetime.utcnow().isoformat()}
-
-
 class BinanceBroker(BrokerBase):
     name = "binance"
 
@@ -535,11 +473,6 @@ class CMCBroker(GenericCryptoBroker):
     name = "cmc"
     _BASE = "https://ciapi.cityindex.com/TradingAPI"
 
-class SchwabBroker(GenericCryptoBroker):
-    name = "schwab"
-    _BASE = "https://api.schwabapi.com/trader/v1"
-
-
 class StakeBroker(GenericCryptoBroker):
     name = "stake"
     _BASE = "https://api.hellostake.com/api"
@@ -559,15 +492,6 @@ class SuperheroBroker(GenericCryptoBroker):
 class NabtradeBroker(GenericCryptoBroker):
     name = "nabtrade"
     _BASE = "https://api.nabtrade.com.au/v1"
-
-class RobinhoodBroker(GenericCryptoBroker):
-    name = "robinhood"
-    _BASE = "https://trading.robinhood.com/api/v1"
-
-class WebullBroker(GenericCryptoBroker):
-    name = "webull"
-    _BASE = "https://userapi.webull.com/api"
-
 
 # ── Active broker global ────────────────────────────────
 ACTIVE_BROKER: Optional[BrokerBase] = None
@@ -594,12 +518,15 @@ def _save_broker_creds(creds: dict):
 
 # ── Broker map for connection routing ───────────────────
 BROKER_MAP = {
-    "ibkr": IBKRBroker, "alpaca": AlpacaBroker, "binance": BinanceBroker,
-    "coinbase": CoinbaseBroker, "coinspot": CoinSpotBroker,
+    # AU Brokers (ASX-capable)
+    "ibkr": IBKRBroker, "coinspot": CoinSpotBroker,
+    "stake": StakeBroker, "moomoo": MomooBroker,
+    "ig": IGBroker, "cmc": CMCBroker,
+    "selfwealth": SelfWealthBroker, "commsec": CommsecBroker,
+    "superhero": SuperheroBroker, "nabtrade": NabtradeBroker,
+    # Crypto Exchanges
+    "binance": BinanceBroker, "coinbase": CoinbaseBroker,
     "kraken": KrakenBroker, "bybit": BybitBroker, "okx": OKXBroker,
     "kucoin": KuCoinBroker, "bitget": BitgetBroker,
-    "independentreserve": IndependentReserveBroker, "stake": StakeBroker,
-    "ig": IGBroker, "cmc": CMCBroker, "schwab": SchwabBroker,
-    "moomoo": MomooBroker,
-    "robinhood": RobinhoodBroker, "webull": WebullBroker,
+    "independentreserve": IndependentReserveBroker,
 }

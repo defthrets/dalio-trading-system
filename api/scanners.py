@@ -125,34 +125,22 @@ CRYPTO_TICKERS = [
 ]
 
 COMMODITY_TICKERS = [
-    # -- Precious Metals ETFs --
-    "GLD", "IAU", "SLV", "SIVR", "PPLT", "PALL",
-    # -- Precious Metals Futures --
-    "GC=F", "SI=F", "PL=F", "PA=F",
-    # -- Energy ETFs --
-    "USO", "BNO", "UNG", "UGA", "XLE", "VDE",
-    # -- Energy Futures --
-    "CL=F", "BZ=F", "NG=F", "RB=F", "HO=F",
-    # -- Base Metals ETFs --
-    "COPX", "CPER", "DBB", "XME", "REMX", "LIT", "URA",
-    # -- Base Metals Futures --
-    "HG=F", "ALI=F",
-    # -- Agriculture ETFs --
-    "DBA", "MOO", "WEAT", "CORN", "SOYB", "CANE",
-    # -- Agriculture Futures --
-    "ZW=F", "ZC=F", "ZS=F", "ZO=F", "KC=F", "CT=F", "SB=F",
-    # -- Livestock Futures --
-    "LE=F", "GF=F", "HE=F",
-    # -- Broad Commodity ETFs --
-    "PDBC", "GSG", "FTGC",
-    # -- Timber & Water --
-    "WOOD", "PHO",
-    # -- Carbon --
-    "KRBN",
-    # -- Miner Proxies --
-    "GDX", "GDXJ", "SIL", "FCX", "NEM", "GOLD", "AEM", "WPM",
-    # -- Oil Majors --
-    "XOM", "CVX",
+    # -- ASX Precious Metal ETFs (not in ASX_TICKERS) --
+    "PMGOLD.AX", "QAU.AX",
+    # -- ASX Crude Oil ETF --
+    "OOO.AX",
+    # -- ASX Broad Commodity ETF --
+    "QCB.AX",
+    # -- ASX Copper --
+    "OZL.AX",
+    # -- ASX Uranium (not in ASX_TICKERS) --
+    "PDN.AX", "BMN.AX", "LOT.AX", "DYL.AX", "PEN.AX",
+    # -- ASX Lithium (not in ASX_TICKERS) --
+    "AKE.AX", "CXO.AX", "GL1.AX", "SYA.AX",
+    # -- ASX Rare Earths (not in ASX_TICKERS) --
+    "ARU.AX", "VML.AX", "HAS.AX",
+    # -- Global Futures (commodity price exposure) --
+    "GC=F", "SI=F", "CL=F", "BZ=F", "NG=F",
 ]
 
 ALL_TICKERS = ASX_TICKERS + CRYPTO_TICKERS + COMMODITY_TICKERS
@@ -224,17 +212,30 @@ _ASSET_META = {
     "XLM-USD":  {"name": "Stellar",         "cat": "Crypto", "sector": "Payments"},
     "AAVE-USD": {"name": "Aave",            "cat": "Crypto", "sector": "DeFi"},
     "SNX-USD":  {"name": "Synthetix",       "cat": "Crypto", "sector": "DeFi"},
-    # Commodities
-    "GLD":  {"name": "Gold ETF (SPDR)",     "cat": "Commodity", "sector": "Precious Metals"},
-    "SLV":  {"name": "Silver ETF (iShares)","cat": "Commodity", "sector": "Precious Metals"},
-    "USO":  {"name": "Crude Oil Fund",      "cat": "Commodity", "sector": "Energy"},
-    "UNG":  {"name": "Natural Gas Fund",    "cat": "Commodity", "sector": "Energy"},
-    "COPX": {"name": "Copper Miners ETF",   "cat": "Commodity", "sector": "Industrial"},
-    "WEAT": {"name": "Wheat ETF (Teucrium)","cat": "Commodity", "sector": "Agriculture"},
-    "DBA":  {"name": "Agriculture ETF",     "cat": "Commodity", "sector": "Agriculture"},
-    "PALL": {"name": "Palladium ETF",       "cat": "Commodity", "sector": "Precious Metals"},
-    "XOM":  {"name": "ExxonMobil (Oil)",    "cat": "Commodity", "sector": "Energy"},
-    "CVX":  {"name": "Chevron (Oil)",       "cat": "Commodity", "sector": "Energy"},
+    # AU Commodities
+    "PMGOLD.AX": {"name": "Perth Mint Gold",       "cat": "Commodity", "sector": "Precious Metals"},
+    "QAU.AX":    {"name": "BetaShares Gold ETF",   "cat": "Commodity", "sector": "Precious Metals"},
+    "GOLD.AX":   {"name": "Gold Bullion ETF",      "cat": "Commodity", "sector": "Precious Metals"},
+    "OOO.AX":    {"name": "BetaShares Crude Oil",  "cat": "Commodity", "sector": "Energy"},
+    "QCB.AX":    {"name": "BetaShares Commodities","cat": "Commodity", "sector": "Broad"},
+    "OZL.AX":    {"name": "OZ Minerals (Copper)",  "cat": "Commodity", "sector": "Base Metals"},
+    "PDN.AX":    {"name": "Paladin Energy",        "cat": "Commodity", "sector": "Uranium"},
+    "BMN.AX":    {"name": "Bannerman Energy",      "cat": "Commodity", "sector": "Uranium"},
+    "LOT.AX":    {"name": "Lotus Resources",       "cat": "Commodity", "sector": "Uranium"},
+    "DYL.AX":    {"name": "Deep Yellow",           "cat": "Commodity", "sector": "Uranium"},
+    "PEN.AX":    {"name": "Peninsula Energy",      "cat": "Commodity", "sector": "Uranium"},
+    "AKE.AX":    {"name": "Allkem (Lithium)",      "cat": "Commodity", "sector": "Lithium"},
+    "CXO.AX":    {"name": "Core Lithium",          "cat": "Commodity", "sector": "Lithium"},
+    "GL1.AX":    {"name": "Global Lithium",        "cat": "Commodity", "sector": "Lithium"},
+    "SYA.AX":    {"name": "Sayona Mining",         "cat": "Commodity", "sector": "Lithium"},
+    "ARU.AX":    {"name": "Arafura Rare Earths",   "cat": "Commodity", "sector": "Rare Earths"},
+    "VML.AX":    {"name": "Vital Metals",          "cat": "Commodity", "sector": "Rare Earths"},
+    "HAS.AX":    {"name": "Hastings Technology",   "cat": "Commodity", "sector": "Rare Earths"},
+    "GC=F":      {"name": "Gold Futures",           "cat": "Commodity", "sector": "Precious Metals"},
+    "SI=F":      {"name": "Silver Futures",         "cat": "Commodity", "sector": "Precious Metals"},
+    "CL=F":      {"name": "Crude Oil Futures",      "cat": "Commodity", "sector": "Energy"},
+    "BZ=F":      {"name": "Brent Crude Futures",    "cat": "Commodity", "sector": "Energy"},
+    "NG=F":      {"name": "Natural Gas Futures",    "cat": "Commodity", "sector": "Energy"},
 }
 
 

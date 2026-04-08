@@ -1797,7 +1797,7 @@ const SPOTS = {
     { id:'pt-history',  sel:'.panel--paper-history', arrow:'top',    title:'\ud83d\udccb TRADE HISTORY',           text:"Every closed trade logged with entry, exit, and P&L. Check which signals actually make money over time \u2014 that\'s where the real insights are." },
   ],
   'comms-config': [
-    { id:'cfg-brokers',  sel:'.panel--brokers',     arrow:'top',    title:'\ud83d\udd17 BROKER CONNECTIONS',     text:"Connect your broker or exchange here. Alpaca is great for getting started \u2014 free paper trading with a full API. Click \'Open\' to visit their site." },
+    { id:'cfg-brokers',  sel:'.panel--brokers',     arrow:'top',    title:'\ud83d\udd17 BROKER CONNECTIONS',     text:"Connect your Australian broker or crypto exchange here. CoinSpot and IBKR are great for getting started. Click \'Open\' to visit their site." },
     { id:'cfg-discord',  sel:'.panel--discord',     arrow:'right',  title:'\ud83d\udce3 DISCORD ALERTS',         text:"Get trade alerts sent straight to your Discord. Paste in your webhook URL, hit Test, done. Never miss a signal again." },
     { id:'cfg-mode',     sel:'#cfgMode',            arrow:'left',   title:'\u26a0 PAPER vs LIVE MODE',      text:"Start in PAPER mode, always. It\'s play money so you can learn the system risk-free. Only switch to LIVE when you\'re confident. No rush, legend." },
   ],
@@ -2116,37 +2116,12 @@ function scrollToTopSignal() {
 function switchBrokerTab(cat, btn) {
   document.querySelectorAll('.broker-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  ['au','us','crypto'].forEach(c => {
+  ['au','crypto'].forEach(c => {
     const g = el(`bcat-${c}`);
     if (g) g.classList.toggle('hidden', c !== cat);
   });
 }
 
-async function connectAlpaca() {
-  const key    = el('settAlpacaKey')?.value?.trim();
-  const secret = el('settAlpacaSecret')?.value?.trim();
-  const env    = el('alpacaEnv')?.value;
-  const result = el('alpacaConnectResult');
-  if (!key || !secret) { if (result) result.textContent = '⚠ Enter API key and secret first'; return; }
-  if (result) result.textContent = '⌛ Testing connection...';
-  try {
-    const base = env === 'paper' ? 'https://paper-api.alpaca.markets' : 'https://api.alpaca.markets';
-    const r = await fetch(`${base}/v2/account`, {
-      headers: { 'APCA-API-KEY-ID': key, 'APCA-API-SECRET-KEY': secret }
-    });
-    if (r.ok) {
-      const data = await r.json();
-      if (result) result.textContent = `✓ Connected! Account: ${data.account_number} · ${env.toUpperCase()}`;
-      el('alpacaStatus') && setEl('alpacaStatus', '● Connected');
-      el('alpacaStatus') && (el('alpacaStatus').className = 'broker-status online');
-      pushAlert('BROKER', `Alpaca ${env} account connected`, 'info');
-    } else {
-      if (result) result.textContent = `✗ Auth failed (${r.status}) — check your keys`;
-    }
-  } catch (e) {
-    if (result) result.textContent = '✗ Connection failed — check network / CORS';
-  }
-}
 
 
 // ═══════════════════════════════════════════════════════════
@@ -2240,7 +2215,6 @@ async function _loadSavedBrokerCreds() {
     const saved = await fetchJSON('/api/broker/saved');
     if (!saved || typeof saved !== 'object') return;
     const fieldMap = {
-      alpaca:   { api_key: 'settAlpacaKey', api_secret: 'settAlpacaSecret' },
       ibkr:     { host: 'settIbkrHost', port: 'settIbkrPort', client_id: 'settIbkrClientId' },
       binance:  { api_key: 'settBinanceKey', api_secret: 'settBinanceSecret' },
       coinspot: { api_key: 'settCoinspotKey', api_secret: 'settCoinspotSecret' },
@@ -2254,11 +2228,11 @@ async function _loadSavedBrokerCreds() {
       selfwealth: { api_key: 'settSelfwealthKey', api_secret: 'settSelfwealthSecret' },
       ig:         { api_key: 'settIgKey', api_secret: 'settIgSecret', passphrase: 'settIgPassphrase' },
       cmc:        { api_key: 'settCmcKey', api_secret: 'settCmcSecret', passphrase: 'settCmcPassphrase' },
-      schwab:     { api_key: 'settSchwabKey', api_secret: 'settSchwabSecret', passphrase: 'settSchwabPassphrase' },
       stake:      { api_key: 'settStakeKey' },
       moomoo:     { api_key: 'settMoomooKey', api_secret: 'settMoomooSecret' },
-      robinhood:  { api_key: 'settRobinhoodKey', api_secret: 'settRobinhoodSecret' },
-      webull:     { api_key: 'settWebullKey', api_secret: 'settWebullSecret' },
+      commsec:    { api_key: 'settCommsecKey', api_secret: 'settCommsecSecret' },
+      superhero:  { api_key: 'settSuperheroKey', api_secret: 'settSuperheroSecret' },
+      nabtrade:   { api_key: 'settNabtradeKey', api_secret: 'settNabtradeSecret' },
     };
     for (const [broker, creds] of Object.entries(saved)) {
       const map = fieldMap[broker];
@@ -3830,11 +3804,10 @@ function _updateBrokerCardStatus(d) {
 }
 
 function onBrokerSelect(val) {
-  ['alpacaFields','ibkrFields','binanceFields','coinbaseFields','coinspotFields','stakeFields'].forEach(id => {
+  ['ibkrFields','binanceFields','coinbaseFields','coinspotFields','stakeFields'].forEach(id => {
     const el2 = el(id); if (el2) el2.style.display = 'none';
   });
   const map = {
-    alpaca:   'alpacaFields',
     ibkr:     'ibkrFields',
     binance:  'binanceFields',
     coinbase: 'coinbaseFields',
@@ -3863,13 +3836,7 @@ async function connectBrokerFromSettings(broker) {
   if (resultEl) resultEl.innerHTML = '<span style="color:var(--amber)">⌛ Connecting...</span>';
   let payload = { broker };
 
-  if (broker === 'alpaca') {
-    payload.api_key    = el('settAlpacaKey')?.value?.trim();
-    payload.api_secret = el('settAlpacaSecret')?.value?.trim();
-    const env = el('settAlpacaEnv')?.value;
-    payload.base_url   = env === 'live' ? 'https://api.alpaca.markets' : 'https://paper-api.alpaca.markets';
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
-  } else if (broker === 'ibkr') {
+  if (broker === 'ibkr') {
     payload.host      = el('settIbkrHost')?.value || '127.0.0.1';
     payload.port      = parseInt(el('settIbkrPort')?.value || '7497');
     payload.client_id = parseInt(el('settIbkrClientId')?.value || '1');
@@ -3927,10 +3894,6 @@ async function connectBrokerFromSettings(broker) {
     payload.api_secret = el('settCmcSecret')?.value?.trim();
     payload.passphrase = el('settCmcPassphrase')?.value?.trim();
     if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
-  } else if (broker === 'schwab') {
-    payload.api_key    = el('settSchwabKey')?.value?.trim();
-    payload.api_secret = el('settSchwabSecret')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">App key and secret required</span>'; return; }
   } else if (broker === 'stake') {
     payload.api_key    = el('settStakeKey')?.value?.trim();
     if (!payload.api_key) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">Session token required</span>'; return; }
@@ -3938,14 +3901,18 @@ async function connectBrokerFromSettings(broker) {
     payload.api_key    = el('settMoomooKey')?.value?.trim();
     payload.api_secret = el('settMoomooSecret')?.value?.trim();
     if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">OpenD host and port required</span>'; return; }
-  } else if (broker === 'robinhood') {
-    payload.api_key    = el('settRobinhoodKey')?.value?.trim();
-    payload.api_secret = el('settRobinhoodSecret')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and private key required</span>'; return; }
-  } else if (broker === 'webull') {
-    payload.api_key    = el('settWebullKey')?.value?.trim();
-    payload.api_secret = el('settWebullSecret')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">App key and secret required</span>'; return; }
+  } else if (broker === 'commsec') {
+    payload.api_key    = el('settCommsecKey')?.value?.trim();
+    payload.api_secret = el('settCommsecSecret')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">Client ID and secret required</span>'; return; }
+  } else if (broker === 'superhero') {
+    payload.api_key    = el('settSuperheroKey')?.value?.trim();
+    payload.api_secret = el('settSuperheroSecret')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
+  } else if (broker === 'nabtrade') {
+    payload.api_key    = el('settNabtradeKey')?.value?.trim();
+    payload.api_secret = el('settNabtradeSecret')?.value?.trim();
+    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
   }
 
   try {
@@ -4004,10 +3971,10 @@ async function _populateBrokerPicker() {
   list.innerHTML = '<div class="broker-picker-item bp-empty">Loading...</div>';
 
   const logoMap = {
-    coinspot:'CS', alpaca:'ALP', binance:'BNB', coinbase:'CB', ibkr:'IB',
+    coinspot:'CS', binance:'BNB', coinbase:'CB', ibkr:'IB',
     kraken:'KRK', bybit:'BBT', okx:'OKX', kucoin:'KCS', bitget:'BGT',
-    stake:'STK', moomoo:'MM', ig:'IG', cmc:'CMC', schwab:'SCH',
-    robinhood:'RH', webull:'WB', independentreserve:'IR', selfwealth:'SW',
+    stake:'STK', moomoo:'MM', ig:'IG', cmc:'CMC',
+    independentreserve:'IR', selfwealth:'SW',
     nabtrade:'NAB', commsec:'CBA', superhero:'SH',
   };
 
@@ -4097,7 +4064,6 @@ async function _quickReconnectSaved() {
 function _getBrokerPayload(broker) {
   const _f = (id) => el(id)?.value?.trim() || '';
   const map = {
-    alpaca:   () => ({ api_key: _f('settAlpacaKey'), api_secret: _f('settAlpacaSecret'), base_url: el('settAlpacaEnv')?.value === 'live' ? 'https://api.alpaca.markets' : 'https://paper-api.alpaca.markets' }),
     ibkr:     () => ({ host: _f('settIbkrHost') || '127.0.0.1', port: _f('settIbkrPort') || '7497', client_id: _f('settIbkrClientId') || '1' }),
     binance:  () => ({ api_key: _f('settBinanceKey'), api_secret: _f('settBinanceSecret'), testnet: el('settBinanceTestnet')?.value }),
     coinspot: () => ({ api_key: _f('settCoinspotKey'), api_secret: _f('settCoinspotSecret') }),
@@ -4111,11 +4077,11 @@ function _getBrokerPayload(broker) {
     selfwealth: () => ({ api_key: _f('settSelfwealthKey'), api_secret: _f('settSelfwealthSecret') }),
     ig:         () => ({ api_key: _f('settIgKey'), api_secret: _f('settIgSecret'), passphrase: _f('settIgPassphrase') }),
     cmc:        () => ({ api_key: _f('settCmcKey'), api_secret: _f('settCmcSecret'), passphrase: _f('settCmcPassphrase') }),
-    schwab:     () => ({ api_key: _f('settSchwabKey'), api_secret: _f('settSchwabSecret'), passphrase: _f('settSchwabPassphrase') }),
     stake:      () => ({ api_key: _f('settStakeKey') }),
     moomoo:     () => ({ api_key: _f('settMoomooKey'), api_secret: _f('settMoomooSecret') }),
-    robinhood:  () => ({ api_key: _f('settRobinhoodKey'), api_secret: _f('settRobinhoodSecret') }),
-    webull:     () => ({ api_key: _f('settWebullKey'), api_secret: _f('settWebullSecret') }),
+    commsec:    () => ({ api_key: _f('settCommsecKey'), api_secret: _f('settCommsecSecret') }),
+    superhero:  () => ({ api_key: _f('settSuperheroKey'), api_secret: _f('settSuperheroSecret') }),
+    nabtrade:   () => ({ api_key: _f('settNabtradeKey'), api_secret: _f('settNabtradeSecret') }),
   };
   return map[broker] ? map[broker]() : {};
 }
@@ -4142,16 +4108,7 @@ async function connectBroker() {
   const res = el('brokerConnectResult');
   if (btn) { btn.textContent = '⌛ CONNECTING...'; btn.classList.add('loading'); }
   let payload = { broker };
-  if (broker === 'alpaca') {
-    payload.api_key    = el('settAlpacaKey')?.value?.trim();
-    payload.api_secret = el('settAlpacaSecret')?.value?.trim();
-    payload.base_url   = el('alpacaUrl')?.value;
-    if (!payload.api_key || !payload.api_secret) {
-      if (res) res.innerHTML = '<span style="color:var(--red)">API key and secret required</span>';
-      if (btn) { btn.textContent = '▶ CONNECT BROKER'; btn.classList.remove('loading'); }
-      return;
-    }
-  } else if (broker === 'ibkr') {
+  if (broker === 'ibkr') {
     payload.host      = el('ibkrHost')?.value || '127.0.0.1';
     payload.port      = parseInt(el('ibkrPort')?.value || '7497');
     payload.client_id = parseInt(el('ibkrClientId')?.value || '1');
@@ -6017,28 +5974,7 @@ async function testBrokerConnection(broker) {
       if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ ${d.message || 'Connection failed'}</span>`;
     }
   } catch (e) {
-    // Fallback: try direct connection test for Alpaca
-    if (broker === 'alpaca') {
-      try {
-        const creds = _getBrokerPayload('alpaca');
-        const env = el('settAlpacaEnv')?.value || 'paper';
-        const base = env === 'live' ? 'https://api.alpaca.markets' : 'https://paper-api.alpaca.markets';
-        const r = await fetch(`${base}/v2/account`, {
-          headers: { 'APCA-API-KEY-ID': creds.api_key, 'APCA-API-SECRET-KEY': creds.api_secret }
-        });
-        if (r.ok) {
-          const data = await r.json();
-          if (resultEl) resultEl.innerHTML = `<span style="color:var(--green)">✓ Alpaca ${env.toUpperCase()} — Account: ${data.account_number} | Equity: $${parseFloat(data.equity).toLocaleString()}</span>`;
-          playBeep(880, 0.1);
-        } else {
-          if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ Auth failed (${r.status}) — check keys</span>`;
-        }
-      } catch (e2) {
-        if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ Network error — ${e2.message}</span>`;
-      }
-    } else {
-      if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ ${escHtml(e.message || 'Test failed')}</span>`;
-    }
+    if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ ${escHtml(e.message || 'Test failed')}</span>`;
   }
 }
 
