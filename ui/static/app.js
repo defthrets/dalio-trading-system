@@ -4320,6 +4320,32 @@ async function loadRealPortfolio() {
       }).join('');
     } else if (hmWrap) { hmWrap.style.display = 'none'; }
 
+    // Mirror to Command Centre when in live mode
+    if (_tradingMode === 'live') {
+      const ccD = {
+        total_value: acctVal,
+        cash: cash,
+        invested: invested,
+        open_count: positions.length,
+        total_pnl: totalPnl,
+        total_pnl_pct: acctVal > 0 ? (totalPnl / (acctVal - totalPnl)) * 100 : 0,
+        positions: positions.map(p => ({
+          ticker: p.ticker,
+          side: p.side || (p.qty > 0 ? 'LONG' : 'SHORT'),
+          qty: Math.abs(p.qty || 0),
+          entry_price: p.avg_cost || 0,
+          current_price: p.market_val && p.qty ? p.market_val / Math.abs(p.qty) : 0,
+          market_value: p.market_val || 0,
+          pnl: p.pnl || 0,
+          pnl_pct: p.pnl_pct || 0,
+        })),
+        drawdown: d.drawdown || null,
+        sharpe: d.sharpe || null,
+        cycles: d.cycles || null,
+      };
+      applyCommandCentre(ccD, null);
+    }
+
     // Positions table
     const body = el('livePositionsBody');
     if (body) {

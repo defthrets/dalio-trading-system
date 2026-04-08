@@ -57,6 +57,10 @@ def _encrypt_creds(creds: dict) -> dict:
     """Encrypt all string values in a broker credentials dict."""
     result = {}
     for broker, data in creds.items():
+        if not isinstance(data, dict):
+            # Preserve non-dict entries like _last_active
+            result[broker] = data
+            continue
         result[broker] = {}
         for k, v in data.items():
             if isinstance(v, str):
@@ -70,6 +74,10 @@ def _decrypt_creds(creds: dict) -> dict:
     """Decrypt all encrypted values in a broker credentials dict."""
     result = {}
     for broker, data in creds.items():
+        if not isinstance(data, dict):
+            # Preserve non-dict entries like _last_active
+            result[broker] = data
+            continue
         result[broker] = {}
         for k, v in data.items():
             if isinstance(v, dict) and "_enc" in v:
