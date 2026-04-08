@@ -5888,7 +5888,7 @@ function pushOpsLine(cmd, msg, type) {
 // ═══════════════════════════════════════════════════════════
 // SYSTEM STATUS TOGGLE (OPERATIONAL / PAUSED)
 // ═══════════════════════════════════════════════════════════
-let _systemPaused = false;
+let _systemPaused = true;
 
 function toggleSystemStatus() {
   _systemPaused = !_systemPaused;

@@ -599,22 +599,24 @@ a:hover { color: var(--primary); text-decoration: underline; }
 
 /* ── Hologram Brain Logo ── */
 .holo-brain {
-  width: 62px;
-  height: 62px;
+  width: 68px;
+  height: 68px;
   display: flex;
   align-items: center;
   justify-content: center;
   text-shadow: none;
+  position: relative;
 }
 .holo-brain-scene {
-  width: 58px;
-  height: 58px;
-  perspective: 280px;
+  width: 64px;
+  height: 64px;
+  perspective: 320px;
+  position: relative;
 }
 .holo-brain-rotator {
   width: 100%;
   height: 100%;
-  animation: holoBrainSpin 6s linear infinite;
+  animation: holoBrainSpin 8s linear infinite;
   transform-style: preserve-3d;
 }
 @keyframes holoBrainSpin {
@@ -622,45 +624,92 @@ a:hover { color: var(--primary); text-decoration: underline; }
   100% { transform: rotateY(360deg); }
 }
 .holo-brain-svg {
-  width: 58px;
-  height: 58px;
-  filter: drop-shadow(0 0 6px rgba(0,212,255,0.5)) drop-shadow(0 0 14px rgba(0,255,170,0.2));
+  width: 64px;
+  height: 64px;
+  filter: drop-shadow(0 0 6px rgba(0,212,255,0.5)) drop-shadow(0 0 16px rgba(0,255,170,0.25));
   backface-visibility: visible;
 }
+
+/* Brain outline glitch — occasional RGB split */
+.brain-outline {
+  animation: brainGlitch 6s ease-in-out infinite;
+}
+@keyframes brainGlitch {
+  0%, 88%, 100% { filter: none; opacity: 0.9; }
+  89%  { filter: url(#glitchR); opacity: 1; transform: translate(1px, 0); }
+  90%  { filter: url(#glitchG); opacity: 0.8; transform: translate(-1px, 0); }
+  91%  { filter: none; opacity: 0.9; transform: none; }
+  94%  { filter: url(#glitchR); opacity: 1; transform: translate(-0.5px, 0.5px); }
+  95%  { filter: none; opacity: 0.9; transform: none; }
+}
+
 /* Neural spark nodes flicker */
 .holo-node {
-  animation: holoNodePulse 2s ease-in-out infinite;
+  animation: holoNodePulse 2.5s ease-in-out infinite;
 }
-.holo-node.n2 { animation-delay: 0.4s; }
-.holo-node.n3 { animation-delay: 0.8s; }
+.holo-node.n2 { animation-delay: 0.5s; }
+.holo-node.n3 { animation-delay: 1.0s; }
 @keyframes holoNodePulse {
-  0%, 100% { opacity: 0.3; r: 0.5; }
-  50%      { opacity: 1; r: 1.2; }
+  0%, 100% { opacity: 0.2; r: 0.8; }
+  50%      { opacity: 1; r: 2.2; }
 }
+
+/* Dollar sign glitch — flash in at random intervals */
+.dollar-glitch text {
+  opacity: 0;
+}
+.dollar-glitch.g1 text { animation: dollarFlash 4s ease-in-out infinite 0.5s; }
+.dollar-glitch.g2 text { animation: dollarFlash 5s ease-in-out infinite 1.8s; }
+.dollar-glitch.g3 text { animation: dollarFlash 3.5s ease-in-out infinite 0.2s; }
+.dollar-glitch.g4 text { animation: dollarFlash 4.5s ease-in-out infinite 2.5s; }
+.dollar-glitch.g5 text { animation: dollarFlash 5.5s ease-in-out infinite 3.2s; }
+
+@keyframes dollarFlash {
+  0%, 82%, 100% { opacity: 0; transform: none; filter: none; }
+  83%  { opacity: 0.9; transform: translate(1px, -1px) skewX(-8deg); filter: drop-shadow(0 0 4px #00ffaa); }
+  84%  { opacity: 0; transform: translate(-2px, 0); }
+  85%  { opacity: 0.7; transform: translate(0, 1px) skewX(5deg); filter: drop-shadow(0 0 6px #00d4ff); }
+  86%  { opacity: 0.3; transform: translate(1px, 0) skewX(-3deg); }
+  87%  { opacity: 0.9; transform: none; filter: drop-shadow(0 0 8px #00ffaa); }
+  88%  { opacity: 0; }
+  92%  { opacity: 0; }
+  93%  { opacity: 0.6; transform: translate(-1px, 1px); filter: drop-shadow(0 0 5px #00d4ff); }
+  94%  { opacity: 0; transform: translate(2px, -1px); }
+}
+
 /* Scan line sweeps vertically */
 .holo-scanline {
-  animation: holoScan 3s ease-in-out infinite;
+  animation: holoScan 4s ease-in-out infinite;
 }
 @keyframes holoScan {
-  0%   { y1: 3; y2: 3; opacity: 0; }
-  10%  { opacity: 0.6; }
-  90%  { opacity: 0.6; }
-  100% { y1: 28; y2: 28; opacity: 0; }
+  0%   { y1: 5; y2: 5; opacity: 0; }
+  10%  { opacity: 0.5; }
+  90%  { opacity: 0.5; }
+  100% { y1: 82; y2: 82; opacity: 0; }
 }
-/* Holographic flicker on the whole icon */
+
+/* Holographic flicker overlay */
 .holo-brain-scene::after {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(transparent 0%, rgba(0,212,255,0.03) 50%, transparent 100%);
-  animation: holoFlicker 4s ease-in-out infinite;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    rgba(0,212,255,0.02) 2px,
+    transparent 4px
+  );
+  animation: holoFlicker 3s ease-in-out infinite;
   pointer-events: none;
+  mix-blend-mode: screen;
 }
 @keyframes holoFlicker {
-  0%, 100% { opacity: 0.5; }
-  25%      { opacity: 1; }
-  50%      { opacity: 0.3; }
-  75%      { opacity: 0.8; }
+  0%, 100% { opacity: 0.4; }
+  15%      { opacity: 1; }
+  30%      { opacity: 0.2; }
+  50%      { opacity: 0.8; }
+  70%      { opacity: 0.3; }
+  85%      { opacity: 0.9; }
 }
 .logo-text { display: flex; flex-direction: column; line-height: 1.1; }
 .logo-main {

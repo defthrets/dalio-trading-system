@@ -27,35 +27,99 @@
         <span class="logo-icon holo-brain" title="DALIOS Trading">
           <div class="holo-brain-scene">
             <div class="holo-brain-rotator">
-              <svg class="holo-brain-svg" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">
+              <svg class="holo-brain-svg" viewBox="0 0 100 85" xmlns="http://www.w3.org/2000/svg">
                 <defs>
                   <linearGradient id="holoGrad" x1="0" y1="0" x2="1" y2="1">
                     <stop offset="0%" stop-color="#00d4ff"/>
                     <stop offset="50%" stop-color="#00ffaa"/>
                     <stop offset="100%" stop-color="#00d4ff"/>
                   </linearGradient>
+                  <linearGradient id="holoGrad2" x1="1" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#00ffaa"/>
+                    <stop offset="100%" stop-color="#00d4ff"/>
+                  </linearGradient>
                   <filter id="holoGlow">
-                    <feGaussianBlur stdDeviation="1" result="blur"/>
+                    <feGaussianBlur stdDeviation="1.5" result="blur"/>
                     <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
                   </filter>
+                  <filter id="glitchR">
+                    <feOffset dx="1.5" dy="0" result="r"/>
+                    <feFlood flood-color="#ff0040" flood-opacity="0.7" result="rc"/>
+                    <feComposite in="rc" in2="r" operator="in"/>
+                  </filter>
+                  <filter id="glitchG">
+                    <feOffset dx="-1.5" dy="0" result="g"/>
+                    <feFlood flood-color="#00ff88" flood-opacity="0.7" result="gc"/>
+                    <feComposite in="gc" in2="g" operator="in"/>
+                  </filter>
                 </defs>
-                <!-- Brain outline -->
-                <path d="M15,3 C9,3 5,7 5,12 C5,14 6,16 7,17 C6,18 5,20 5,22 C5,25 8,27 11,27 C12,27 13,26.5 14,26 C14.5,26.5 14.8,27 15,27 C15.2,27 15.5,26.5 16,26 C17,26.5 18,27 19,27 C22,27 25,25 25,22 C25,20 24,18 23,17 C24,16 25,14 25,12 C25,7 21,3 15,3Z"
-                      fill="none" stroke="url(#holoGrad)" stroke-width="0.6" filter="url(#holoGlow)" opacity="0.9"/>
-                <!-- Brain fissure -->
-                <path d="M15,5 L15,25" fill="none" stroke="url(#holoGrad)" stroke-width="0.3" opacity="0.5" stroke-dasharray="1,1.5"/>
-                <!-- Neural connections -->
-                <path d="M8,12 Q12,10 15,12 Q18,14 22,12" fill="none" stroke="#00d4ff" stroke-width="0.3" opacity="0.6"/>
-                <path d="M9,17 Q12,15 15,17 Q18,19 21,17" fill="none" stroke="#00ffaa" stroke-width="0.3" opacity="0.5"/>
-                <path d="M10,22 Q13,20 15,22 Q17,24 20,22" fill="none" stroke="#00d4ff" stroke-width="0.3" opacity="0.4"/>
+
+                <!-- Brain outer shape — side view with lobes -->
+                <path class="brain-outline" d="
+                  M52,6 C44,3 34,4 28,8 C22,12 18,14 15,20
+                  C12,26 10,30 10,36 C10,42 12,46 14,50
+                  C11,52 9,56 10,60 C11,64 14,68 18,70
+                  C22,72 26,73 30,72 C34,74 38,76 42,76
+                  C44,76 46,75 48,74 C50,76 53,78 57,78
+                  C62,78 66,75 68,72 C72,74 76,73 79,70
+                  C82,67 84,63 84,58 C86,55 86,50 84,46
+                  C87,42 88,38 86,34 C84,28 80,22 74,16
+                  C68,10 60,8 52,6Z"
+                  fill="none" stroke="url(#holoGrad)" stroke-width="2" filter="url(#holoGlow)" opacity="0.9"
+                  stroke-linejoin="round"/>
+
+                <!-- Frontal lobe bumps (top) -->
+                <path d="M30,14 C34,9 42,7 50,8 C56,9 62,11 66,15" fill="none" stroke="url(#holoGrad)" stroke-width="1.5" opacity="0.7"/>
+                <path d="M24,22 C28,16 38,12 48,12 C58,12 68,16 72,22" fill="none" stroke="#00d4ff" stroke-width="1.2" opacity="0.5"/>
+
+                <!-- Brain folds / sulci (the wrinkly lines) -->
+                <path d="M22,30 C30,26 40,28 48,25 C56,22 66,24 76,28" fill="none" stroke="url(#holoGrad2)" stroke-width="1.3" opacity="0.6"/>
+                <path d="M16,40 C24,35 34,38 44,34 C54,30 64,33 78,38" fill="none" stroke="#00d4ff" stroke-width="1.2" opacity="0.5"/>
+                <path d="M14,50 C22,45 32,48 42,44 C52,40 62,43 80,48" fill="none" stroke="#00ffaa" stroke-width="1.1" opacity="0.45"/>
+                <path d="M18,58 C26,53 36,56 46,52 C56,48 66,52 78,56" fill="none" stroke="url(#holoGrad)" stroke-width="1.0" opacity="0.4"/>
+
+                <!-- Central fissure (divides frontal/parietal) -->
+                <path d="M48,10 C46,20 44,32 46,44 C48,56 50,66 48,74" fill="none" stroke="url(#holoGrad)" stroke-width="1.4" opacity="0.6" stroke-dasharray="3,2"/>
+
+                <!-- Lateral fissure (Sylvian) -->
+                <path d="M28,42 C36,38 44,40 52,42 C60,44 68,42 76,46" fill="none" stroke="#00ffaa" stroke-width="1.5" opacity="0.55"/>
+
+                <!-- Cerebellum (lower back) -->
+                <path d="M60,66 C64,62 70,60 76,62 C80,64 82,68 80,72 C78,74 72,74 68,72 C64,70 60,68 60,66Z" fill="none" stroke="url(#holoGrad2)" stroke-width="1.3" opacity="0.6"/>
+                <path d="M62,66 C66,64 72,64 76,66" fill="none" stroke="#00d4ff" stroke-width="0.8" opacity="0.4"/>
+                <path d="M64,70 C68,68 74,68 78,70" fill="none" stroke="#00d4ff" stroke-width="0.8" opacity="0.35"/>
+
+                <!-- Brain stem -->
+                <path d="M56,74 C54,76 52,80 54,82 C56,84 58,82 58,78 C58,76 57,74 56,74" fill="none" stroke="url(#holoGrad)" stroke-width="1.5" opacity="0.7"/>
+
                 <!-- Neural spark nodes -->
-                <circle class="holo-node" cx="10" cy="10" r="0.8" fill="#00d4ff"/>
-                <circle class="holo-node n2" cx="20" cy="10" r="0.8" fill="#00ffaa"/>
-                <circle class="holo-node n3" cx="15" cy="15" r="0.8" fill="#00d4ff"/>
-                <circle class="holo-node" cx="11" cy="20" r="0.6" fill="#00ffaa"/>
-                <circle class="holo-node n2" cx="19" cy="20" r="0.6" fill="#00d4ff"/>
+                <circle class="holo-node" cx="35" cy="20" r="1.8" fill="#00d4ff"/>
+                <circle class="holo-node n2" cx="60" cy="18" r="1.8" fill="#00ffaa"/>
+                <circle class="holo-node n3" cx="48" cy="38" r="2" fill="#00d4ff"/>
+                <circle class="holo-node" cx="30" cy="48" r="1.5" fill="#00ffaa"/>
+                <circle class="holo-node n2" cx="68" cy="42" r="1.5" fill="#00d4ff"/>
+                <circle class="holo-node n3" cx="50" cy="58" r="1.5" fill="#00ffaa"/>
+                <circle class="holo-node" cx="72" cy="64" r="1.2" fill="#00d4ff"/>
+
+                <!-- Glitching dollar signs -->
+                <g class="dollar-glitch g1">
+                  <text x="30" y="36" font-size="12" font-family="monospace" font-weight="900" fill="#00ffaa" opacity="0">$</text>
+                </g>
+                <g class="dollar-glitch g2">
+                  <text x="58" y="30" font-size="10" font-family="monospace" font-weight="900" fill="#00d4ff" opacity="0">$</text>
+                </g>
+                <g class="dollar-glitch g3">
+                  <text x="44" y="54" font-size="14" font-family="monospace" font-weight="900" fill="#00ffaa" opacity="0">$</text>
+                </g>
+                <g class="dollar-glitch g4">
+                  <text x="68" y="50" font-size="9" font-family="monospace" font-weight="900" fill="#00d4ff" opacity="0">$</text>
+                </g>
+                <g class="dollar-glitch g5">
+                  <text x="22" y="56" font-size="11" font-family="monospace" font-weight="900" fill="#00ffaa" opacity="0">$</text>
+                </g>
+
                 <!-- Scan line -->
-                <line class="holo-scanline" x1="5" y1="3" x2="25" y2="3" stroke="#00ffaa" stroke-width="0.4" opacity="0"/>
+                <line class="holo-scanline" x1="8" y1="5" x2="90" y2="5" stroke="#00ffaa" stroke-width="1" opacity="0"/>
               </svg>
             </div>
           </div>
@@ -67,7 +131,7 @@
       </div>
       <div class="header-divider"></div>
       <div class="system-badges">
-        <button class="badge badge--green" id="statusBadge" onclick="toggleSystemStatus()" title="Click to pause/resume trading" aria-label="Toggle system status">● OPERATIONAL</button>
+        <button class="badge badge--paused" id="statusBadge" onclick="toggleSystemStatus()" title="Click to pause/resume trading" aria-label="Toggle system status">⏸ PAUSED</button>
         <div class="mode-dropdown" id="modeDropdown">
           <button class="badge badge--red" id="modeBadge" onclick="toggleModeDropdown()" title="Click to switch LIVE / PAPER trading mode" aria-label="Toggle trading mode" aria-haspopup="true">MODE: LIVE ▾</button>
           <div class="mode-dropdown-menu hidden" id="modeDropdownMenu">
