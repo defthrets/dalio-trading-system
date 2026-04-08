@@ -5033,153 +5033,304 @@ body.cli-expanded { padding-bottom: 272px; }
 .light-theme .scanlines,
 .light-theme .noise { display: none !important; }
 
-/* ── Light theme: truly bright, clean, airy ── */
-.light-theme body,
-.light-theme { background: #fafbfd !important; color: #2d3748; }
+/* ══════════════════════════════════════════════════════════════
+   LIGHT THEME — override ALL CSS variables for a truly light UI
+   Every element using var(--xxx) automatically becomes light.
+   ══════════════════════════════════════════════════════════════ */
+.light-theme {
+  /* ── Backgrounds: pure white / soft gray ── */
+  --bg-0:        #f8f9fb;
+  --bg-1:        #ffffff;
+  --bg-2:        #f1f3f5;
+  --bg-panel:    #ffffff;
+  --bg-panel-2:  #f8f9fb;
+  --bg-card:     #ffffff;
+  --bg-row-hover:#f1f5f9;
 
+  /* ── Glass & shadows: subtle for light ── */
+  --glass:        rgba(0,0,0,0.02);
+  --glass-border: rgba(0,0,0,0.06);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.06);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+
+  /* ── Primary accent: slightly deeper for contrast on white ── */
+  --primary:     #e68a00;
+  --primary-dim: #cc7a00;
+  --primary-dark:#7c4a00;
+  --primary-glow:rgba(230,138,0,0.08);
+
+  /* ── Semantic: darker tones for readability on white ── */
+  --green:       #16a34a;
+  --green-dim:   #15803d;
+  --green-dark:  #14532d;
+  --green-glow:  rgba(22,163,74,0.08);
+  --amber:       #d97706;
+  --amber-dim:   #b45309;
+  --amber-glow:  rgba(217,119,6,0.08);
+  --red:         #dc2626;
+  --red-dim:     #b91c1c;
+  --red-glow:    rgba(220,38,38,0.08);
+  --cyan:        #0891b2;
+  --cyan-glow:   rgba(8,145,178,0.08);
+
+  /* ── Text: dark on light ── */
+  --text-primary:#1a202c;
+  --text-1:      #2d3748;
+  --text-2:      #4a5568;
+  --text-muted:  #a0aec0;
+
+  /* ── Borders: soft gray ── */
+  --border:      #e2e8f0;
+  --border-hi:   #cbd5e0;
+  --border-act:  #e68a00;
+
+  background: #f8f9fb !important;
+  color: #2d3748;
+}
+
+/* ── Body / root background ── */
+.light-theme body { background: #f8f9fb !important; color: #2d3748; }
+
+/* ── Panels: white cards with soft borders ── */
 .light-theme .panel {
   background: #ffffff;
   border-color: #e2e8f0;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 .light-theme .panel-header {
-  border-color: #edf2f7;
-  background: #fafbfd;
-  color: #2d3748;
+  border-color: #e2e8f0;
+  background: #f8f9fb;
+  color: #1a202c;
 }
+
+/* ── App header & nav: clean white ── */
 .light-theme .app-header {
   background: #ffffff !important;
   border-color: #e2e8f0 !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 .light-theme .tab-nav {
   background: #ffffff !important;
   border-color: #e2e8f0 !important;
 }
 .light-theme .tab-btn {
-  color: #a0aec0;
+  color: #718096;
   background: transparent;
 }
 .light-theme .tab-btn.active {
   color: var(--primary);
   border-color: var(--primary);
-  background: rgba(194,65,12,0.04);
+  background: rgba(230,138,0,0.06);
 }
-.light-theme .tab-btn:hover { color: #4a5568; background: #f7fafc; }
+.light-theme .tab-btn:hover { color: #2d3748; background: #f1f5f9; }
+
+/* ── Ticker strip ── */
 .light-theme .ticker-strip {
   background: #ffffff !important;
   border-color: #e2e8f0 !important;
 }
+.light-theme .ticker-strip::before { background: linear-gradient(to right, #ffffff, transparent) !important; }
+.light-theme .ticker-strip::after  { background: linear-gradient(to left, #ffffff, transparent) !important; }
+
+/* ── Forms & inputs ── */
 .light-theme .form-input,
-.light-theme .ctrl-select {
+.light-theme .ctrl-select,
+.light-theme input,
+.light-theme select,
+.light-theme textarea {
   background: #ffffff !important;
-  border-color: #e2e8f0;
-  color: #2d3748;
+  border-color: #e2e8f0 !important;
+  color: #2d3748 !important;
 }
 .light-theme .form-input:focus,
-.light-theme .ctrl-select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(194,65,12,0.10);
+.light-theme .ctrl-select:focus,
+.light-theme input:focus,
+.light-theme select:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px rgba(230,138,0,0.12);
 }
-.light-theme table tr:nth-child(even) { background: #fafbfd; }
+
+/* ── Tables ── */
+.light-theme table { border-color: #e2e8f0; }
+.light-theme table tr:nth-child(even) { background: #f8f9fb; }
+.light-theme table tr:hover { background: #f1f5f9; }
 .light-theme .data-table th {
-  background: #f7fafc;
-  border-color: #edf2f7;
-  color: #718096;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #4a5568;
   font-weight: 600;
 }
-.light-theme .data-table td { border-color: #edf2f7; color: #4a5568; }
+.light-theme .data-table td { border-color: #e2e8f0; color: #2d3748; }
+.light-theme th { background: #f1f5f9 !important; color: #4a5568 !important; border-color: #e2e8f0 !important; }
+.light-theme td { color: #2d3748; border-color: #e2e8f0 !important; }
+
+/* ── Alerts ── */
 .light-theme .alert-item {
   border-color: #e2e8f0;
   background: #ffffff;
 }
+
+/* ── Signal cards ── */
 .light-theme .signal-card {
   background: #ffffff;
   border-color: #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
-.light-theme .order-modal {
+.light-theme .signal-card::before { opacity: 0; }
+.light-theme .signal-card:hover { border-color: #cbd5e0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+
+/* ── Modals & overlays ── */
+.light-theme .order-modal,
+.light-theme .modal {
   background: #ffffff;
   border-color: #e2e8f0;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.10);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
 }
+.light-theme .modal-overlay { background: rgba(0,0,0,0.15); }
+.light-theme .welcome-overlay { background: rgba(248,249,251,0.96); }
+.light-theme .welcome-box {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+}
+.light-theme .tutorial-overlay { background: rgba(248,249,251,0.92); }
+
+/* ── Search & CLI ── */
 .light-theme .search-box {
   background: #ffffff;
   border-color: #e2e8f0;
 }
+.light-theme .cli-bar {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+.light-theme .cli-input { background: transparent; color: #2d3748; }
+.light-theme .cli-output { background: #f8f9fb; color: #4a5568; border-color: #e2e8f0; }
+
+/* ── Badges ── */
+.light-theme .badge {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #4a5568;
+}
+.light-theme .badge--green { border-color: var(--green); background: rgba(22,163,74,0.08); }
+.light-theme .badge--red   { border-color: var(--red);   background: rgba(220,38,38,0.08); }
+.light-theme .badge--cyan  { border-color: var(--cyan);  background: rgba(8,145,178,0.08); }
+
+/* ── Buttons ── */
+.light-theme .btn-primary { color: #fff; }
+.light-theme .btn, .light-theme .btn-ghost {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #4a5568;
+}
+.light-theme .btn:hover, .light-theme .btn-ghost:hover {
+  background: #e2e8f0;
+  color: #2d3748;
+}
+
+/* ── Dropdowns ── */
+.light-theme .mode-dropdown-menu {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+.light-theme .mode-drop-opt:hover { background: #f1f5f9; }
+.light-theme .broker-picker-dropdown {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+/* ── Cards & tiles ── */
+.light-theme .sq-card,
+.light-theme .opp-card,
+.light-theme .cc-pos-tile,
+.light-theme .broker-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+.light-theme .opp-card:hover,
+.light-theme .sq-card:hover { border-color: #cbd5e0; background: #f8f9fb; }
+.light-theme .paper-summary-grid .ps-stat {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+.light-theme .opportunity-list { background: #ffffff; }
+
+/* ── Scanner ── */
+.light-theme .scanner-toolbar { background: #ffffff; border-color: #e2e8f0; }
+.light-theme .scanner-search {
+  background: #ffffff;
+  color: #2d3748;
+  border-color: #e2e8f0;
+}
+.light-theme .scanner-card { background: #ffffff; }
+.light-theme .scanner-card:hover { background: #f1f5f9; }
+.light-theme .scanner-card-grid { background: #e2e8f0; }
+
+/* ── Spot bubble (tutorials) ── */
 .light-theme .spot-bubble {
   background: #ffffff;
   border-color: var(--primary);
   color: #2d3748;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
-.light-theme .badge {
-  background: #f7fafc;
-  border-color: #e2e8f0;
-  color: #4a5568;
-}
-.light-theme .badge--green { border-color: var(--green); background: rgba(21,128,61,0.06); }
-.light-theme .badge--red   { border-color: var(--red);   background: rgba(185,28,28,0.06); }
-.light-theme .badge--cyan  { border-color: var(--cyan);  background: rgba(2,132,199,0.06); }
-.light-theme .cli-bar {
-  background: #ffffff;
-  border-color: #e2e8f0;
-}
-.light-theme .cli-input { background: transparent; color: #2d3748; }
-.light-theme .cli-output { background: #f7fafc; color: #4a5568; }
-.light-theme .holo-brain-svg path,
-.light-theme .holo-brain-svg circle { opacity: 0.6; }
-.light-theme .mode-dropdown-menu {
-  background: #ffffff;
-  border-color: #e2e8f0;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-}
-.light-theme .mode-drop-opt:hover { background: #f7fafc; }
-.light-theme .welcome-overlay { background: rgba(250,251,253,0.95); }
-.light-theme .welcome-box {
-  background: #ffffff;
-  border-color: #e2e8f0;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.08);
-}
+
+/* ── Heatmap ── */
+.light-theme .hm-cell { border-color: #e2e8f0; }
+.light-theme .hm-ticker { color: #2d3748; }
+
+/* ── Chart wrappers: white background for Chart.js ── */
+.light-theme canvas { filter: none; }
+
+/* ── Stat elements ── */
+.light-theme .stat-label { color: #718096; }
+.light-theme .stat-val { color: #1a202c; }
+
+/* ── Logo ── */
+.light-theme .logo-main { color: #1a202c !important; }
+.light-theme .logo-sub { color: #718096 !important; }
+
+/* ── Misc ── */
+.light-theme .sent-center-label { color: #1a202c !important; }
+.light-theme .sent-glow-ring { opacity: 0.15; }
 .light-theme .ws-dot { box-shadow: none; }
 .light-theme .live-clock { color: #718096; }
-.light-theme .opportunity-list { background: #ffffff; }
-.light-theme .opp-card {
-  background: #ffffff;
-  border-color: #e2e8f0;
+.light-theme .holo-brain-svg path,
+.light-theme .holo-brain-svg circle { opacity: 0.5; }
+.light-theme .td-cyan { color: #0e7490 !important; }
+.light-theme .td-green { color: #16a34a !important; }
+.light-theme .td-red { color: #dc2626 !important; }
+
+/* ── SVG glows: tone down for light ── */
+.light-theme [style*="text-shadow"] { text-shadow: none !important; }
+.light-theme [style*="box-shadow"] { --glow-opacity: 0.05; }
+
+/* ── Scrollbar ── */
+.light-theme ::placeholder { color: #a0aec0; }
+.light-theme ::-webkit-scrollbar-track { background: #f1f5f9; }
+.light-theme ::-webkit-scrollbar-thumb { background: #cbd5e0; }
+.light-theme ::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
+
+/* ── Broker config panels in settings ── */
+.light-theme .broker-config-panel {
+  background: #f8f9fb !important;
+  border-color: #e2e8f0 !important;
 }
-.light-theme .opp-card:hover { border-color: var(--primary); background: #fafbfd; }
-.light-theme .paper-summary-grid .ps-stat {
-  background: #ffffff;
-  border-color: #e2e8f0;
-}
-.light-theme .tutorial-overlay { background: rgba(250,251,253,0.90); }
-.light-theme .btn-primary { color: #fff; }
-.light-theme .btn { background: #f7fafc; border-color: #e2e8f0; color: #4a5568; }
-.light-theme .btn:hover { background: #edf2f7; }
-.light-theme .scanner-toolbar { background: #ffffff; }
-.light-theme .scanner-search {
-  background: #ffffff;
-  color: #2d3748;
-  border-color: #e2e8f0;
-}
-.light-theme .broker-picker-dropdown {
+
+/* ── Quick pos panel ── */
+.light-theme .quick-pos-panel {
   background: #ffffff;
   border-color: #e2e8f0;
   box-shadow: 0 4px 16px rgba(0,0,0,0.08);
 }
-/* Extra light overrides for remaining dark elements */
-.light-theme .logo-main { color: #2d3748 !important; }
-.light-theme .logo-sub { color: #718096 !important; }
-.light-theme .sq-card { background: #ffffff; border-color: #e2e8f0; }
-.light-theme .sent-center-label { color: #2d3748 !important; }
-.light-theme .sent-glow-ring { opacity: 0.2; }
-.light-theme .stat-label { color: #718096; }
-.light-theme .stat-val { color: #2d3748; }
-.light-theme ::placeholder { color: #a0aec0; }
-.light-theme ::-webkit-scrollbar-track { background: #f7fafc; }
-.light-theme ::-webkit-scrollbar-thumb { background: #cbd5e0; }
-.light-theme ::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
+
+/* ── Catch-all: any inline bg using dark var values ── */
+.light-theme [style*="background: var(--bg-"] { background: #ffffff !important; }
+.light-theme .panel-hint { color: #718096; }
+.light-theme .panel-tag { background: #f1f5f9; border-color: #e2e8f0; color: #4a5568; }
 
 /* ═══════════════════════════════════════════════════════════
    MULTI-TIMEFRAME BADGES
