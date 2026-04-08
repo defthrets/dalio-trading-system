@@ -3495,6 +3495,7 @@ async function setTradingMode(newMode) {
     const d = await postJSON('/api/mode', { mode: newMode });
     updateModeUI(d.mode, true);
     refreshCcForMode();
+    loadHealth();  // Immediately refresh stats for new mode
     playBeep(newMode === 'live' ? 880 : 440, 0.1);
     if (brokerWarning) {
       pushAlert('MODE', '⚠ LIVE MODE — No broker configured. Trading is halted until a broker is connected.', 'warning');

@@ -41,7 +41,7 @@ from api.state import (
     ROOT, STATE, SETTINGS_AVAILABLE,
     CIRCUIT_BREAKER, NOTIFIER,
     WATCHLIST, _save_watchlist, _WATCHLIST_LOCK,
-    TRADING_MODE, _save_trading_mode, _MODE_LOCK,
+    _save_trading_mode, _MODE_LOCK,
     REAL_EQUITY_CURVE, _load_real_equity, _save_real_equity,
     _db_save_trade, _db_save_equity_snapshot, _db_get_trades, _db_get_equity_curve,
     _db_save_real_equity_snapshot, _db_get_real_equity_curve,
@@ -82,6 +82,12 @@ from api.auth import (
     AUTH_ENABLED, auth_middleware,
     register_user, login_user, get_current_user,
 )
+
+import api.state as _state_ref  # module ref for mutable TRADING_MODE
+
+def _current_mode() -> str:
+    """Read current trading mode from the state module (avoids stale import binding)."""
+    return _state_ref.TRADING_MODE or "paper"
 
 # ── Settings / DB init ─────────────────────────────────────
 if SETTINGS_AVAILABLE:
@@ -198,7 +204,7 @@ async def _on_startup():
     # Auto-reconnect last active broker from saved credentials
     await _auto_reconnect_saved_broker()
 
-    logger.info(f"Startup complete -- trading mode: {TRADING_MODE}")
+    logger.info(f"Startup complete -- trading mode: {_current_mode()}")
 
 
 async def _auto_reconnect_saved_broker():
@@ -288,7 +294,7 @@ async def auth_me(request: Request):
 
 @app.get("/api/status")
 async def get_status():
-    mode = TRADING_MODE.upper() if TRADING_MODE else "PAPER"
+    mode = _current_mode().upper()
     return {
         "status": "PAUSED" if getattr(STATE, 'paused', False) else "OPERATIONAL",
         "mode": mode,
@@ -313,7 +319,7 @@ async def toggle_pause(body: dict):
 
 @app.get("/api/portfolio/health")
 async def portfolio_health():
-    if TRADING_MODE == "live":
+    if _current_mode() == "live":
         if ACTIVE_BROKER and ACTIVE_BROKER.is_connected():
             try:
                 data = await _gen_live_portfolio_health()
@@ -1265,7 +1271,7 @@ async def watchlist_remove(payload: dict):
 @app.get("/api/mode")
 async def get_trading_mode():
     return {
-        "mode":      TRADING_MODE,
+        "mode":      _current_mode(),
         "broker":    ACTIVE_BROKER.name if ACTIVE_BROKER else None,
         "connected": ACTIVE_BROKER.is_connected() if ACTIVE_BROKER else False,
     }
@@ -1457,7 +1463,7 @@ async def broker_saved():
 def _require_live():
     if ACTIVE_BROKER is None or not ACTIVE_BROKER.is_connected():
         raise HTTPException(503, "No broker connected")
-    if TRADING_MODE != "live":
+    if _current_mode() != "live":
         raise HTTPException(403, "Switch to live mode first")
 
 
@@ -1651,8 +1657,8 @@ async def agent_status():
         "last_cycle_time": _agent_mod._agent_last_cycle_time,
         "next_cycle_time": _agent_mod._agent_next_cycle_time,
         "cycle_count": STATE.cycle_count,
-        "trading_mode": TRADING_MODE,
-        "auto_execute": TRADING_MODE.upper() != "LIVE",
+        "trading_mode": _current_mode(),
+        "auto_execute": _current_mode().upper() != "LIVE",
         "timestamp": datetime.utcnow().isoformat(),
     }
 
