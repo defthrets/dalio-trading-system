@@ -29,6 +29,9 @@ LEMON_DEACTIVATE_URL = "https://api.lemonsqueezy.com/v1/licenses/deactivate"
 # Revalidate online every 30 days
 REVALIDATION_DAYS = 30
 
+# ── Master admin key (bypasses LemonSqueezy) ──────
+MASTER_KEY = "DALIOS-MASTER-9F3A-7X2K-ADMIN"
+
 
 def _machine_fingerprint() -> str:
     """Generate a unique machine fingerprint from hardware identifiers."""
@@ -75,10 +78,12 @@ def is_licensed() -> bool:
 
 
 def needs_revalidation() -> bool:
-    """Check if online revalidation is due."""
+    """Check if online revalidation is due. Master keys never need revalidation."""
     lic = _load_license()
     if not lic:
         return True
+    if lic.get("is_master"):
+        return False
 
     last = lic.get("last_validated")
     if not last:
@@ -94,9 +99,27 @@ def needs_revalidation() -> bool:
 async def activate_license(key: str) -> dict:
     """
     Activate a license key via LemonSqueezy API.
+    Master key bypasses online validation entirely.
     Returns dict with 'success', 'message', and optionally 'data'.
     """
     fingerprint = _machine_fingerprint()
+
+    # Master key — instant activation, no internet needed
+    if key.strip() == MASTER_KEY:
+        _save_license({
+            "license_key": key,
+            "instance_id": "master",
+            "machine_id": fingerprint,
+            "activated": True,
+            "activated_at": datetime.now().isoformat(),
+            "last_validated": datetime.now().isoformat(),
+            "customer_name": "Admin",
+            "customer_email": "admin",
+            "product_name": "DALIOS Master",
+            "is_master": True,
+        })
+        logger.info("Master license activated")
+        return {"success": True, "message": "Master license activated."}
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
