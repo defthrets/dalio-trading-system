@@ -1,13 +1,11 @@
 """
 Dalios -- Market Scanning
-Scanner cache, ticker universes, market data fetching (ASX, crypto, commodities),
+Scanner cache, ticker universes, market data fetching (ASX, commodities),
 market summary, live price lookups.
 """
 
 import asyncio
 import random
-import time
-import aiohttp
 import numpy as np
 from datetime import datetime
 from typing import Optional
@@ -112,74 +110,7 @@ ASX_TICKERS = [
     "WHF.AX", "MIR.AX", "AMH.AX", "PIC.AX",
 ]
 
-# Crypto -- top liquid pairs from Binance/Coinbase/Kraken in yfinance USD format
-CRYPTO_TICKERS = [
-    # -- Layer 1 Major --
-    "BTC-USD", "ETH-USD", "BNB-USD", "SOL-USD", "XRP-USD",
-    "ADA-USD", "AVAX-USD", "DOT-USD", "TRX-USD", "LTC-USD",
-    "ATOM-USD", "NEAR-USD", "ALGO-USD", "XLM-USD", "VET-USD",
-    "ICP-USD", "HBAR-USD", "FIL-USD", "EOS-USD", "XTZ-USD",
-    "NEO-USD", "IOTA-USD", "XMR-USD", "ZEC-USD", "DASH-USD",
-    "WAVES-USD", "ICX-USD", "ONT-USD", "QTUM-USD", "ZIL-USD",
-    "ONE-USD", "KSM-USD", "EGLD-USD", "THETA-USD", "MINA-USD",
-    # -- Layer 2 & Scaling --
-    "MATIC-USD", "ARB-USD", "OP-USD", "IMX-USD", "LRC-USD",
-    "SKL-USD", "METIS-USD", "BOBA-USD", "CELR-USD", "CELO-USD",
-    "STRK-USD", "MANTA-USD", "BLAST-USD",
-    # -- New-Gen L1 --
-    "APT-USD", "SUI-USD", "INJ-USD", "SEI-USD", "TIA-USD",
-    "PYTH-USD", "JUP-USD", "TON-USD", "KASPA-USD", "NOT-USD",
-    "CORE-USD", "HYPE-USD", "MOVE-USD", "VIRTUAL-USD",
-    # -- DeFi -- DEX & Lending --
-    "UNI-USD", "AAVE-USD", "MKR-USD", "COMP-USD", "YFI-USD",
-    "SUSHI-USD", "1INCH-USD", "CRV-USD", "BAL-USD", "DYDX-USD",
-    "GMX-USD", "SNX-USD", "PENDLE-USD", "CAKE-USD",
-    "CVX-USD", "FXS-USD", "VELO-USD", "OSMO-USD",
-    "FLUID-USD", "MORPHO-USD", "EIGEN-USD",
-    # -- DeFi -- Staking & LSDs --
-    "LDO-USD", "RPL-USD", "ANKR-USD", "SSV-USD",
-    "ETHFI-USD", "RSETH-USD",
-    # -- Gaming & Metaverse --
-    "SAND-USD", "MANA-USD", "ENJ-USD", "AXS-USD", "GALA-USD",
-    "FLOW-USD", "BEAM-USD", "RONIN-USD", "ILV-USD", "GODS-USD",
-    "PYR-USD", "MC-USD", "MAGIC-USD", "YGG-USD",
-    # -- Meme Coins --
-    "DOGE-USD", "SHIB-USD", "PEPE-USD", "FLOKI-USD", "BONK-USD",
-    "WIF-USD", "MOG-USD", "TURBO-USD", "POPCAT-USD", "COW-USD",
-    "BRETT-USD", "DOGS-USD", "NEIRO-USD", "PNUT-USD",
-    # -- Infrastructure & Oracles --
-    "LINK-USD", "BAND-USD", "API3-USD", "TRB-USD",
-    "DIA-USD", "UMA-USD", "TELLOR-USD",
-    # -- Storage & Data --
-    "AR-USD", "STORJ-USD", "SC-USD", "BLUZELLE-USD",
-    # -- Privacy --
-    "SCRT-USD", "ROSE-USD", "KEEP-USD", "PHA-USD",
-    # -- Cross-chain & Interop --
-    "RUNE-USD", "AXL-USD", "WORMHOLE-USD", "LAYERZERO-USD",
-    "STG-USD", "ACROSS-USD",
-    # -- AI & Data --
-    "FET-USD", "AGIX-USD", "OCEAN-USD", "NMR-USD",
-    "TAO-USD", "RNDR-USD", "WLD-USD", "ALT-USD",
-    "GRASS-USD", "AIOZ-USD", "GENSYN-USD", "PROMPT-USD",
-    # -- Exchange Tokens --
-    "CRO-USD", "KCS-USD", "GT-USD", "OKB-USD",
-    # -- Web3 & Social --
-    "BAT-USD", "ZRX-USD", "GRT-USD", "LPT-USD",
-    "DESO-USD", "MASK-USD", "LOOKS-USD", "X2Y2-USD",
-    # -- RWA & Tokenisation --
-    "ONDO-USD", "POLYX-USD", "CFG-USD", "RIO-USD",
-    "PAXG-USD",
-    # -- Payments & Stablecoin Infra --
-    "XDC-USD", "NANO-USD", "XNO-USD", "COTI-USD",
-    "QASH-USD", "RVN-USD",
-    # -- NFT & Marketplaces --
-    "APE-USD", "BLUR-USD",
-    # -- Misc High-liquidity --
-    "CHZ-USD", "KAVA-USD", "CFX-USD", "JASMY-USD", "FTM-USD",
-    "HOT-USD", "WIN-USD", "OMG-USD", "BTT-USD", "JST-USD",
-    "SXP-USD", "LINA-USD", "DENT-USD", "MTL-USD",
-    "ACH-USD", "CTSI-USD", "POLY-USD", "REQ-USD",
-]
+CRYPTO_TICKERS = []  # Crypto removed -- ASX + commodities only
 
 COMMODITY_TICKERS = [
     # -- ASX Precious Metal ETFs --
@@ -204,7 +135,7 @@ COMMODITY_TICKERS = [
     "LBS=F",
 ]
 
-ALL_TICKERS = ASX_TICKERS + CRYPTO_TICKERS + COMMODITY_TICKERS
+ALL_TICKERS = ASX_TICKERS + COMMODITY_TICKERS
 CORR_TICKERS = ASX_TICKERS  # Use ASX for correlation heatmap
 
 
@@ -252,27 +183,6 @@ _ASSET_META = {
     "NCM.AX":  {"name": "Newcrest Mining",         "cat": "ASX", "sector": "Gold"},
     "EVN.AX":  {"name": "Evolution Mining",        "cat": "ASX", "sector": "Gold"},
     "NST.AX":  {"name": "Northern Star Resources", "cat": "ASX", "sector": "Gold"},
-    # Crypto
-    "BTC-USD":  {"name": "Bitcoin",         "cat": "Crypto", "sector": "Layer 1"},
-    "ETH-USD":  {"name": "Ethereum",        "cat": "Crypto", "sector": "Layer 1"},
-    "BNB-USD":  {"name": "BNB",             "cat": "Crypto", "sector": "Exchange"},
-    "SOL-USD":  {"name": "Solana",          "cat": "Crypto", "sector": "Layer 1"},
-    "XRP-USD":  {"name": "XRP",             "cat": "Crypto", "sector": "Payments"},
-    "ADA-USD":  {"name": "Cardano",         "cat": "Crypto", "sector": "Layer 1"},
-    "AVAX-USD": {"name": "Avalanche",       "cat": "Crypto", "sector": "Layer 1"},
-    "DOT-USD":  {"name": "Polkadot",        "cat": "Crypto", "sector": "Layer 0"},
-    "LINK-USD": {"name": "Chainlink",       "cat": "Crypto", "sector": "Oracle"},
-    "MATIC-USD":{"name": "Polygon",         "cat": "Crypto", "sector": "Layer 2"},
-    "DOGE-USD": {"name": "Dogecoin",        "cat": "Crypto", "sector": "Meme"},
-    "LTC-USD":  {"name": "Litecoin",        "cat": "Crypto", "sector": "Payments"},
-    "UNI-USD":  {"name": "Uniswap",         "cat": "Crypto", "sector": "DeFi"},
-    "ATOM-USD": {"name": "Cosmos",          "cat": "Crypto", "sector": "Interop"},
-    "NEAR-USD": {"name": "NEAR Protocol",   "cat": "Crypto", "sector": "Layer 1"},
-    "FTM-USD":  {"name": "Fantom",          "cat": "Crypto", "sector": "Layer 1"},
-    "ALGO-USD": {"name": "Algorand",        "cat": "Crypto", "sector": "Layer 1"},
-    "XLM-USD":  {"name": "Stellar",         "cat": "Crypto", "sector": "Payments"},
-    "AAVE-USD": {"name": "Aave",            "cat": "Crypto", "sector": "DeFi"},
-    "SNX-USD":  {"name": "Synthetix",       "cat": "Crypto", "sector": "DeFi"},
     # AU Commodities
     "PMGOLD.AX": {"name": "Perth Mint Gold",       "cat": "Commodity", "sector": "Precious Metals"},
     "QAU.AX":    {"name": "BetaShares Gold ETF",   "cat": "Commodity", "sector": "Precious Metals"},
@@ -305,148 +215,9 @@ _scanner_cache: dict = {}   # market -> {"ts": float, "rows": list}
 _CACHE_TTL = 90             # seconds
 
 
-# ── CoinGecko maps ─────────────────────────────────────
-_COINGECKO_MAP = {
-    "BTC-USD": "bitcoin",      "ETH-USD": "ethereum",       "BNB-USD": "binancecoin",
-    "SOL-USD": "solana",       "XRP-USD": "ripple",          "ADA-USD": "cardano",
-    "AVAX-USD":"avalanche-2",  "DOT-USD": "polkadot",        "LINK-USD":"chainlink",
-    "MATIC-USD":"matic-network","DOGE-USD":"dogecoin",       "LTC-USD": "litecoin",
-    "UNI-USD": "uniswap",      "ATOM-USD":"cosmos",          "NEAR-USD":"near",
-    "FTM-USD": "fantom",       "ALGO-USD":"algorand",        "XLM-USD": "stellar",
-    "AAVE-USD":"aave",         "SNX-USD": "havven",
-}
-
-_CG_SYMBOL_MAP: dict = {
-    "BTC-USD":"bitcoin","ETH-USD":"ethereum","BNB-USD":"binancecoin",
-    "SOL-USD":"solana","XRP-USD":"ripple","ADA-USD":"cardano",
-    "AVAX-USD":"avalanche-2","DOT-USD":"polkadot","TRX-USD":"tron",
-    "LTC-USD":"litecoin","ATOM-USD":"cosmos","NEAR-USD":"near",
-    "ALGO-USD":"algorand","XLM-USD":"stellar","VET-USD":"vechain",
-    "ICP-USD":"internet-computer","HBAR-USD":"hedera-hashgraph",
-    "FIL-USD":"filecoin","EOS-USD":"eos","XTZ-USD":"tezos",
-    "NEO-USD":"neo","IOTA-USD":"iota","XMR-USD":"monero",
-    "ZEC-USD":"zcash","DASH-USD":"dash","WAVES-USD":"waves",
-    "MATIC-USD":"matic-network","ARB-USD":"arbitrum","OP-USD":"optimism",
-    "IMX-USD":"immutable-x","LRC-USD":"loopring","APT-USD":"aptos",
-    "SUI-USD":"sui","INJ-USD":"injective-protocol","SEI-USD":"sei-network",
-    "TIA-USD":"celestia","PYTH-USD":"pyth-network","JUP-USD":"jupiter-exchange-solana",
-    "UNI-USD":"uniswap","AAVE-USD":"aave","MKR-USD":"maker",
-    "COMP-USD":"compound-governance-token","YFI-USD":"yearn-finance",
-    "SUSHI-USD":"sushi","1INCH-USD":"1inch","CRV-USD":"curve-dao-token",
-    "BAL-USD":"balancer","DYDX-USD":"dydx","GMX-USD":"gmx",
-    "SNX-USD":"synthetix-network-token","PENDLE-USD":"pendle",
-    "CAKE-USD":"pancakeswap-token","CVX-USD":"convex-finance",
-    "FXS-USD":"frax-share","LDO-USD":"lido-dao","RPL-USD":"rocket-pool",
-    "ANKR-USD":"ankr","SAND-USD":"the-sandbox","MANA-USD":"decentraland",
-    "ENJ-USD":"enjincoin","AXS-USD":"axie-infinity","GALA-USD":"gala",
-    "FLOW-USD":"flow","BEAM-USD":"beam-2","RONIN-USD":"ronin",
-    "DOGE-USD":"dogecoin","SHIB-USD":"shiba-inu","PEPE-USD":"pepe",
-    "FLOKI-USD":"floki","BONK-USD":"bonk","WIF-USD":"dogwifcoin",
-    "LINK-USD":"chainlink","BAND-USD":"band-protocol","TRB-USD":"tellor",
-    "AR-USD":"arweave","STORJ-USD":"storj","SCRT-USD":"secret",
-    "ROSE-USD":"oasis-network","RUNE-USD":"thorchain","AXL-USD":"axelar",
-    "FET-USD":"fetch-ai","AGIX-USD":"singularitynet","OCEAN-USD":"ocean-protocol",
-    "NMR-USD":"numeraire","TAO-USD":"bittensor","RNDR-USD":"render-token",
-    "WLD-USD":"worldcoin-wld","CRO-USD":"crypto-com-chain",
-    "KCS-USD":"kucoin-shares","BAT-USD":"basic-attention-token",
-    "ZRX-USD":"0x","GRT-USD":"the-graph","LPT-USD":"livepeer",
-    "ONDO-USD":"ondo-finance","THETA-USD":"theta-token","CHZ-USD":"chiliz",
-    "MINA-USD":"mina-protocol","KAVA-USD":"kava","CFX-USD":"conflux-token",
-    "FTM-USD":"fantom","OMG-USD":"omisego","METIS-USD":"metis-token",
-    "SKL-USD":"skale","ICX-USD":"icon","ONT-USD":"ontology",
-    "QTUM-USD":"qtum","ZIL-USD":"zilliqa","VET-USD":"vechain",
-    "HOT-USD":"holotoken","WIN-USD":"wink","REEF-USD":"reef",
-    "JASMY-USD":"jasmycoin","API3-USD":"api3","CELR-USD":"celer-network",
-}
-
-
-async def _get_crypto_coingecko() -> Optional[dict]:
-    """Fetch real crypto prices from CoinGecko free API (no API key needed).
-    Returns both USD and AUD prices for CoinSpot trade execution."""
-    from api.utils import _to_trade_ticker
-    key = "coingecko_prices"
-    cached = _cache_get(key)
-    if cached is not None:
-        return cached
-    ids = ",".join(_COINGECKO_MAP.values())
-    url = (
-        "https://api.coingecko.com/api/v3/simple/price"
-        f"?ids={ids}&vs_currencies=usd,aud&include_24hr_change=true"
-    )
-    try:
-        async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=8),
-            headers={"User-Agent": "DALIOS/1.0"},
-        ) as session:
-            async with session.get(url) as resp:
-                if resp.status != 200:
-                    return None
-                data = await resp.json()
-        rev = {v: k for k, v in _COINGECKO_MAP.items()}
-        result = {}
-        for cid, vals in data.items():
-            if cid not in rev:
-                continue
-            usd_ticker = rev[cid]
-            result[usd_ticker] = {
-                "price":      vals.get("usd"),
-                "price_aud":  vals.get("aud"),
-                "change_pct": round(vals.get("usd_24h_change") or 0, 2),
-                "source":     "CoinGecko",
-            }
-            # Also store under -AUD ticker for CoinSpot lookups
-            aud_ticker = _to_trade_ticker(usd_ticker)
-            result[aud_ticker] = {
-                "price":      vals.get("aud"),
-                "change_pct": round(vals.get("usd_24h_change") or 0, 2),
-                "source":     "CoinGecko",
-            }
-        if result:
-            _cache_set(key, result)
-        return result or None
-    except Exception as exc:
-        logger.warning(f"CoinGecko error: {exc}")
-        return None
-
-
-# ── Binance price feed ──────────────────────────────────
-_BINANCE_PRICE_CACHE: dict = {}
-_BINANCE_PRICE_TS: float = 0.0
-_BINANCE_PRICE_TTL: float = 20.0   # 20-second cache
-
-
-async def _fetch_binance_prices() -> dict:
-    """Fetch all USDT spot prices from Binance public REST -- no API key needed."""
-    global _BINANCE_PRICE_CACHE, _BINANCE_PRICE_TS
-    now = time.time()
-    if now - _BINANCE_PRICE_TS < _BINANCE_PRICE_TTL and _BINANCE_PRICE_CACHE:
-        return _BINANCE_PRICE_CACHE
-
-    try:
-        timeout = aiohttp.ClientTimeout(total=8)
-        async with aiohttp.ClientSession(timeout=timeout) as sess:
-            async with sess.get("https://api.binance.com/api/v3/ticker/price") as resp:
-                if resp.status != 200:
-                    return _BINANCE_PRICE_CACHE
-                data = await resp.json(content_type=None)
-        result = {}
-        for item in data:
-            sym = item["symbol"]  # e.g. "BTCUSDT"
-            if sym.endswith("USDT"):
-                base = sym[:-4]   # "BTC"
-                result[f"{base}-USD"] = float(item["price"])
-        _BINANCE_PRICE_CACHE = result
-        _BINANCE_PRICE_TS = now
-        logger.debug(f"Binance price feed: {len(result)} USDT pairs cached")
-        return result
-    except Exception as e:
-        logger.warning(f"Binance price feed failed: {e}")
-        return _BINANCE_PRICE_CACHE
-
-
 async def _live_price(ticker: str) -> Optional[float]:
     """Get the most recent price for a ticker.
-    Priority: scanner cache -> Binance (crypto) -> yfinance -> demo seed.
+    Priority: scanner cache -> yfinance -> demo seed.
     """
     # 1. Scanner cache (fastest -- already in memory)
     cached_ms = _cache_get("market_summary")
@@ -455,18 +226,12 @@ async def _live_price(ticker: str) -> Optional[float]:
             if item.get("ticker") == ticker and item.get("price") is not None:
                 return float(item["price"])
 
-    # 2. Binance public API for crypto (fast, real-time, no auth needed)
-    if ticker.endswith("-USD"):
-        bn_prices = await _fetch_binance_prices()
-        if ticker in bn_prices:
-            return bn_prices[ticker]
-
-    # 3. yfinance fallback
+    # 2. yfinance fallback
     prices = await _get_prices([ticker], "5d")
     if prices and ticker in prices and prices[ticker]:
         return float(prices[ticker][-1])
 
-    # 4. Demo seed (never None -- prevents order failure on unknown tickers)
+    # 3. Demo seed (never None -- prevents order failure on unknown tickers)
     seed = abs(hash(ticker)) % 10000
     rng = random.Random(seed)
     return round(rng.uniform(10, 300), 2)
@@ -478,16 +243,7 @@ async def _prices_for_positions(tickers: list) -> dict:
         return {}
     result = {}
 
-    # 1. Batch-fetch crypto prices from Binance
-    crypto_tickers = [t for t in tickers if t.endswith("-USD") or t.endswith("-AUD")]
-    if crypto_tickers:
-        bn_prices = await _fetch_binance_prices()
-        for t in crypto_tickers:
-            lookup = t.replace("-AUD", "-USD") if t.endswith("-AUD") else t
-            if lookup in bn_prices:
-                result[t] = bn_prices[lookup]
-
-    # 2. Batch-fetch remaining tickers via yfinance download
+    # 1. Batch-fetch tickers via yfinance download
     remaining = [t for t in tickers if t not in result]
     if remaining and YF_AVAILABLE:
         try:
@@ -540,7 +296,7 @@ async def _prices_for_positions(tickers: list) -> dict:
 # ── Scanner functions ───────────────────────────────────
 
 async def _scan_yfinance(tickers: list, market: str) -> list:
-    """Fetch OHLCV for non-crypto markets."""
+    """Fetch OHLCV for ASX and commodity markets via yfinance."""
     if not YF_AVAILABLE:
         return []
     await SOURCE_LIMITER.acquire("yfinance")
@@ -644,113 +400,8 @@ async def _scan_yfinance_inner(tickers: list, market: str) -> list:
     return rows
 
 
-async def _scan_coingecko(tickers: list) -> list:
-    """Fetch crypto prices: CoinGecko free API first, yfinance fallback."""
-    await SOURCE_LIMITER.acquire("coingecko")
-    try:
-        return await _scan_coingecko_inner(tickers)
-    finally:
-        SOURCE_LIMITER.release("coingecko")
-
-
-async def _scan_coingecko_inner(tickers: list) -> list:
-    cg_ids: list = []
-    id_to_ticker: dict = {}
-    for t in tickers:
-        cg_id = _CG_SYMBOL_MAP.get(t)
-        if cg_id:
-            cg_ids.append(cg_id)
-            id_to_ticker[cg_id] = t
-
-    all_coin_data: dict = {}
-
-    if cg_ids:
-        try:
-            connector = aiohttp.TCPConnector(ssl=True, limit=5)
-            timeout = aiohttp.ClientTimeout(total=20)
-            headers = {"User-Agent": "DALIOS/1.0", "Accept": "application/json"}
-            async with aiohttp.ClientSession(connector=connector, timeout=timeout, headers=headers) as session:
-                chunk_size = 100
-                for i in range(0, len(cg_ids), chunk_size):
-                    chunk = cg_ids[i:i + chunk_size]
-                    url = (
-                        "https://api.coingecko.com/api/v3/coins/markets"
-                        f"?vs_currency=usd&ids={','.join(chunk)}"
-                        "&order=market_cap_desc&per_page=250&page=1"
-                        "&price_change_percentage=24h&sparkline=false"
-                    )
-                    try:
-                        async with session.get(url) as resp:
-                            if resp.status == 200:
-                                data = await resp.json(content_type=None)
-                                for coin in data:
-                                    all_coin_data[coin["id"]] = coin
-                            elif resp.status == 429:
-                                logger.warning("CoinGecko rate-limited (429) -- using yfinance fallback")
-                                break
-                            else:
-                                logger.warning(f"CoinGecko HTTP {resp.status}")
-                    except Exception as exc:
-                        logger.warning(f"CoinGecko chunk error: {exc}")
-        except Exception as exc:
-            logger.warning(f"CoinGecko session error: {exc}")
-
-    rows = []
-    found_tickers: set = set()
-
-    for cg_id, ticker in id_to_ticker.items():
-        coin = all_coin_data.get(cg_id, {})
-        price = float(coin.get("current_price") or 0)
-        if price <= 0:
-            continue
-        found_tickers.add(ticker)
-        chg_pct = float(coin.get("price_change_percentage_24h") or 0)
-        vol = float(coin.get("total_volume") or 0)
-        mkt_cap = float(coin.get("market_cap") or 0)
-        rows.append({
-            "ticker":          ticker,
-            "name":            coin.get("name", ticker.replace("-USD", "")),
-            "sector":          "Crypto",
-            "price":           round(price, 6) if price < 1 else round(price, 2),
-            "change":          round(price * chg_pct / 100, 6),
-            "change_pct":      round(chg_pct, 2),
-            "volume_fmt":      _fmt_vol(vol),
-            "volume":          int(vol),
-            "market_cap_fmt":  _fmt_vol(mkt_cap),
-            "in_watchlist":    ticker in WATCHLIST,
-        })
-
-    # yfinance fallback for tickers CoinGecko missed
-    missing = [t for t in tickers if t not in found_tickers]
-    if missing:
-        logger.info(f"CoinGecko missed {len(missing)} tickers -- yfinance fallback")
-        yf_rows = await _scan_yfinance(missing, "crypto")
-        for r in yf_rows:
-            r.setdefault("market_cap_fmt", "--")
-            r["sector"] = "Crypto"
-            rows.append(r)
-
-    logger.info(f"Crypto scan: {len(found_tickers)} CoinGecko + {len(missing)} yfinance = {len(rows)} rows")
-    return rows
-
-
 # ── Market summary demo data ───────────────────────────
 _MARKET_DEMO = [
-    ("BTC-USD",  "Bitcoin",       "crypto",     95_420.0,   2.14),
-    ("ETH-USD",  "Ethereum",      "crypto",      3_512.5,   1.87),
-    ("SOL-USD",  "Solana",        "crypto",       178.40,   4.31),
-    ("BNB-USD",  "BNB",           "crypto",       612.00,   1.05),
-    ("XRP-USD",  "XRP",           "crypto",         0.62,   3.20),
-    ("ADA-USD",  "Cardano",       "crypto",         0.45,  -1.10),
-    ("DOGE-USD", "Dogecoin",      "crypto",         0.082,  5.40),
-    ("AVAX-USD", "Avalanche",     "crypto",        38.50,   2.80),
-    ("DOT-USD",  "Polkadot",      "crypto",         7.20,  -0.95),
-    ("LINK-USD", "Chainlink",     "crypto",        15.80,   1.65),
-    ("MATIC-USD","Polygon",       "crypto",         0.72,  -1.40),
-    ("ATOM-USD", "Cosmos",        "crypto",         9.10,   0.85),
-    ("LTC-USD",  "Litecoin",      "crypto",        85.40,   0.52),
-    ("UNI-USD",  "Uniswap",       "crypto",         7.90,   2.10),
-    ("NEAR-USD", "NEAR",          "crypto",         5.60,   3.15),
     ("^AXJO",    "ASX 200",       "index",       7_985.0,   0.42),
     ("CBA.AX",   "CommBank",      "asx",          145.20,   0.72),
     ("BHP.AX",   "BHP Group",     "asx",           42.80,  -0.33),
