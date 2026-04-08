@@ -29,48 +29,87 @@ ASX_TICKERS = [
     # -- Other Banks & Financials --
     "MQG.AX", "BEN.AX", "BOQ.AX", "SUN.AX", "QBE.AX", "IAG.AX",
     "AMP.AX", "ASX.AX", "PPT.AX", "CGF.AX", "CPU.AX", "NHF.AX",
-    "MPL.AX", "NIB.AX", "AUB.AX",
-    # -- Mining & Resources --
+    "MPL.AX", "NIB.AX", "AUB.AX", "HUB.AX", "MFG.AX", "PTM.AX",
+    "GQG.AX", "PDL.AX", "EQT.AX", "IFL.AX", "CIP.AX", "AFG.AX",
+    "MAB.AX", "SDF.AX",
+    # -- Mining & Resources (Majors) --
     "BHP.AX", "RIO.AX", "FMG.AX", "S32.AX", "MIN.AX", "LYC.AX",
     "IGO.AX", "SFR.AX", "PLS.AX", "ILU.AX", "AWC.AX",
-    "LTR.AX", "NIC.AX", "WSA.AX",
+    "LTR.AX", "NIC.AX", "WSA.AX", "CIA.AX", "MGX.AX",
+    "GRR.AX", "CLQ.AX", "CHN.AX", "TNG.AX",
+    # -- Mining Juniors --
+    "NHC.AX", "WHC.AX", "CRN.AX", "BCB.AX", "TER.AX",
+    "RED.AX", "SLR.AX", "OGC.AX", "BGL.AX", "RXL.AX",
+    "MEU.AX", "AIS.AX", "IPT.AX", "GWR.AX", "SBR.AX",
     # -- Gold & Precious Metals --
     "NST.AX", "EVN.AX", "SBM.AX", "RRL.AX", "SAR.AX",
     "GOR.AX", "CMM.AX", "RMS.AX", "DEG.AX", "WAF.AX",
+    "MML.AX", "RSG.AX", "PRU.AX", "SDG.AX", "BDC.AX",
+    "SKY.AX", "MAU.AX",
+    # -- Lithium & Battery Metals --
+    "AKE.AX", "SYA.AX", "CXO.AX", "GL1.AX",
+    "AVZ.AX", "LKE.AX", "PLL.AX", "EUR.AX",
+    "DEL.AX", "NVX.AX", "EV1.AX", "LAT.AX",
+    # -- Uranium --
+    "PDN.AX", "BOE.AX", "NXE.AX", "ERA.AX",
+    "92E.AX", "AGE.AX", "SLX.AX", "PEN.AX",
+    # -- Rare Earths --
+    "ARU.AX", "VML.AX", "HAS.AX",
+    "REE.AX", "NTU.AX", "ASM.AX", "HLX.AX",
     # -- Energy --
     "WDS.AX", "STO.AX", "BPT.AX", "AGL.AX", "ORG.AX",
-    "APA.AX", "KAR.AX", "CVN.AX",
+    "APA.AX", "KAR.AX", "CVN.AX", "STX.AX", "MEL.AX",
+    "COE.AX", "NHE.AX", "TAP.AX", "OPT.AX",
     # -- Healthcare & Biotech --
     "CSL.AX", "RMD.AX", "COH.AX", "SHL.AX", "ANN.AX",
     "PME.AX", "EBO.AX", "HLS.AX", "PNV.AX", "RHC.AX",
-    "CUV.AX", "NEU.AX", "TLX.AX", "MSB.AX",
+    "CUV.AX", "NEU.AX", "TLX.AX", "MSB.AX", "AVH.AX",
+    "IMM.AX", "PXA.AX", "NAN.AX", "ACL.AX", "RAC.AX",
+    "PRO.AX", "MX1.AX", "OSL.AX", "EMV.AX",
     # -- Technology --
     "WTC.AX", "XRO.AX", "ALU.AX", "MP1.AX", "TNE.AX",
     "REA.AX", "APX.AX", "TYR.AX", "SDR.AX", "DTL.AX",
-    "ZIP.AX", "EML.AX", "HUB.AX", "NXT.AX",
+    "NXT.AX", "DUB.AX", "LNW.AX", "STP.AX", "RDY.AX",
+    "BVS.AX", "OTW.AX", "AR9.AX",
+    # -- Fintech --
+    "ZIP.AX", "EML.AX", "APT.AX", "SPT.AX", "MNY.AX",
+    "LBL.AX", "MYS.AX", "PGL.AX", "ABA.AX", "FIN.AX",
+    # -- Cybersecurity --
+    "TNT.AX", "RNO.AX", "PKS.AX",
     # -- Consumer / Retail --
     "WES.AX", "WOW.AX", "COL.AX", "JBH.AX", "TWE.AX",
     "HVN.AX", "DMP.AX", "SUL.AX", "LOV.AX", "KGN.AX",
-    "TPW.AX", "MYR.AX", "NCK.AX",
+    "TPW.AX", "MYR.AX", "NCK.AX", "BBN.AX", "UNI.AX",
+    "PFP.AX", "BCF.AX", "TRS.AX", "ADH.AX",
     # -- Consumer Staples & Food --
     "GNC.AX", "NUF.AX", "ELD.AX", "BKL.AX",
+    "CGC.AX", "TGR.AX", "HUO.AX", "SKC.AX",
+    # -- Cannabis --
+    "CPH.AX", "BOD.AX", "CAN.AX", "LEGA.AX", "CUP.AX",
     # -- REITs --
     "GMG.AX", "SCG.AX", "GPT.AX", "VCX.AX", "CLW.AX",
     "MGR.AX", "DXS.AX", "CHC.AX", "BWP.AX", "NSR.AX",
     "CQR.AX", "HMC.AX", "ABP.AX", "SCP.AX", "HDN.AX",
+    "URW.AX", "AOF.AX", "CNI.AX", "GDI.AX", "PPC.AX",
+    "RGN.AX", "ARF.AX", "CRF.AX",
     # -- Industrials & Infrastructure --
     "TCL.AX", "QAN.AX", "BXB.AX", "AZJ.AX", "QUB.AX",
     "WOR.AX", "MND.AX", "JHX.AX", "CSR.AX", "BLD.AX",
-    "DOW.AX", "SVW.AX",
+    "DOW.AX", "SVW.AX", "ALQ.AX", "NWH.AX", "SXE.AX",
+    "CIM.AX", "IDR.AX", "RWC.AX", "LGL.AX",
     # -- Telecom --
-    "TLS.AX", "TPG.AX", "SPK.AX",
+    "TLS.AX", "TPG.AX", "SPK.AX", "NXL.AX", "PPS.AX",
     # -- Media --
-    "NWS.AX", "SEK.AX", "CAR.AX", "REA.AX", "NEC.AX",
-    # -- LICs & ETFs --
+    "NWS.AX", "SEK.AX", "CAR.AX", "NEC.AX", "SWM.AX",
+    "MMS.AX", "OML.AX", "AHG.AX",
+    # -- LICs & ASX ETFs --
     "VAS.AX", "VGS.AX", "IOZ.AX", "STW.AX", "NDQ.AX",
-    "A200.AX", "GOLD.AX", "ETHI.AX",
-    # -- Diversified --
+    "A200.AX", "GOLD.AX", "ETHI.AX", "IVV.AX", "IAA.AX",
+    "VHY.AX", "SFY.AX", "MVW.AX", "TECH.AX", "HACK.AX",
+    "SEMI.AX", "RBTZ.AX", "ACDC.AX", "ERTH.AX",
+    # -- Diversified / LICs --
     "AFI.AX", "ARG.AX", "MLT.AX", "WAM.AX",
+    "WHF.AX", "MIR.AX", "AMH.AX", "PIC.AX",
 ]
 
 # Crypto -- top liquid pairs from Binance/Coinbase/Kraken in yfinance USD format
@@ -82,65 +121,87 @@ CRYPTO_TICKERS = [
     "ICP-USD", "HBAR-USD", "FIL-USD", "EOS-USD", "XTZ-USD",
     "NEO-USD", "IOTA-USD", "XMR-USD", "ZEC-USD", "DASH-USD",
     "WAVES-USD", "ICX-USD", "ONT-USD", "QTUM-USD", "ZIL-USD",
+    "ONE-USD", "KSM-USD", "EGLD-USD", "THETA-USD", "MINA-USD",
     # -- Layer 2 & Scaling --
     "MATIC-USD", "ARB-USD", "OP-USD", "IMX-USD", "LRC-USD",
-    "SKL-USD", "METIS-USD",
+    "SKL-USD", "METIS-USD", "BOBA-USD", "CELR-USD", "CELO-USD",
+    "STRK-USD", "MANTA-USD", "BLAST-USD",
     # -- New-Gen L1 --
     "APT-USD", "SUI-USD", "INJ-USD", "SEI-USD", "TIA-USD",
-    "PYTH-USD", "JUP-USD",
+    "PYTH-USD", "JUP-USD", "TON-USD", "KASPA-USD", "NOT-USD",
+    "CORE-USD", "HYPE-USD", "MOVE-USD", "VIRTUAL-USD",
     # -- DeFi -- DEX & Lending --
     "UNI-USD", "AAVE-USD", "MKR-USD", "COMP-USD", "YFI-USD",
     "SUSHI-USD", "1INCH-USD", "CRV-USD", "BAL-USD", "DYDX-USD",
     "GMX-USD", "SNX-USD", "PENDLE-USD", "CAKE-USD",
-    "CVX-USD", "FXS-USD",
-    # -- DeFi -- Staking --
-    "LDO-USD", "RPL-USD", "ANKR-USD",
+    "CVX-USD", "FXS-USD", "VELO-USD", "OSMO-USD",
+    "FLUID-USD", "MORPHO-USD", "EIGEN-USD",
+    # -- DeFi -- Staking & LSDs --
+    "LDO-USD", "RPL-USD", "ANKR-USD", "SSV-USD",
+    "ETHFI-USD", "RSETH-USD",
     # -- Gaming & Metaverse --
     "SAND-USD", "MANA-USD", "ENJ-USD", "AXS-USD", "GALA-USD",
-    "FLOW-USD", "BEAM-USD", "RONIN-USD",
+    "FLOW-USD", "BEAM-USD", "RONIN-USD", "ILV-USD", "GODS-USD",
+    "PYR-USD", "MC-USD", "MAGIC-USD", "YGG-USD",
     # -- Meme Coins --
     "DOGE-USD", "SHIB-USD", "PEPE-USD", "FLOKI-USD", "BONK-USD",
-    "WIF-USD",
+    "WIF-USD", "MOG-USD", "TURBO-USD", "POPCAT-USD", "COW-USD",
+    "BRETT-USD", "DOGS-USD", "NEIRO-USD", "PNUT-USD",
     # -- Infrastructure & Oracles --
     "LINK-USD", "BAND-USD", "API3-USD", "TRB-USD",
+    "DIA-USD", "UMA-USD", "TELLOR-USD",
     # -- Storage & Data --
-    "AR-USD", "STORJ-USD",
+    "AR-USD", "STORJ-USD", "SC-USD", "BLUZELLE-USD",
     # -- Privacy --
-    "SCRT-USD", "ROSE-USD",
+    "SCRT-USD", "ROSE-USD", "KEEP-USD", "PHA-USD",
     # -- Cross-chain & Interop --
-    "RUNE-USD", "AXL-USD",
+    "RUNE-USD", "AXL-USD", "WORMHOLE-USD", "LAYERZERO-USD",
+    "STG-USD", "ACROSS-USD",
     # -- AI & Data --
     "FET-USD", "AGIX-USD", "OCEAN-USD", "NMR-USD",
-    "TAO-USD", "RNDR-USD", "WLD-USD",
+    "TAO-USD", "RNDR-USD", "WLD-USD", "ALT-USD",
+    "GRASS-USD", "AIOZ-USD", "GENSYN-USD", "PROMPT-USD",
     # -- Exchange Tokens --
-    "CRO-USD", "KCS-USD",
+    "CRO-USD", "KCS-USD", "GT-USD", "OKB-USD",
     # -- Web3 & Social --
     "BAT-USD", "ZRX-USD", "GRT-USD", "LPT-USD",
-    # -- RWA --
-    "ONDO-USD",
+    "DESO-USD", "MASK-USD", "LOOKS-USD", "X2Y2-USD",
+    # -- RWA & Tokenisation --
+    "ONDO-USD", "POLYX-USD", "CFG-USD", "RIO-USD",
+    "PAXG-USD",
+    # -- Payments & Stablecoin Infra --
+    "XDC-USD", "NANO-USD", "XNO-USD", "COTI-USD",
+    "QASH-USD", "RVN-USD",
+    # -- NFT & Marketplaces --
+    "APE-USD", "BLUR-USD",
     # -- Misc High-liquidity --
-    "THETA-USD", "CHZ-USD", "CELR-USD", "MINA-USD",
-    "KAVA-USD", "CFX-USD", "JASMY-USD", "FTM-USD",
-    "HOT-USD", "WIN-USD", "REEF-USD", "OMG-USD",
+    "CHZ-USD", "KAVA-USD", "CFX-USD", "JASMY-USD", "FTM-USD",
+    "HOT-USD", "WIN-USD", "OMG-USD", "BTT-USD", "JST-USD",
+    "SXP-USD", "LINA-USD", "DENT-USD", "MTL-USD",
+    "ACH-USD", "CTSI-USD", "POLY-USD", "REQ-USD",
 ]
 
 COMMODITY_TICKERS = [
-    # -- ASX Precious Metal ETFs (not in ASX_TICKERS) --
-    "PMGOLD.AX", "QAU.AX",
+    # -- ASX Precious Metal ETFs --
+    "PMGOLD.AX", "QAU.AX", "MNRS.AX",
     # -- ASX Crude Oil ETF --
     "OOO.AX",
-    # -- ASX Broad Commodity ETF --
-    "QCB.AX",
-    # -- ASX Copper --
-    "OZL.AX",
-    # -- ASX Uranium (not in ASX_TICKERS) --
-    "PDN.AX", "BMN.AX", "LOT.AX", "DYL.AX", "PEN.AX",
-    # -- ASX Lithium (not in ASX_TICKERS) --
-    "AKE.AX", "CXO.AX", "GL1.AX", "SYA.AX",
-    # -- ASX Rare Earths (not in ASX_TICKERS) --
-    "ARU.AX", "VML.AX", "HAS.AX",
+    # -- ASX Broad Commodity ETFs --
+    "QCB.AX", "COMB.AX",
+    # -- ASX Copper & Base Metals --
+    "OZL.AX", "29M.AX",
+    # -- ASX Uranium (additional, not in ASX_TICKERS) --
+    "BMN.AX", "LOT.AX", "DYL.AX",
+    "BKY.AX", "TOE.AX", "GTR.AX",
+    # -- ASX Agriculture & Soft Commodities --
+    "FOOD.AX", "QAG.AX",
     # -- Global Futures (commodity price exposure) --
     "GC=F", "SI=F", "CL=F", "BZ=F", "NG=F",
+    "HG=F", "PL=F", "PA=F",
+    "ZC=F", "ZW=F", "ZS=F",
+    "KC=F", "SB=F", "CC=F",
+    "LE=F", "GF=F", "HE=F",
+    "LBS=F",
 ]
 
 ALL_TICKERS = ASX_TICKERS + CRYPTO_TICKERS + COMMODITY_TICKERS
