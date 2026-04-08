@@ -892,15 +892,15 @@ a:hover { color: var(--primary); text-decoration: underline; }
   97%      { opacity: 1; }
 }
 #statusBadge.badge--green {
-  color: #00ff44;
-  border-color: #00ff44;
-  background: rgba(0,255,68,0.12);
+  color: var(--green);
+  border-color: var(--green);
+  background: rgba(34,197,94,0.12);
   animation: badgeBorderPulse 3s ease infinite;
 }
 #statusBadge.badge--green:hover {
-  background: rgba(0,255,68,0.25);
-  box-shadow: 0 0 20px #00ff44, 0 0 40px rgba(0,255,68,0.4), 0 0 8px #00ff44 inset;
-  text-shadow: 0 0 14px rgba(0,255,68,1);
+  background: rgba(34,197,94,0.25);
+  box-shadow: 0 0 20px var(--green), 0 0 40px rgba(34,197,94,0.4), 0 0 8px var(--green) inset;
+  text-shadow: 0 0 14px var(--green);
 }
 
 /* ── PAUSED badge: dead and grey ── */
