@@ -2563,7 +2563,9 @@ canvas { display: block; max-width: 100%; }
 /* ─── Welcome Tutorial Popup ─── */
 .welcome-overlay {
   position: fixed; inset: 0; z-index: 10000;
-  background: rgba(255,255,255,0.85);
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex; align-items: center; justify-content: center;
   animation: fadeIn 0.4s ease;
 }
@@ -5364,7 +5366,7 @@ body.cli-expanded { padding-bottom: 272px; }
   box-shadow: 0 8px 32px rgba(0,0,0,0.14);
 }
 .light-theme .modal-overlay { background: rgba(60,48,32,0.12); }
-.light-theme .welcome-overlay { background: rgba(236,229,218,0.96); }
+.light-theme .welcome-overlay { background: rgba(236,229,218,0.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .light-theme .welcome-box {
   background: #faf6f0;
   border-color: #ddd4c6;
