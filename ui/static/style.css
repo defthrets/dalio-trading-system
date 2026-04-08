@@ -597,127 +597,181 @@ a:hover { color: var(--primary); text-decoration: underline; }
   color: var(--primary);
 }
 
-/* ── Hologram Cash Stack Logo ── */
-.holo-cash {
+/* ── 3D Cash Stack Logo (GTA-style) ── */
+.cash3d {
   width: 68px;
   height: 68px;
   display: flex;
   align-items: center;
   justify-content: center;
-  text-shadow: none;
   position: relative;
 }
-.holo-cash-scene {
-  width: 64px;
-  height: 64px;
-  perspective: 400px;
+.cash3d-scene {
+  width: 56px;
+  height: 46px;
+  perspective: 300px;
   position: relative;
 }
-.holo-cash-rotator {
+.cash3d-rotator {
   width: 100%;
   height: 100%;
-  animation: holoCashSpin 7s linear infinite;
+  position: relative;
   transform-style: preserve-3d;
+  animation: cash3dSpin 5s linear infinite;
 }
-@keyframes holoCashSpin {
-  0%   { transform: rotateY(0deg); }
-  100% { transform: rotateY(360deg); }
+@keyframes cash3dSpin {
+  0%   { transform: rotateY(0deg) rotateX(-8deg); }
+  100% { transform: rotateY(360deg) rotateX(-8deg); }
 }
-.holo-cash-svg {
-  width: 64px;
-  height: 64px;
-  filter: drop-shadow(0 0 6px rgba(0,212,255,0.5)) drop-shadow(0 0 16px rgba(0,255,170,0.25));
+
+/* Shared face styles */
+.cash3d-face {
+  position: absolute;
   backface-visibility: visible;
 }
 
-/* Note stack shimmer */
-.cash-note { animation: cashNoteShimmer 4s ease-in-out infinite; }
-.cash-n1 { animation-delay: 0s; }
-.cash-n2 { animation-delay: 0.3s; }
-.cash-n3 { animation-delay: 0.6s; }
-@keyframes cashNoteShimmer {
-  0%, 100% { opacity: var(--base-opacity, 0.9); }
-  50%      { opacity: 1; filter: drop-shadow(0 0 4px rgba(0,255,170,0.4)); }
+/* Bill dimensions: 56w x 30h, stack depth: 14px */
+.cash3d-front {
+  width: 56px; height: 30px;
+  top: 8px; left: 0;
+  transform: translateZ(7px);
 }
-.cash-n1 { --base-opacity: 0.35; }
-.cash-n2 { --base-opacity: 0.55; }
-.cash-n3 { --base-opacity: 0.9; }
-
-/* Dollar sign pulse */
-.cash-dollar {
-  animation: cashDollarPulse 2s ease-in-out infinite;
+.cash3d-back {
+  width: 56px; height: 30px;
+  top: 8px; left: 0;
+  transform: translateZ(-7px) rotateY(180deg);
 }
-@keyframes cashDollarPulse {
-  0%, 100% { opacity: 0.85; }
-  50%      { opacity: 1; font-size: 19px; }
+.cash3d-right {
+  width: 14px; height: 30px;
+  top: 8px; left: 49px;
+  transform: rotateY(90deg) translateZ(21px);
 }
-
-/* Floating coins bob */
-.cash-coin { animation: cashCoinBob 3s ease-in-out infinite; }
-.cash-coin.c1 { animation-delay: 0s; }
-.cash-coin.c2 { animation-delay: 0.8s; }
-.cash-coin.c3 { animation-delay: 1.6s; }
-@keyframes cashCoinBob {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-3px); }
+.cash3d-left {
+  width: 14px; height: 30px;
+  top: 8px; left: 0;
+  transform: rotateY(-90deg) translateZ(7px);
 }
-
-/* RGB glitch ghosts */
-.cash-ghost-r { animation: cashGlitchR 6s ease-in-out infinite; }
-.cash-ghost-g { animation: cashGlitchG 6s ease-in-out infinite 0.1s; }
-@keyframes cashGlitchR {
-  0%, 88%, 100% { opacity: 0; transform: none; }
-  89%  { opacity: 0.7; transform: translate(2px, -1px) skewX(-3deg); }
-  90%  { opacity: 0; transform: translate(-1px, 1px); }
-  91%  { opacity: 0.5; transform: translate(1px, 0); }
-  92%  { opacity: 0; transform: none; }
-  95%  { opacity: 0.6; transform: translate(2px, -1px) skewX(-4deg); }
-  96%  { opacity: 0; transform: none; }
+.cash3d-top {
+  width: 56px; height: 14px;
+  top: 1px; left: 0;
+  transform: rotateX(90deg) translateZ(7px);
+  background: linear-gradient(180deg, #2d6b3a 0%, #1a4d28 100%);
+  border: 1px solid #3a8a4a;
 }
-@keyframes cashGlitchG {
-  0%, 88%, 100% { opacity: 0; transform: none; }
-  89%  { opacity: 0.5; transform: translate(-2px, 1px) skewX(3deg); }
-  90%  { opacity: 0; transform: translate(1px, -1px); }
-  91%  { opacity: 0.4; transform: translate(-1px, 0); }
-  92%  { opacity: 0; transform: none; }
-  95%  { opacity: 0.5; transform: translate(-2px, 1px) skewX(3deg); }
-  96%  { opacity: 0; transform: none; }
+.cash3d-bottom {
+  width: 56px; height: 14px;
+  top: 31px; left: 0;
+  transform: rotateX(-90deg) translateZ(7px);
+  background: linear-gradient(0deg, #1a3d22 0%, #1a4d28 100%);
+  border: 1px solid #2a5a35;
 }
 
-/* Scan line sweeps */
-.cash-scanline {
-  animation: cashScan 4s ease-in-out infinite;
+/* Bill face design */
+.bill-face {
+  width: 100%; height: 100%;
+  background: linear-gradient(135deg, #1e6b30 0%, #2a8540 30%, #1e6b30 60%, #236e35 100%);
+  border: 1.5px solid #4aad5a;
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 0 8px rgba(0,0,0,0.3);
 }
-@keyframes cashScan {
-  0%   { y1: 5; y2: 5; opacity: 0; }
-  10%  { opacity: 0.4; }
-  90%  { opacity: 0.4; }
-  100% { y1: 75; y2: 75; opacity: 0; }
+.bill-border {
+  position: absolute;
+  top: 3px; left: 3px; right: 3px; bottom: 3px;
+  border: 1px solid rgba(120,200,130,0.4);
+  border-radius: 1px;
+}
+.bill-oval {
+  position: absolute;
+  width: 18px; height: 18px;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(120,200,130,0.35);
+  border-radius: 50%;
+}
+.bill-dollar {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Georgia', serif;
+  font-size: 16px;
+  font-weight: bold;
+  color: rgba(180,240,180,0.9);
+  text-shadow: 0 0 4px rgba(100,200,120,0.5);
+}
+.bill-100 {
+  position: absolute;
+  bottom: 2px; right: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 7px;
+  font-weight: bold;
+  color: rgba(150,220,160,0.6);
 }
 
-/* Holographic flicker overlay */
-.holo-cash-scene::after {
+/* Stack edge — shows individual bill lines */
+.stack-edge {
+  width: 100%; height: 100%;
+  background: repeating-linear-gradient(
+    180deg,
+    #1a4d28 0px,
+    #2a7a3a 1px,
+    #1a4d28 2px
+  );
+  border: 1px solid #3a8a4a;
+}
+
+/* Money band (wraps around center) */
+.cash3d-band {
+  position: absolute;
+  width: 60px; height: 10px;
+  top: 18px; left: -2px;
+  transform: translateZ(8px);
+  background: linear-gradient(180deg, #c4973a 0%, #e8c44a 30%, #c4973a 60%, #a07828 100%);
+  border: 1px solid #d4a840;
+  border-radius: 1px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  backface-visibility: visible;
+}
+.cash3d-band::after {
+  content: '$$$';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Courier New', monospace;
+  font-size: 6px;
+  font-weight: bold;
+  color: rgba(80,50,10,0.6);
+  letter-spacing: 2px;
+}
+
+/* Holographic glow */
+.cash3d-scene::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent 0px,
-    rgba(0,212,255,0.03) 2px,
-    transparent 4px
-  );
-  animation: holoFlicker 3s ease-in-out infinite;
+  top: -4px; left: -4px; right: -4px; bottom: -4px;
+  border-radius: 4px;
+  background: radial-gradient(ellipse, rgba(0,212,255,0.15) 0%, transparent 70%);
+  animation: cashGlow 3s ease-in-out infinite;
   pointer-events: none;
-  mix-blend-mode: screen;
-  z-index: 3;
+  z-index: -1;
 }
-@keyframes holoFlicker {
-  0%, 100% { opacity: 0.4; }
-  15%      { opacity: 1; }
-  30%      { opacity: 0.2; }
-  50%      { opacity: 0.8; }
-  70%      { opacity: 0.3; }
-  85%      { opacity: 0.9; }
+@keyframes cashGlow {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+
+/* Glitch effect on the whole stack */
+.cash3d-rotator {
+  animation: cash3dSpin 5s linear infinite, cashGlitch 7s ease-in-out infinite;
+}
+@keyframes cashGlitch {
+  0%, 88%, 92%, 100% { filter: none; }
+  89% { filter: drop-shadow(2px 0 0 rgba(255,0,64,0.5)) drop-shadow(-2px 0 0 rgba(0,255,136,0.5)); }
+  90% { filter: drop-shadow(-1px 0 0 rgba(0,200,255,0.4)) drop-shadow(1px 0 0 rgba(255,0,64,0.4)); transform: rotateY(var(--r,180deg)) rotateX(-8deg) translate(1px, -1px); }
+  91% { filter: none; }
+  95% { filter: drop-shadow(1px 0 0 rgba(255,0,64,0.3)); }
+  96% { filter: none; }
 }
 .logo-text { display: flex; flex-direction: column; line-height: 1.1; }
 .logo-main {
@@ -5353,21 +5407,11 @@ body.cli-expanded { padding-bottom: 272px; }
   animation: none !important;
 }
 .light-theme .logo-sub { color: #000000 !important; }
-.light-theme .holo-cash-svg {
-  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.15)) !important;
+.light-theme .cash3d-scene::before { opacity: 0.2 !important; }
+.light-theme .bill-face {
+  background: linear-gradient(135deg, #2a8540 0%, #35a050 30%, #2a8540 60%, #2f9045 100%) !important;
+  border-color: #50c060 !important;
 }
-.light-theme .holo-cash-svg path,
-.light-theme .holo-cash-svg rect,
-.light-theme .holo-cash-svg circle,
-.light-theme .holo-cash-svg text,
-.light-theme .holo-cash-svg line {
-  stroke: #1a1a1a !important;
-  fill: none !important;
-}
-.light-theme .holo-cash-svg text { fill: #1a1a1a !important; }
-.light-theme .cash-ghost-r,
-.light-theme .cash-ghost-g { display: none; }
-.light-theme .holo-cash-scene::after { display: none; }
 
 /* ── Misc ── */
 .light-theme .sent-center-label { color: #2a2218 !important; }
