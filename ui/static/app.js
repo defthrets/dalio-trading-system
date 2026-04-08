@@ -2452,77 +2452,22 @@ const _THEMES = {
 function setTheme(name, btn) {
   const t = _THEMES[name]; if (!t) return;
   const root = document.documentElement;
+
+  // Clear ALL inline CSS variable overrides so the stylesheet :root / .light-theme rules take effect
+  Array.from(root.style).filter(p => p.startsWith('--')).forEach(p => root.style.removeProperty(p));
+
+  // Only set accent colors as inline overrides (these vary per color scheme)
   root.style.setProperty('--primary',      t.primary);
   root.style.setProperty('--green',        t.green);
   root.style.setProperty('--red',          t.red);
   root.style.setProperty('--amber',        t.amber);
-  root.style.setProperty('--bg-0',         t.bg0);
-  root.style.setProperty('--primary-glow', t.primary + '20');
-  root.style.setProperty('--green-glow',   t.green + '20');
-
-  // Both modes are light-based (no more dark terminal themes)
-  root.classList.add('light-theme');
 
   if (name === 'light') {
-    // Light mode: bright, airy, high contrast
     root.classList.add('light-theme');
     root.classList.remove('dark-theme');
-    root.style.setProperty('--bg-0', '#fafbfd');
-    root.style.setProperty('--bg-1', '#ffffff');
-    root.style.setProperty('--bg-2', '#f5f7fa');
-    root.style.setProperty('--bg-panel', '#ffffff');
-    root.style.setProperty('--bg-panel-2', '#fafbfd');
-    root.style.setProperty('--bg-card', '#ffffff');
-    root.style.setProperty('--bg-row-hover', '#f0f4f8');
-    root.style.setProperty('--text-primary', '#1a202c');
-    root.style.setProperty('--text-1', '#2d3748');
-    root.style.setProperty('--text-2', '#718096');
-    root.style.setProperty('--text-muted', '#a0aec0');
-    root.style.setProperty('--border', '#e8ecf1');
-    root.style.setProperty('--border-hi', '#d2d8e0');
-    root.style.setProperty('--border-act', t.primary);
-    root.style.setProperty('--glass', 'rgba(0,0,0,0.01)');
-    root.style.setProperty('--glass-border', 'rgba(0,0,0,0.03)');
-    root.style.setProperty('--shadow-sm', '0 1px 2px rgba(0,0,0,0.04)');
-    root.style.setProperty('--shadow-md', '0 2px 8px rgba(0,0,0,0.06)');
-    root.style.setProperty('--shadow-lg', '0 4px 16px rgba(0,0,0,0.08)');
-    root.style.setProperty('--cyan', '#0284c7');
-    root.style.setProperty('--cyan-glow', 'rgba(2,132,199,0.08)');
-    root.style.setProperty('--primary-dim', '#e8890a');
-    root.style.setProperty('--primary-dark', '#92400e');
-    root.style.setProperty('--primary-glow', 'rgba(194,65,12,0.08)');
-    root.style.setProperty('--green-dim', '#0d9236');
-    root.style.setProperty('--green-dark', '#064e1f');
-    root.style.setProperty('--green-glow', 'rgba(21,128,61,0.08)');
-    root.style.setProperty('--red-dim', '#a71d1d');
-    root.style.setProperty('--red-glow', 'rgba(185,28,28,0.08)');
-    root.style.setProperty('--amber-dim', '#a16207');
-    root.style.setProperty('--amber-glow', 'rgba(180,83,9,0.08)');
   } else {
-    // Dark mode: deep dark terminal aesthetic
     root.classList.add('dark-theme');
     root.classList.remove('light-theme');
-    root.style.setProperty('--bg-0', '#0c0a09');
-    root.style.setProperty('--bg-1', '#1c1917');
-    root.style.setProperty('--bg-2', '#292524');
-    root.style.setProperty('--bg-panel', '#1c1917');
-    root.style.setProperty('--bg-panel-2', '#211f1d');
-    root.style.setProperty('--bg-card', '#211f1d');
-    root.style.setProperty('--bg-row-hover', '#292524');
-    root.style.setProperty('--text-primary', '#fafaf9');
-    root.style.setProperty('--text-1', '#e7e5e4');
-    root.style.setProperty('--text-2', '#a8a29e');
-    root.style.setProperty('--text-muted', '#78716c');
-    root.style.setProperty('--border', '#3d3835');
-    root.style.setProperty('--border-hi', '#57534e');
-    root.style.setProperty('--border-act', t.primary);
-    root.style.setProperty('--glass', 'rgba(255,255,255,0.03)');
-    root.style.setProperty('--glass-border', 'rgba(255,255,255,0.06)');
-    root.style.setProperty('--shadow-sm', '0 1px 3px rgba(0,0,0,0.30)');
-    root.style.setProperty('--shadow-md', '0 4px 12px rgba(0,0,0,0.40)');
-    root.style.setProperty('--shadow-lg', '0 8px 32px rgba(0,0,0,0.50)');
-    root.style.setProperty('--cyan', '#22d3ee');
-    root.style.setProperty('--cyan-glow', 'rgba(34,211,238,0.15)');
   }
 
   _saveSetting('theme', name);
