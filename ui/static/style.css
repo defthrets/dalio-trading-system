@@ -786,48 +786,8 @@ a:hover { color: var(--primary); text-decoration: underline; }
   text-shadow: 0 0 4px rgba(0,255,170,0.5);
 }
 
-/* Holographic glow */
-.cash3d-scene::before {
-  content: '';
-  position: absolute;
-  top: -6px; left: -6px; right: -6px; bottom: -6px;
-  border-radius: 4px;
-  background: radial-gradient(ellipse, rgba(0,212,255,0.25) 0%, rgba(0,255,170,0.1) 40%, transparent 70%);
-  animation: cashGlow 3s ease-in-out infinite;
-  pointer-events: none;
-  z-index: -1;
-}
-@keyframes cashGlow {
-  0%, 100% { opacity: 0.5; }
-  50%      { opacity: 1; }
-}
-/* Scanline overlay */
-.cash3d-scene::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent 0px,
-    rgba(0,212,255,0.04) 2px,
-    transparent 4px
-  );
-  animation: holoFlicker 3s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 10;
-}
-@keyframes holoFlicker {
-  0%, 100% { opacity: 0.4; }
-  15%      { opacity: 1; }
-  30%      { opacity: 0.2; }
-  50%      { opacity: 0.8; }
-  70%      { opacity: 0.3; }
-  85%      { opacity: 0.9; }
-}
-/* Overall holographic drop shadow on the stack */
-.cash3d-rotator {
-  filter: drop-shadow(0 0 8px rgba(0,212,255,0.4)) drop-shadow(0 0 20px rgba(0,255,170,0.15));
-}
+/* Subtle holographic glow — no hard edges */
+/* No scanline overlay — keep it clean */
 
 /* Glitch effect */
 @keyframes cashGlitch {
