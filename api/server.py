@@ -195,7 +195,32 @@ async def _on_startup():
     auto_status = "ENABLED" if AGENT_CONFIG.get("enabled", False) else "DISABLED"
     logger.info(f"Autonomous agent loop started ({auto_status}, interval {AGENT_CONFIG.get('interval_seconds', 300)}s)")
 
+    # Auto-reconnect last active broker from saved credentials
+    await _auto_reconnect_saved_broker()
+
     logger.info(f"Startup complete -- trading mode: {TRADING_MODE}")
+
+
+async def _auto_reconnect_saved_broker():
+    """Try to reconnect the last active broker using saved credentials."""
+    import api.brokers as _brokers_mod
+    try:
+        creds = _load_broker_creds()
+        last_active = creds.get("_last_active")
+        if not last_active or last_active not in BROKER_MAP:
+            return
+        broker_creds = creds.get(last_active)
+        if not broker_creds:
+            return
+        logger.info(f"Auto-reconnecting to {last_active}...")
+        broker = BROKER_MAP[last_active]()
+        await broker.connect(**broker_creds)
+        _brokers_mod.ACTIVE_BROKER = broker
+        STATE.add_alert("BROKER", f"{last_active.upper()} auto-reconnected", "INFO")
+        _ensure_broker_heartbeat()
+        logger.info(f"Auto-reconnected to {last_active} successfully")
+    except Exception as exc:
+        logger.warning(f"Auto-reconnect failed for {creds.get('_last_active', '?')}: {exc}")
 
 
 # ─────────────────────────────────────────────
@@ -1297,6 +1322,17 @@ async def broker_connect(payload: dict):
     _brokers_mod.ACTIVE_BROKER = broker
     STATE.add_alert("BROKER", f"{broker_name.upper()} connected", "INFO")
     _ensure_broker_heartbeat()
+
+    # Auto-save credentials + last active broker on successful connect
+    try:
+        creds = _load_broker_creds()
+        creds[broker_name] = {k: v for k, v in kwargs.items() if v}
+        creds["_last_active"] = broker_name
+        _save_broker_creds(creds)
+        logger.info(f"Auto-saved credentials for {broker_name}")
+    except Exception as e:
+        logger.warning(f"Failed to auto-save credentials: {e}")
+
     return {"status": "connected", "broker": broker_name}
 
 

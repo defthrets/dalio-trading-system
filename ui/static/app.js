@@ -2270,10 +2270,22 @@ async function _loadSavedBrokerCreds() {
           input.placeholder = creds[key];
         }
       }
-      // Show a saved indicator on the config panel
+      // Show a saved indicator on the config panel + broker card
       const resultEl = el(`bcfgResult-${broker}`);
       if (resultEl && !resultEl.innerHTML) {
-        resultEl.innerHTML = '<span style="color:var(--green)">● Saved</span>';
+        resultEl.innerHTML = '<span style="color:var(--cyan)">● SAVED — click TEST to connect</span>';
+      }
+      // Mark the card as having saved creds
+      const card = document.querySelector(`.broker-card[data-broker="${broker}"]`);
+      if (card) {
+        let badge = card.querySelector('.broker-saved-badge');
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'broker-saved-badge';
+          badge.style.cssText = 'color:var(--cyan);font-size:9px;font-weight:700;letter-spacing:1px;margin-left:auto;';
+          card.querySelector('.broker-name')?.appendChild(badge);
+        }
+        badge.textContent = '● SAVED';
       }
     }
   } catch (e) { /* silent — settings page still works without this */ }
@@ -3756,7 +3768,10 @@ function _updateBrokerCardStatus(d) {
     const brokerId = card.dataset.broker;
     if (!brokerId) return;
     let badge = card.querySelector('.broker-conn-badge');
+    const savedBadge = card.querySelector('.broker-saved-badge');
     if (d.connected && d.broker && d.broker.toLowerCase() === brokerId) {
+      // Hide saved badge when connected
+      if (savedBadge) savedBadge.style.display = 'none';
       if (!badge) {
         badge = document.createElement('span');
         badge.className = 'broker-conn-badge';
@@ -3766,8 +3781,12 @@ function _updateBrokerCardStatus(d) {
       badge.style.cssText = 'color:var(--green);font-size:10px;font-weight:700;letter-spacing:1px;margin-left:auto;';
       card.style.borderColor = 'var(--green)';
       card.style.boxShadow = '0 0 12px rgba(0,200,80,0.15)';
+      // Update config panel result
+      const resultEl = el(`bcfgResult-${brokerId}`);
+      if (resultEl) resultEl.innerHTML = `<span style="color:var(--green)">● CONNECTED — ready to trade</span>`;
     } else {
       if (badge) badge.remove();
+      if (savedBadge) savedBadge.style.display = '';
       card.style.borderColor = '';
       card.style.boxShadow = '';
     }
@@ -3895,9 +3914,9 @@ async function connectBrokerFromSettings(broker) {
 
   try {
     const d = await postJSON('/api/broker/connect', payload);
-    if (resultEl) resultEl.innerHTML = `<span style="color:var(--green)">✓ ${d.broker.toUpperCase()} connected — ready to trade</span>`;
-    pushAlert('BROKER', `${d.broker.toUpperCase()} connected from settings`, 'info');
-    sendNotification('Broker Connected', `${d.broker.toUpperCase()} is now connected and ready.`);
+    if (resultEl) resultEl.innerHTML = `<span style="color:var(--green)">✓ ${d.broker.toUpperCase()} connected & saved — will auto-reconnect on restart</span>`;
+    pushAlert('BROKER', `${d.broker.toUpperCase()} connected & saved`, 'info');
+    sendNotification('Broker Connected', `${d.broker.toUpperCase()} is now connected and saved.`);
     // sync to live trading tab dropdowns
     const sel = el('brokerSelect');
     if (sel) { sel.value = broker; onBrokerSelect(broker); }
