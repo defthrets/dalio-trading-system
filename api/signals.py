@@ -1207,11 +1207,13 @@ async def _gen_sentiment_data() -> dict:
 # ── Correlation matrix ─────────────────────────────────
 
 def _gen_correlation_matrix_demo() -> dict:
-    """Fallback correlation matrix — still uses real yfinance data but with
-    default tickers when portfolio + watchlist have too few assets."""
+    """Fallback correlation matrix — uses real yfinance price data with
+    default tickers when portfolio + watchlist have too few assets.
+    Returns synthetic random only if yfinance fetch fails entirely."""
     portfolio_tickers = list(PAPER.positions.keys())
     watchlist_tickers = list(WATCHLIST) if WATCHLIST else []
     tickers = list(dict.fromkeys(portfolio_tickers + watchlist_tickers))
+    has_portfolio = len(portfolio_tickers) > 0
     if len(tickers) < 6:
         defaults = ["CBA.AX", "BHP.AX", "CSL.AX", "WDS.AX", "GMG.AX",
                      "FMG.AX", "NAB.AX", "WBC.AX", "GC=F", "CL=F", "SI=F"]
@@ -1220,8 +1222,33 @@ def _gen_correlation_matrix_demo() -> dict:
                 tickers.append(t)
             if len(tickers) >= 12:
                 break
+    # Try fetching real price data synchronously via yfinance
+    try:
+        import yfinance as yf
+        import concurrent.futures
+        df = yf.download(tickers[:15], period="3mo", progress=False, threads=True)
+        if df is not None and hasattr(df, 'columns') and len(df) >= 20:
+            close = df["Close"] if "Close" in df.columns else df
+            close = close.dropna(axis=1, how="all").dropna()
+            if len(close.columns) >= 4 and len(close) >= 20:
+                valid = [t for t in tickers if t in close.columns]
+                returns = close[valid].pct_change().dropna()
+                corr = np.round(returns.corr().values, 3)
+                n = len(valid)
+                upper = np.triu_indices(n, k=1)
+                source = "PORTFOLIO" if has_portfolio else "DEFAULTS"
+                return {
+                    "tickers": valid, "matrix": corr.tolist(),
+                    "mean_correlation": round(float(np.mean(corr[upper])), 3),
+                    "max_correlation": round(float(np.max(corr[upper])), 3),
+                    "holy_grail_count": sum(1 for i in range(n) if np.mean(np.abs(corr[i][np.arange(n) != i])) < 0.3),
+                    "threshold": 0.3, "data_source": source,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+    except Exception:
+        pass
+    # Ultimate fallback: synthetic random (should rarely hit)
     n = len(tickers)
-    # Still generate synthetic correlations as sync fallback
     mat = np.eye(n)
     for i in range(n):
         for j in range(i + 1, n):
@@ -1229,13 +1256,13 @@ def _gen_correlation_matrix_demo() -> dict:
             mat[i][j] = r
             mat[j][i] = r
     upper = np.triu_indices(n, k=1)
-    source = "PORTFOLIO" if portfolio_tickers else "DEFAULTS"
     return {
         "tickers": tickers, "matrix": mat.tolist(),
         "mean_correlation": round(float(np.mean(mat[upper])), 3),
         "max_correlation": round(float(np.max(mat[upper])), 3),
         "holy_grail_count": sum(1 for i in range(n) if np.mean(np.abs(mat[i][np.arange(n) != i])) < 0.3),
-        "threshold": 0.3, "data_source": source, "timestamp": datetime.utcnow().isoformat(),
+        "threshold": 0.3, "data_source": "DEMO",
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
 
@@ -1270,12 +1297,23 @@ async def _real_correlation_matrix() -> Optional[dict]:
     n = len(valid)
     upper = np.triu_indices(n, k=1)
     hg_count = sum(1 for i in range(n) if float(np.mean(np.abs(corr[i][np.arange(n) != i]))) < 0.3)
+    # Include real portfolio position data for weight calculation
+    portfolio_info = {}
+    total_value = PAPER.cash
+    for t, pos in PAPER.positions.items():
+        mv = pos["qty"] * pos["entry_price"]
+        total_value += mv
+        portfolio_info[t] = {"qty": pos["qty"], "entry_price": pos["entry_price"],
+                             "market_value": round(mv, 2), "side": pos.get("side", "LONG")}
+    for t in portfolio_info:
+        portfolio_info[t]["weight_pct"] = round(portfolio_info[t]["market_value"] / max(total_value, 1) * 100, 2)
     return {
         "tickers": valid, "matrix": corr.tolist(),
         "mean_correlation": round(float(np.mean(corr[upper])), 3),
         "max_correlation": round(float(np.max(corr[upper])), 3),
         "holy_grail_count": hg_count, "threshold": 0.3,
         "data_source": "LIVE", "timestamp": datetime.utcnow().isoformat(),
+        "portfolio_positions": portfolio_info,
     }
 
 
@@ -1308,6 +1346,18 @@ def _gen_portfolio_health() -> dict:
          "unrealised_pnl_pct": 0.0}
         for t, pos in PAPER.positions.items()
     ]
+    # Build daily P&L series from equity history
+    daily_pnl_series = []
+    if len(PAPER.equity_history) >= 2:
+        for idx in range(1, len(PAPER.equity_history)):
+            prev_v = PAPER.equity_history[idx - 1]["v"]
+            curr_v = PAPER.equity_history[idx]["v"]
+            d_pnl = round(curr_v - prev_v, 2)
+            d_pct = round(d_pnl / prev_v * 100, 3) if prev_v else 0
+            daily_pnl_series.append({
+                "t": PAPER.equity_history[idx].get("t", ""),
+                "pnl": d_pnl, "pnl_pct": d_pct,
+            })
     return {
         "timestamp": datetime.utcnow().isoformat(), "equity": round(equity, 2),
         "initial_equity": initial, "cash": round(PAPER.cash, 2),
@@ -1320,10 +1370,71 @@ def _gen_portfolio_health() -> dict:
         "circuit_breaker_active": drawdown > 9.5,
         "daily_limit_pct": 2.0, "max_drawdown_pct": 10.0,
         "sharpe_ratio": sharpe, "positions": positions_list,
+        "daily_pnl_series": daily_pnl_series[-60:],
+        "has_real_data": len(PAPER.equity_history) >= 2,
     }
 
 
 def _gen_backtest_results() -> dict:
+    """Generate backtest results from real trade history when available,
+    falling back to simulated demo data."""
+    trades = PAPER.history
+    eq_hist = PAPER.equity_history
+
+    # ── Try real data first ──
+    if len(trades) >= 3 and len(eq_hist) >= 5:
+        wins = [t for t in trades if t.get("pnl", 0) > 0]
+        losses = [t for t in trades if t.get("pnl", 0) <= 0]
+        total_pnl = sum(t.get("pnl", 0) for t in trades)
+        initial = STATE.initial_equity or PAPER_STARTING_CASH
+        eq_vals = np.array([e["v"] for e in eq_hist], dtype=float)
+        rets = np.diff(eq_vals) / eq_vals[:-1]
+        sharpe = round(float((rets.mean() / rets.std()) * (252 ** 0.5)), 2) if rets.std() > 0 else 0
+        neg_rets = rets[rets < 0]
+        sortino = round(float((rets.mean() / neg_rets.std()) * (252 ** 0.5)), 2) if len(neg_rets) > 0 and neg_rets.std() > 0 else 0
+        peak = np.maximum.accumulate(eq_vals)
+        drawdowns = (peak - eq_vals) / peak * 100
+        max_dd = -round(float(drawdowns.max()), 2)
+        calmar = round(abs(total_pnl / initial * 100 / max_dd), 2) if max_dd != 0 else 0
+        win_rate = round(len(wins) / len(trades) * 100, 1)
+        avg_trade_ret = round(np.mean([t.get("pnl_pct", t.get("pnl", 0) / initial * 100) for t in trades]), 2)
+        total_ret = round((eq_vals[-1] / eq_vals[0] - 1) * 100, 2)
+        # Build period breakdown from equity history chunks
+        chunk_size = max(len(eq_hist) // 8, 5)
+        periods = []
+        for i in range(min(8, len(eq_hist) // chunk_size)):
+            chunk = eq_vals[i * chunk_size:(i + 1) * chunk_size]
+            if len(chunk) < 2:
+                continue
+            p_ret = round(float((chunk[-1] / chunk[0] - 1) * 100), 2)
+            p_rets = np.diff(chunk) / chunk[:-1]
+            p_sharpe = round(float((p_rets.mean() / p_rets.std()) * (252 ** 0.5)), 2) if p_rets.std() > 0 else 0
+            p_peak = np.maximum.accumulate(chunk)
+            p_dd = -round(float(((p_peak - chunk) / p_peak * 100).max()), 2)
+            # Count trades in this time window
+            chunk_trades = trades[i * (len(trades) // 8):(i + 1) * (len(trades) // 8)] if len(trades) >= 8 else trades
+            p_wins = len([t for t in chunk_trades if t.get("pnl", 0) > 0])
+            p_total = len(chunk_trades) or 1
+            periods.append({
+                "period": i + 1, "train_start": eq_hist[i * chunk_size].get("t", "")[:10],
+                "return_pct": p_ret, "sharpe": p_sharpe,
+                "max_drawdown": p_dd, "win_rate": round(p_wins / p_total * 100, 1),
+                "trades": p_total,
+            })
+        days = (len(eq_hist)) / 252 if len(eq_hist) > 0 else 1
+        ann_ret = round(total_ret / max(days, 0.01), 2)
+        return {
+            "status": "REAL", "data_source": "real", "training_months": 0,
+            "test_months": 0, "periods": len(periods),
+            "total_return_pct": total_ret,
+            "annualised_return_pct": ann_ret,
+            "sharpe_ratio": sharpe, "sortino_ratio": sortino,
+            "calmar_ratio": calmar, "max_drawdown_pct": max_dd,
+            "win_rate_pct": win_rate, "avg_trade_return_pct": avg_trade_ret,
+            "period_results": periods, "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    # ── Fallback: simulated demo data ──
     periods = []
     cumulative = STATE.initial_equity
     for i in range(8):
@@ -1334,7 +1445,7 @@ def _gen_backtest_results() -> dict:
             "max_drawdown": round(random.uniform(-12, -1), 2),
             "win_rate": round(random.uniform(50, 72), 1), "trades": random.randint(28, 85)})
     return {
-        "status": "SIMULATED", "data_source": "simulated", "training_months": 12,
+        "status": "DEMO", "data_source": "demo", "training_months": 12,
         "test_months": 3, "periods": len(periods),
         "total_return_pct": round((cumulative / STATE.initial_equity - 1) * 100, 2),
         "annualised_return_pct": round(random.uniform(18, 42), 2),

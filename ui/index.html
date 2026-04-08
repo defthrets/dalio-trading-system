@@ -793,6 +793,7 @@
         <div class="panel panel--alloc-table">
           <div class="panel-header">
             <span class="panel-title">SELECTED PORTFOLIO</span>
+            <span id="allocDataSource" style="font-size:9px;letter-spacing:0.5px;margin-left:auto"></span>
           </div>
           <div class="panel-hint">Detailed breakdown of each asset in the optimised portfolio — its suggested weight, risk contribution, and which economic quadrant it fits best. Use this to guide your actual allocation decisions.</div>
           <table class="data-table" id="allocTable">
@@ -853,6 +854,7 @@
         <div class="panel panel--pnl-chart">
           <div class="panel-header">
             <span class="panel-title">DAILY P&L HISTORY</span>
+            <span id="pnlDataSource" style="font-size:9px;letter-spacing:0.5px;margin-left:auto"></span>
           </div>
           <div class="panel-hint">Bar chart of daily profit and loss. Green bars = profitable days, red bars = losing days. Look for consistency — many small green bars with few red bars indicates a stable strategy. Large red bars may signal the circuit breaker is close to triggering.</div>
           <div class="chart-container">
@@ -969,7 +971,7 @@
         <div class="panel panel--bt-summary">
           <div class="panel-header">
             <span class="panel-title">STRATEGY PERFORMANCE SUMMARY</span>
-            <span class="panel-tag">TRAIN: 12M  TEST: 3M</span>
+            <span id="btDataSource" style="font-size:9px;letter-spacing:0.5px;margin-left:auto"></span>
           </div>
           <div class="bt-tab-desc" style="padding:8px 14px 0;font-size:11px;color:var(--text-2);line-height:1.5">
             How well would this strategy have performed on historical data? These metrics show overall results across all test periods.
@@ -1024,6 +1026,7 @@
         <div class="panel panel--wf-chart">
           <div class="panel-header">
             <span class="panel-title">PERIOD-BY-PERIOD RETURNS</span>
+            <span id="wfDataSource" style="font-size:9px;letter-spacing:0.5px;margin-left:auto;margin-right:8px"></span>
             <button class="btn-ghost btn--sm" onclick="loadBacktest()">↻ RUN BACKTEST</button>
           </div>
           <div style="padding:4px 14px 0;font-size:11px;color:var(--text-2)">
@@ -1038,6 +1041,7 @@
         <div class="panel panel--period-table">
           <div class="panel-header">
             <span class="panel-title">DETAILED PERIOD BREAKDOWN</span>
+            <span id="periodDataSource" style="font-size:9px;letter-spacing:0.5px;margin-left:auto"></span>
           </div>
           <div style="padding:4px 14px 0;font-size:11px;color:var(--text-2)">
             Drill into each test window to see individual performance. Look for consistency across periods.

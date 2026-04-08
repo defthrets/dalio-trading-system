@@ -358,6 +358,8 @@ function applyHealth(d) {
   if (d.positions) renderPositionTable(d.positions);
   // Weights chart
   if (d.risk_weights) updateWeightsChart(d.risk_weights);
+  // Daily P&L chart — use real series when available
+  if (d.daily_pnl_series) updatePnlChart(d.daily_pnl_series);
 
   // ── Statsbar hero stats ──
   _updateStatsbarFromHealth(d);
@@ -1108,19 +1110,30 @@ function applyCorrelation(d) {
   if (srcEl) {
     const src = d.data_source;
     if (src === 'LIVE') {
-      srcEl.textContent = '● LIVE — YOUR ASSETS';
+      srcEl.textContent = '● LIVE DATA — YOUR PORTFOLIO';
       srcEl.style.color = 'var(--green)';
     } else if (src === 'PORTFOLIO') {
-      srcEl.textContent = '● PORTFOLIO DATA';
+      srcEl.textContent = '● REAL DATA — YOUR PORTFOLIO + DEFAULTS';
       srcEl.style.color = 'var(--green)';
-    } else {
-      srcEl.textContent = '● DEFAULT ASSETS — ADD POSITIONS OR WATCHLIST';
+    } else if (src === 'DEFAULTS') {
+      srcEl.textContent = '● REAL PRICES — DEFAULT ASSETS (NO POSITIONS YET)';
       srcEl.style.color = 'var(--amber)';
+    } else {
+      srcEl.textContent = '⚠ DEMO DATA — NO REAL DATA AVAILABLE';
+      srcEl.style.color = 'var(--red)';
     }
   }
 
   drawCorrelationHeatmap(d.tickers, d.matrix);
-  renderAllocTable(d.tickers, d.matrix);
+  renderAllocTable(d.tickers, d.matrix, d.portfolio_positions);
+
+  // Selected Portfolio data source badge
+  const allocSrc = el('allocDataSource');
+  if (allocSrc) {
+    const hasPos = d.portfolio_positions && Object.keys(d.portfolio_positions).length > 0;
+    allocSrc.textContent = hasPos ? '● REAL WEIGHTS — YOUR POSITIONS' : '● EQUAL WEIGHT — NO POSITIONS YET';
+    allocSrc.style.color = hasPos ? 'var(--green)' : 'var(--amber)';
+  }
 }
 
 function drawCorrelationHeatmap(tickers, matrix) {
@@ -1179,21 +1192,22 @@ function corrColor(v) {
   return '#cc1a1a';
 }
 
-function renderAllocTable(tickers, matrix) {
+function renderAllocTable(tickers, matrix, portfolioPositions) {
   const n = tickers.length;
-  const weights = Object.fromEntries(
-    tickers.map((t, i) => [t, (1 / n).toFixed(4)])
-  );
   const body = el('allocTableBody');
   if (!body) return;
-  const fits = ['strong','moderate','weak'];
+  const hasPositions = portfolioPositions && Object.keys(portfolioPositions).length > 0;
   body.innerHTML = tickers.map((t, i) => {
     const rowAvg = matrix[i].reduce((s,v,j) => j!==i ? s+Math.abs(v) : s, 0) / (n-1);
     const fit = rowAvg < 0.2 ? 'strong' : rowAvg < 0.35 ? 'moderate' : 'weak';
+    const posInfo = hasPositions ? portfolioPositions[t] : null;
+    const weight = posInfo ? posInfo.weight_pct.toFixed(2) + '%' : (1/n*100).toFixed(2) + '%';
+    const riskContrib = posInfo ? posInfo.weight_pct.toFixed(2) + '%' : (1/n*100).toFixed(2) + '%';
+    const inPortfolio = posInfo ? '●' : '';
     return `<tr>
-      <td class="td-green">${t}</td>
-      <td class="td-cyan">${(1/n*100).toFixed(2)}%</td>
-      <td>${(1/n*100).toFixed(2)}%</td>
+      <td class="td-green">${inPortfolio} ${t}</td>
+      <td class="td-cyan">${weight}</td>
+      <td>${riskContrib}</td>
       <td><span class="sc-fit ${fit}">${fit.toUpperCase()}</span></td>
     </tr>`;
   }).join('');
@@ -1238,6 +1252,16 @@ function applyBacktest(d) {
   setEl('bt-winrate',  d.win_rate_pct != null ? (+d.win_rate_pct).toFixed(1) + '%' : '--');
   setEl('bt-periods',  d.periods ?? '--');
   setEl('bt-annRet',   pct(d.annualised_return_pct, 1));
+
+  // Data source badges for all backtest panels
+  const isReal = d.data_source === 'real';
+  const srcText = isReal ? '● REAL DATA — YOUR TRADING HISTORY' : '⚠ DEMO DATA — NO REAL TRADES AVAILABLE';
+  const srcColor = isReal ? 'var(--green)' : 'var(--amber)';
+  ['btDataSource', 'wfDataSource', 'periodDataSource'].forEach(id => {
+    setEl(id, srcText);
+    const e = el(id);
+    if (e) e.style.color = srcColor;
+  });
 
   const sortino = d.sortino_ratio ?? 0;
   const winRate = d.win_rate_pct ?? 0;
@@ -1697,23 +1721,24 @@ function initCharts() {
     });
   }
 
-  // PnL chart
+  // PnL chart — initialised empty, updated from real health data
   const pnlctx = el('pnlChart')?.getContext('2d');
   if (pnlctx) {
-    const pnlData = Array.from({ length: 30 }, () => +(Math.random() * 2 - 0.5).toFixed(3));
     charts.pnl = new Chart(pnlctx, {
       type: 'bar',
       data: {
-        labels: pnlData.map((_, i) => `D-${30-i}`),
+        labels: [],
         datasets: [{
-          data: pnlData,
-          backgroundColor: pnlData.map(v => v >= 0 ? 'rgba(0,204,68,0.6)' : 'rgba(255,34,34,0.6)'),
-          borderColor:      pnlData.map(v => v >= 0 ? '#00cc44' : '#ff2222'),
+          data: [],
+          backgroundColor: [],
+          borderColor: [],
           borderWidth: 1,
         }],
       },
       options: { ...CHART_DEFAULTS, maintainAspectRatio: false },
     });
+    // Show demo data initially until real data arrives
+    _showDemoPnlChart();
   }
 
   // Weights doughnut
@@ -1743,6 +1768,40 @@ function updateEquityChart(history) {
   charts.equity.update('none');
   // Also update prediction chart with real data
   updatePredictionFromEquity(history);
+}
+
+function _showDemoPnlChart() {
+  if (!charts.pnl) return;
+  const demoData = Array.from({ length: 30 }, () => +(Math.random() * 2 - 0.5).toFixed(3));
+  charts.pnl.data.labels = demoData.map((_, i) => `D-${30 - i}`);
+  charts.pnl.data.datasets[0].data = demoData;
+  charts.pnl.data.datasets[0].backgroundColor = demoData.map(v => v >= 0 ? 'rgba(0,204,68,0.6)' : 'rgba(255,34,34,0.6)');
+  charts.pnl.data.datasets[0].borderColor = demoData.map(v => v >= 0 ? '#00cc44' : '#ff2222');
+  charts.pnl.update('none');
+  setEl('pnlDataSource', '⚠ DEMO DATA — NO REAL TRADES YET');
+  const srcEl = el('pnlDataSource');
+  if (srcEl) srcEl.style.color = 'var(--amber)';
+}
+
+function updatePnlChart(series) {
+  if (!charts.pnl) return;
+  if (!series || series.length < 2) {
+    _showDemoPnlChart();
+    return;
+  }
+  const data = series.map(s => s.pnl_pct);
+  const labels = series.map(s => {
+    const d = s.t || '';
+    return d.length >= 10 ? d.substring(5, 10) : d;
+  });
+  charts.pnl.data.labels = labels;
+  charts.pnl.data.datasets[0].data = data;
+  charts.pnl.data.datasets[0].backgroundColor = data.map(v => v >= 0 ? 'rgba(0,204,68,0.6)' : 'rgba(255,34,34,0.6)');
+  charts.pnl.data.datasets[0].borderColor = data.map(v => v >= 0 ? '#00cc44' : '#ff2222');
+  charts.pnl.update('none');
+  setEl('pnlDataSource', '● REAL DATA — YOUR TRADING HISTORY');
+  const srcEl = el('pnlDataSource');
+  if (srcEl) srcEl.style.color = 'var(--green)';
 }
 
 function updateSentimentChart(qs) {
