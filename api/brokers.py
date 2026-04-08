@@ -164,37 +164,30 @@ class GenericASXBroker(BrokerBase):
         raise NotImplementedError(f"{self.name.upper()} close not yet implemented")
 
 
-class SelfWealthBroker(GenericASXBroker):
-    name = "selfwealth"
-    _BASE = "https://api.selfwealth.com.au"
-
 class IGBroker(GenericASXBroker):
+    """IG Markets — REST API for ASX CFDs and share trading."""
     name = "ig"
     _BASE = "https://api.ig.com/gateway/deal"
 
 class CMCBroker(GenericASXBroker):
+    """CMC Markets — REST API for ASX CFDs and spread betting."""
     name = "cmc"
     _BASE = "https://ciapi.cityindex.com/TradingAPI"
 
-class StakeBroker(GenericASXBroker):
-    name = "stake"
-    _BASE = "https://api.hellostake.com/api"
-
-class CommsecBroker(GenericASXBroker):
-    name = "commsec"
-    _BASE = "https://api.commsec.com.au/v1"
-
 class MomooBroker(GenericASXBroker):
+    """Moomoo (Futu) — OpenAPI SDK for ASX equities."""
     name = "moomoo"
     _BASE = "https://openapi.moomoo.com/v1"
 
-class SuperheroBroker(GenericASXBroker):
-    name = "superhero"
-    _BASE = "https://api.superhero.com.au/v1"
+class SaxoBroker(GenericASXBroker):
+    """Saxo Markets — OpenAPI for ASX equities, ETFs, and derivatives."""
+    name = "saxo"
+    _BASE = "https://gateway.saxobank.com/openapi"
 
-class NabtradeBroker(GenericASXBroker):
-    name = "nabtrade"
-    _BASE = "https://api.nabtrade.com.au/v1"
+class TigerBroker(GenericASXBroker):
+    """Tiger Brokers — Open API for ASX equities."""
+    name = "tiger"
+    _BASE = "https://openapi.tigerbrokers.com/gateway"
 
 # ── Active broker global ────────────────────────────────
 ACTIVE_BROKER: Optional[BrokerBase] = None
@@ -222,8 +215,7 @@ def _save_broker_creds(creds: dict):
 # ── Broker map for connection routing ───────────────────
 BROKER_MAP = {
     "ibkr": IBKRBroker,
-    "stake": StakeBroker, "moomoo": MomooBroker,
     "ig": IGBroker, "cmc": CMCBroker,
-    "selfwealth": SelfWealthBroker, "commsec": CommsecBroker,
-    "superhero": SuperheroBroker, "nabtrade": NabtradeBroker,
+    "moomoo": MomooBroker, "saxo": SaxoBroker,
+    "tiger": TigerBroker,
 }

@@ -65,9 +65,8 @@ from api.signals import (
 )
 from api.brokers import (
     BrokerBase, IBKRBroker,
-    SelfWealthBroker, IGBroker, CMCBroker,
-    StakeBroker, CommsecBroker, MomooBroker,
-    SuperheroBroker, NabtradeBroker,
+    IGBroker, CMCBroker, MomooBroker,
+    SaxoBroker, TigerBroker,
     ACTIVE_BROKER, _load_broker_creds, _save_broker_creds, BROKER_MAP,
 )
 from api.agent import (

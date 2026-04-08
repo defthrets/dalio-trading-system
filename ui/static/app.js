@@ -2224,14 +2224,11 @@ async function _loadSavedBrokerCreds() {
     if (!saved || typeof saved !== 'object') return;
     const fieldMap = {
       ibkr:     { host: 'settIbkrHost', port: 'settIbkrPort', client_id: 'settIbkrClientId' },
-      selfwealth: { api_key: 'settSelfwealthKey', api_secret: 'settSelfwealthSecret' },
       ig:         { api_key: 'settIgKey', api_secret: 'settIgSecret', passphrase: 'settIgPassphrase' },
       cmc:        { api_key: 'settCmcKey', api_secret: 'settCmcSecret', passphrase: 'settCmcPassphrase' },
-      stake:      { api_key: 'settStakeKey' },
       moomoo:     { api_key: 'settMoomooKey', api_secret: 'settMoomooSecret' },
-      commsec:    { api_key: 'settCommsecKey', api_secret: 'settCommsecSecret' },
-      superhero:  { api_key: 'settSuperheroKey', api_secret: 'settSuperheroSecret' },
-      nabtrade:   { api_key: 'settNabtradeKey', api_secret: 'settNabtradeSecret' },
+      saxo:       { api_key: 'settSaxoKey', api_secret: 'settSaxoSecret' },
+      tiger:      { api_key: 'settTigerKey', api_secret: 'settTigerSecret' },
     };
     for (const [broker, creds] of Object.entries(saved)) {
       const map = fieldMap[broker];
@@ -3821,12 +3818,11 @@ function _updateBrokerCardStatus(d) {
 }
 
 function onBrokerSelect(val) {
-  ['ibkrFields','stakeFields'].forEach(id => {
+  ['ibkrFields'].forEach(id => {
     const el2 = el(id); if (el2) el2.style.display = 'none';
   });
   const map = {
     ibkr:     'ibkrFields',
-    stake:    'stakeFields',
   };
   if (map[val]) { const el2 = el(map[val]); if (el2) el2.style.display = 'block'; }
   // Enable setup guide button when a valid broker is selected
@@ -3854,10 +3850,6 @@ async function connectBrokerFromSettings(broker) {
     payload.host      = el('settIbkrHost')?.value || '127.0.0.1';
     payload.port      = parseInt(el('settIbkrPort')?.value || '7497');
     payload.client_id = parseInt(el('settIbkrClientId')?.value || '1');
-  } else if (broker === 'selfwealth') {
-    payload.api_key    = el('settSelfwealthKey')?.value?.trim();
-    payload.api_secret = el('settSelfwealthSecret')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
   } else if (broker === 'ig') {
     payload.api_key    = el('settIgKey')?.value?.trim();
     payload.api_secret = el('settIgSecret')?.value?.trim();
@@ -3868,24 +3860,17 @@ async function connectBrokerFromSettings(broker) {
     payload.api_secret = el('settCmcSecret')?.value?.trim();
     payload.passphrase = el('settCmcPassphrase')?.value?.trim();
     if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
-  } else if (broker === 'stake') {
-    payload.api_key    = el('settStakeKey')?.value?.trim();
-    if (!payload.api_key) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">Session token required</span>'; return; }
   } else if (broker === 'moomoo') {
     payload.api_key    = el('settMoomooKey')?.value?.trim();
     payload.api_secret = el('settMoomooSecret')?.value?.trim();
     if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">OpenD host and port required</span>'; return; }
-  } else if (broker === 'commsec') {
-    payload.api_key    = el('settCommsecKey')?.value?.trim();
-    payload.api_secret = el('settCommsecSecret')?.value?.trim();
-    if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">Client ID and secret required</span>'; return; }
-  } else if (broker === 'superhero') {
-    payload.api_key    = el('settSuperheroKey')?.value?.trim();
-    payload.api_secret = el('settSuperheroSecret')?.value?.trim();
+  } else if (broker === 'saxo') {
+    payload.api_key    = el('settSaxoKey')?.value?.trim();
+    payload.api_secret = el('settSaxoSecret')?.value?.trim();
     if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
-  } else if (broker === 'nabtrade') {
-    payload.api_key    = el('settNabtradeKey')?.value?.trim();
-    payload.api_secret = el('settNabtradeSecret')?.value?.trim();
+  } else if (broker === 'tiger') {
+    payload.api_key    = el('settTigerKey')?.value?.trim();
+    payload.api_secret = el('settTigerSecret')?.value?.trim();
     if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
   }
 
@@ -3946,9 +3931,8 @@ async function _populateBrokerPicker() {
 
   const logoMap = {
     ibkr:'IB',
-    stake:'STK', moomoo:'MM', ig:'IG', cmc:'CMC',
-    selfwealth:'SW',
-    nabtrade:'NAB', commsec:'CBA', superhero:'SH',
+    moomoo:'MM', ig:'IG', cmc:'CMC',
+    saxo:'SX', tiger:'TG',
   };
 
   try {
@@ -4038,14 +4022,11 @@ function _getBrokerPayload(broker) {
   const _f = (id) => el(id)?.value?.trim() || '';
   const map = {
     ibkr:     () => ({ host: _f('settIbkrHost') || '127.0.0.1', port: _f('settIbkrPort') || '7497', client_id: _f('settIbkrClientId') || '1' }),
-    selfwealth: () => ({ api_key: _f('settSelfwealthKey'), api_secret: _f('settSelfwealthSecret') }),
     ig:         () => ({ api_key: _f('settIgKey'), api_secret: _f('settIgSecret'), passphrase: _f('settIgPassphrase') }),
     cmc:        () => ({ api_key: _f('settCmcKey'), api_secret: _f('settCmcSecret'), passphrase: _f('settCmcPassphrase') }),
-    stake:      () => ({ api_key: _f('settStakeKey') }),
     moomoo:     () => ({ api_key: _f('settMoomooKey'), api_secret: _f('settMoomooSecret') }),
-    commsec:    () => ({ api_key: _f('settCommsecKey'), api_secret: _f('settCommsecSecret') }),
-    superhero:  () => ({ api_key: _f('settSuperheroKey'), api_secret: _f('settSuperheroSecret') }),
-    nabtrade:   () => ({ api_key: _f('settNabtradeKey'), api_secret: _f('settNabtradeSecret') }),
+    saxo:       () => ({ api_key: _f('settSaxoKey'), api_secret: _f('settSaxoSecret') }),
+    tiger:      () => ({ api_key: _f('settTigerKey'), api_secret: _f('settTigerSecret') }),
   };
   return map[broker] ? map[broker]() : {};
 }
@@ -4076,10 +4057,6 @@ async function connectBroker() {
     payload.host      = el('ibkrHost')?.value || '127.0.0.1';
     payload.port      = parseInt(el('ibkrPort')?.value || '7497');
     payload.client_id = parseInt(el('ibkrClientId')?.value || '1');
-  } else if (broker === 'stake') {
-    if (res) res.innerHTML = '<span style="color:var(--amber)">⚠ Stake does not support bot-trading API</span>';
-    if (btn) { btn.textContent = '▶ CONNECT BROKER'; btn.classList.remove('loading'); }
-    return;
   } else {
     // For other brokers, load saved credentials — configure them in Settings tab first
     try {
