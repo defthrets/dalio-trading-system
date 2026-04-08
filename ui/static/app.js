@@ -140,6 +140,7 @@ async function loadAll() {
     loadHealth(),
     loadQuadrant(),
     loadAlerts(),
+    loadBrokerStatus(),
   ]);
 }
 
@@ -3711,6 +3712,7 @@ async function loadBrokerStatus() {
     const barDot = el('brokerBarDot');
     const barLabel = el('brokerBarLabel');
     const barStats = el('brokerBarStats');
+    const barQuickConnect = el('brokerBarQuickConnect');
     if (d.connected) {
       if (barDot) barDot.style.color = 'var(--green)';
       if (barLabel) barLabel.textContent = `${(d.broker||'').toUpperCase()} CONNECTED`;
@@ -3720,13 +3722,56 @@ async function loadBrokerStatus() {
         setEl('bbsBuyPow', fmt$(d.buying_power || 0));
         setEl('bbsCash', fmt$(d.cash || 0));
       }
+      if (barQuickConnect) barQuickConnect.style.display = 'none';
       updateModeUI(_tradingMode, true);
     } else {
       if (barDot) barDot.style.color = 'var(--red)';
-      if (barLabel) barLabel.textContent = 'NO BROKER CONNECTED';
+      if (barLabel) barLabel.textContent = d.broker ? `${d.broker.toUpperCase()} DISCONNECTED` : 'NO BROKER CONNECTED';
       if (barStats) barStats.style.display = 'none';
+      if (barQuickConnect) barQuickConnect.style.display = '';
     }
+    // Update command centre broker indicator
+    _updateCcBrokerStatus(d);
+    // Update settings broker card status badges
+    _updateBrokerCardStatus(d);
   } catch {}
+}
+
+function _updateCcBrokerStatus(d) {
+  const dot = el('ccBrokerDot');
+  const label = el('ccBrokerLabel');
+  if (!dot && !label) return;
+  if (d.connected) {
+    if (dot) { dot.textContent = '●'; dot.style.color = 'var(--green)'; }
+    if (label) label.textContent = `${(d.broker||'').toUpperCase()} LIVE`;
+  } else {
+    if (dot) { dot.textContent = '●'; dot.style.color = 'var(--text-muted)'; }
+    if (label) label.textContent = 'NO BROKER';
+  }
+}
+
+function _updateBrokerCardStatus(d) {
+  // Mark the active connected broker's card
+  document.querySelectorAll('.broker-card').forEach(card => {
+    const brokerId = card.dataset.broker;
+    if (!brokerId) return;
+    let badge = card.querySelector('.broker-conn-badge');
+    if (d.connected && d.broker && d.broker.toLowerCase() === brokerId) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'broker-conn-badge';
+        card.querySelector('.broker-name')?.appendChild(badge);
+      }
+      badge.textContent = '● CONNECTED';
+      badge.style.cssText = 'color:var(--green);font-size:10px;font-weight:700;letter-spacing:1px;margin-left:auto;';
+      card.style.borderColor = 'var(--green)';
+      card.style.boxShadow = '0 0 12px rgba(0,200,80,0.15)';
+    } else {
+      if (badge) badge.remove();
+      card.style.borderColor = '';
+      card.style.boxShadow = '';
+    }
+  });
 }
 
 function onBrokerSelect(val) {
@@ -3850,8 +3895,9 @@ async function connectBrokerFromSettings(broker) {
 
   try {
     const d = await postJSON('/api/broker/connect', payload);
-    if (resultEl) resultEl.innerHTML = `<span style="color:var(--green)">✓ ${d.broker.toUpperCase()} connected</span>`;
+    if (resultEl) resultEl.innerHTML = `<span style="color:var(--green)">✓ ${d.broker.toUpperCase()} connected — ready to trade</span>`;
     pushAlert('BROKER', `${d.broker.toUpperCase()} connected from settings`, 'info');
+    sendNotification('Broker Connected', `${d.broker.toUpperCase()} is now connected and ready.`);
     // sync to live trading tab dropdowns
     const sel = el('brokerSelect');
     if (sel) { sel.value = broker; onBrokerSelect(broker); }
@@ -3859,6 +3905,30 @@ async function connectBrokerFromSettings(broker) {
     await loadRealPortfolio();
   } catch (e) {
     if (resultEl) resultEl.innerHTML = `<span style="color:var(--red)">✗ ${escHtml(e.message || 'Connection failed')}</span>`;
+  }
+}
+
+async function _quickReconnectSaved() {
+  const label = el('brokerBarLabel');
+  if (label) label.textContent = '⌛ RECONNECTING...';
+  try {
+    const saved = await fetchJSON('/api/broker/saved');
+    const brokers = Object.keys(saved || {});
+    if (!brokers.length) {
+      if (label) label.textContent = 'NO SAVED CREDENTIALS — configure in Settings';
+      return;
+    }
+    // Try to connect the first saved broker
+    const broker = brokers[0];
+    const creds = saved[broker];
+    const payload = { broker, ...creds };
+    const d = await postJSON('/api/broker/connect', payload);
+    pushAlert('BROKER', `${d.broker.toUpperCase()} reconnected`, 'info');
+    await loadBrokerStatus();
+    await loadRealPortfolio();
+  } catch (e) {
+    if (label) label.textContent = `RECONNECT FAILED — ${e.message || 'check Settings'}`;
+    setTimeout(() => { if (label) label.textContent = 'NO BROKER CONNECTED'; }, 4000);
   }
 }
 

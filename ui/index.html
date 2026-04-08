@@ -172,6 +172,7 @@
               <span class="stat-item statsbar-stat">WIN RATE <strong id="ccStatsWinRate" class="statsbar-val">--%</strong></span>
               <span class="stat-item statsbar-stat">TRADES <strong id="ccStatsTotalTrades" class="statsbar-val">0</strong></span>
               <span class="stat-item statsbar-stat">SHARPE <strong id="ccStatsSharpe" class="statsbar-val">--</strong></span>
+              <span class="stat-item statsbar-stat" style="border-left:1px solid var(--border);padding-left:12px"><span id="ccBrokerDot" style="color:var(--text-muted)">●</span> <strong id="ccBrokerLabel" class="statsbar-val">NO BROKER</strong></span>
             </div>
           </div>
           <div class="panel-hint">Statistical projection from actual equity history. Solid line = real equity, dashed line = mean-return projection. Green zone = 95% confidence interval (1.96&#963;&#8730;t).</div>
@@ -1340,15 +1341,19 @@
           <div class="panel-hint">Shows your broker connection status. Green dot = connected and ready to trade. Red = disconnected. Account value, buying power, and cash balance update in real-time from your broker. Click CONFIGURE BROKERS to set up in Settings.</div>
           <div class="broker-bar-inner">
             <div class="broker-bar-status">
-              <span class="broker-bar-dot" id="brokerBarDot">●</span>
-              <span id="brokerBarLabel">NO BROKER CONNECTED</span>
+              <span class="broker-bar-dot" id="brokerBarDot" style="font-size:16px">●</span>
+              <span id="brokerBarLabel" style="font-weight:700;letter-spacing:1px">NO BROKER CONNECTED</span>
             </div>
             <div class="broker-bar-stats" id="brokerBarStats" style="display:none">
               <span class="bbs-item"><span class="bbs-label">ACCT</span> <span class="bbs-val" id="bbsAcctVal">—</span></span>
               <span class="bbs-item"><span class="bbs-label">BUYING POWER</span> <span class="bbs-val" id="bbsBuyPow">—</span></span>
               <span class="bbs-item"><span class="bbs-label">CASH</span> <span class="bbs-val" id="bbsCash">—</span></span>
             </div>
-            <button class="btn-ghost btn--sm" onclick="document.querySelector('[data-tab=comms-config]').click()">⚙ CONFIGURE BROKERS</button>
+            <div id="brokerBarQuickConnect" style="display:flex;gap:6px;align-items:center">
+              <button class="btn-primary btn--sm" onclick="document.querySelector('[data-tab=comms-config]').click()" style="background:var(--primary)">⚡ CONNECT BROKER</button>
+              <button class="btn-ghost btn--sm" onclick="_quickReconnectSaved()">↻ RECONNECT</button>
+            </div>
+            <button class="btn-ghost btn--sm" onclick="document.querySelector('[data-tab=comms-config]').click()">⚙ SETTINGS</button>
           </div>
         </div>
 
@@ -2284,7 +2289,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=20260408b"></script>
+  <script src="/static/app.js?v=20260408c"></script>
 
   <!-- ═══════════════════════════════════════════════
        SPEECH BUBBLE SPOTLIGHT TOOLTIP
