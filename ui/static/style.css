@@ -5289,17 +5289,35 @@ body.cli-expanded { padding-bottom: 272px; }
 .light-theme .stat-label { color: #9c9488; }
 .light-theme .stat-val { color: #2c2418; }
 
-/* ── Logo ── */
-.light-theme .logo-main { color: #2c2418 !important; }
+/* ── Logo: warm solid tones for light mode ── */
+.light-theme .logo-main {
+  color: #3d3428 !important;
+  text-shadow: none !important;
+  animation: none !important;
+}
 .light-theme .logo-sub { color: #9c9488 !important; }
+.light-theme .holo-brain-svg {
+  filter: none !important;
+}
+.light-theme .holo-brain-svg path {
+  stroke: #b87a1a !important;
+  opacity: 0.7;
+}
+.light-theme .holo-brain-svg circle {
+  fill: #d4920a !important;
+  opacity: 0.8;
+}
+.light-theme .holo-brain-svg line {
+  stroke: #d4920a !important;
+}
+.light-theme .holo-brain-scene::after { display: none; }
+.light-theme #holoGrad stop { stop-color: #c4820a !important; }
 
 /* ── Misc ── */
 .light-theme .sent-center-label { color: #2c2418 !important; }
 .light-theme .sent-glow-ring { opacity: 0.15; }
 .light-theme .ws-dot { box-shadow: none; }
 .light-theme .live-clock { color: #9c9488; }
-.light-theme .holo-brain-svg path,
-.light-theme .holo-brain-svg circle { opacity: 0.5; }
 .light-theme .td-cyan { color: #0e7e9b !important; }
 .light-theme .td-green { color: #1a8a42 !important; }
 .light-theme .td-red { color: #c82828 !important; }
