@@ -138,6 +138,41 @@ COMMODITY_TICKERS = [
 ALL_TICKERS = ASX_TICKERS + COMMODITY_TICKERS
 CORR_TICKERS = ASX_TICKERS  # Use ASX for correlation heatmap
 
+# ── Dynamic ASX full universe (~1,900 companies) ──────────
+_ASX_FULL_UNIVERSE: list = []  # Populated on startup
+
+async def _fetch_asx_listed_companies() -> list:
+    """Fetch the full list of ASX-listed companies from the ASX website.
+    Returns list of ticker strings like 'BHP.AX'. Falls back to ASX_TICKERS."""
+    global _ASX_FULL_UNIVERSE
+    try:
+        import aiohttp, csv, io
+        url = "https://asx.api.markitdigital.com/asx-research/1.0/companies/directory/file"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                if resp.status == 200:
+                    text = await resp.text()
+                    reader = csv.DictReader(io.StringIO(text))
+                    tickers = []
+                    for row in reader:
+                        code = row.get("ASX code", row.get("Code", "")).strip()
+                        if code and len(code) <= 5:
+                            tickers.append(f"{code}.AX")
+                    if len(tickers) > 500:
+                        _ASX_FULL_UNIVERSE = sorted(set(tickers))
+                        logger.info(f"Loaded {len(_ASX_FULL_UNIVERSE)} ASX companies from ASX directory")
+                        return _ASX_FULL_UNIVERSE
+    except Exception as e:
+        logger.warning(f"Failed to fetch ASX directory: {e}")
+    # Fallback: use static list
+    _ASX_FULL_UNIVERSE = ASX_TICKERS[:]
+    logger.info(f"Using static ASX ticker list ({len(_ASX_FULL_UNIVERSE)} tickers)")
+    return _ASX_FULL_UNIVERSE
+
+def get_asx_universe() -> list:
+    """Return the full ASX universe (fetched or static fallback)."""
+    return _ASX_FULL_UNIVERSE if _ASX_FULL_UNIVERSE else ASX_TICKERS
+
 
 # ── Asset metadata ──────────────────────────────────────
 _ASSET_META = {

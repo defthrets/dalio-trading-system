@@ -2321,12 +2321,22 @@ async function _loadSavedBrokerCreds() {
     const saved = await fetchJSON('/api/broker/saved');
     if (!saved || typeof saved !== 'object') return;
     const fieldMap = {
-      ibkr:     { host: 'settIbkrHost', port: 'settIbkrPort', client_id: 'settIbkrClientId' },
-      ig:         { api_key: 'settIgKey', api_secret: 'settIgSecret', passphrase: 'settIgPassphrase' },
-      cmc:        { api_key: 'settCmcKey', api_secret: 'settCmcSecret', passphrase: 'settCmcPassphrase' },
-      moomoo:     { api_key: 'settMoomooKey', api_secret: 'settMoomooSecret' },
-      saxo:       { api_key: 'settSaxoKey', api_secret: 'settSaxoSecret' },
-      tiger:      { api_key: 'settTigerKey', api_secret: 'settTigerSecret' },
+      ibkr:        { host: 'settIbkrHost', port: 'settIbkrPort', client_id: 'settIbkrClientId' },
+      ig:          { api_key: 'settIgKey', api_secret: 'settIgSecret', passphrase: 'settIgPassphrase' },
+      cmc:         { api_key: 'settCmcKey', api_secret: 'settCmcSecret', passphrase: 'settCmcPassphrase' },
+      moomoo:      { api_key: 'settMoomooKey', api_secret: 'settMoomooSecret' },
+      saxo:        { api_key: 'settSaxoKey', api_secret: 'settSaxoSecret' },
+      tiger:       { api_key: 'settTigerKey', api_secret: 'settTigerSecret' },
+      pepperstone: { api_key: 'settPepperstoneKey', api_secret: 'settPepperstoneSecret' },
+      finclear:    { api_key: 'settFinclearKey', api_secret: 'settFinclearSecret' },
+      openmarkets: { api_key: 'settOpenmarketsKey', api_secret: 'settOpenmarketsSecret' },
+      marketech:   { api_key: 'settMarketechKey', api_secret: 'settMarketechSecret' },
+      opentrader:  { api_key: 'settOpentraderKey', api_secret: 'settOpentraderSecret' },
+      iress:       { api_key: 'settIressKey', api_secret: 'settIressSecret' },
+      cqg:         { api_key: 'settCqgKey', api_secret: 'settCqgSecret' },
+      flextrade:   { api_key: 'settFlextradeKey', api_secret: 'settFlextradeSecret' },
+      tradingview: { api_key: 'settTradingviewKey', api_secret: 'settTradingviewSecret' },
+      eodhd:       { api_key: 'settEodhdKey' },
     };
     for (const [broker, creds] of Object.entries(saved)) {
       const map = fieldMap[broker];
@@ -3980,6 +3990,14 @@ async function connectBrokerFromSettings(broker) {
     payload.api_key    = el('settTigerKey')?.value?.trim();
     payload.api_secret = el('settTigerSecret')?.value?.trim();
     if (!payload.api_key || !payload.api_secret) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key and secret required</span>'; return; }
+  } else {
+    // Generic API key/secret broker (pepperstone, finclear, openmarkets, etc.)
+    const capBroker = broker.charAt(0).toUpperCase() + broker.slice(1);
+    const keyEl = el(`sett${capBroker}Key`);
+    const secretEl = el(`sett${capBroker}Secret`);
+    if (keyEl) payload.api_key = keyEl.value?.trim();
+    if (secretEl) payload.api_secret = secretEl.value?.trim();
+    if (!payload.api_key) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--red)">API key required</span>'; return; }
   }
 
   try {
@@ -4038,9 +4056,10 @@ async function _populateBrokerPicker() {
   list.innerHTML = '<div class="broker-picker-item bp-empty">Loading...</div>';
 
   const logoMap = {
-    ibkr:'IB',
-    moomoo:'MM', ig:'IG', cmc:'CMC',
-    saxo:'SX', tiger:'TG',
+    ibkr:'IB', ig:'IG', cmc:'CMC', saxo:'SX', tiger:'TG',
+    moomoo:'MM', pepperstone:'PP', finclear:'FC', openmarkets:'OM',
+    marketech:'MK', opentrader:'OT', iress:'IR', cqg:'CQ',
+    flextrade:'FX', tradingview:'TV', eodhd:'EO',
   };
 
   try {
@@ -4129,12 +4148,22 @@ async function _quickReconnectSaved() {
 function _getBrokerPayload(broker) {
   const _f = (id) => el(id)?.value?.trim() || '';
   const map = {
-    ibkr:     () => ({ host: _f('settIbkrHost') || '127.0.0.1', port: _f('settIbkrPort') || '7497', client_id: _f('settIbkrClientId') || '1' }),
-    ig:         () => ({ api_key: _f('settIgKey'), api_secret: _f('settIgSecret'), passphrase: _f('settIgPassphrase') }),
-    cmc:        () => ({ api_key: _f('settCmcKey'), api_secret: _f('settCmcSecret'), passphrase: _f('settCmcPassphrase') }),
-    moomoo:     () => ({ api_key: _f('settMoomooKey'), api_secret: _f('settMoomooSecret') }),
-    saxo:       () => ({ api_key: _f('settSaxoKey'), api_secret: _f('settSaxoSecret') }),
-    tiger:      () => ({ api_key: _f('settTigerKey'), api_secret: _f('settTigerSecret') }),
+    ibkr:        () => ({ host: _f('settIbkrHost') || '127.0.0.1', port: _f('settIbkrPort') || '7497', client_id: _f('settIbkrClientId') || '1' }),
+    ig:          () => ({ api_key: _f('settIgKey'), api_secret: _f('settIgSecret'), passphrase: _f('settIgPassphrase') }),
+    cmc:         () => ({ api_key: _f('settCmcKey'), api_secret: _f('settCmcSecret'), passphrase: _f('settCmcPassphrase') }),
+    moomoo:      () => ({ api_key: _f('settMoomooKey'), api_secret: _f('settMoomooSecret') }),
+    saxo:        () => ({ api_key: _f('settSaxoKey'), api_secret: _f('settSaxoSecret') }),
+    tiger:       () => ({ api_key: _f('settTigerKey'), api_secret: _f('settTigerSecret') }),
+    pepperstone: () => ({ api_key: _f('settPepperstoneKey'), api_secret: _f('settPepperstoneSecret') }),
+    finclear:    () => ({ api_key: _f('settFinclearKey'), api_secret: _f('settFinclearSecret') }),
+    openmarkets: () => ({ api_key: _f('settOpenmarketsKey'), api_secret: _f('settOpenmarketsSecret') }),
+    marketech:   () => ({ api_key: _f('settMarketechKey'), api_secret: _f('settMarketechSecret') }),
+    opentrader:  () => ({ api_key: _f('settOpentraderKey'), api_secret: _f('settOpentraderSecret') }),
+    iress:       () => ({ api_key: _f('settIressKey'), api_secret: _f('settIressSecret') }),
+    cqg:         () => ({ api_key: _f('settCqgKey'), api_secret: _f('settCqgSecret') }),
+    flextrade:   () => ({ api_key: _f('settFlextradeKey'), api_secret: _f('settFlextradeSecret') }),
+    tradingview: () => ({ api_key: _f('settTradingviewKey'), api_secret: _f('settTradingviewSecret') }),
+    eodhd:       () => ({ api_key: _f('settEodhdKey') }),
   };
   return map[broker] ? map[broker]() : {};
 }

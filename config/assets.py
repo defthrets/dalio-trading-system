@@ -57,7 +57,8 @@ DEFENSIVE_ETFS = {
 }
 
 def get_all_assets() -> dict:
-    """Return the full asset universe (41 assets)."""
+    """Return the curated asset universe (equities + commodities + ETFs).
+    For the full ASX universe (~1,900 companies), use api.scanners.get_asx_universe()."""
     all_assets = {}
     all_assets.update(ASX_EQUITIES)
     all_assets.update(COMMODITIES)

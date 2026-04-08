@@ -64,10 +64,7 @@ from api.signals import (
     _gen_portfolio_health, _gen_backtest_results, dalio_analyse_trade,
 )
 from api.brokers import (
-    BrokerBase, IBKRBroker,
-    IGBroker, CMCBroker, MomooBroker,
-    SaxoBroker, TigerBroker,
-    ACTIVE_BROKER, _load_broker_creds, _save_broker_creds, BROKER_MAP,
+    BrokerBase, ACTIVE_BROKER, _load_broker_creds, _save_broker_creds, BROKER_MAP,
 )
 from api.agent import (
     AGENT_CONFIG, _save_agent_config,
@@ -190,6 +187,10 @@ async def _on_startup():
     asyncio.get_event_loop().create_task(_autonomous_agent_loop())
     auto_status = "ENABLED" if AGENT_CONFIG.get("enabled", False) else "DISABLED"
     logger.info(f"Autonomous agent loop started ({auto_status}, interval {AGENT_CONFIG.get('interval_seconds', 300)}s)")
+
+    # Fetch full ASX universe (1,900+ companies) in background
+    from api.scanners import _fetch_asx_listed_companies
+    asyncio.get_event_loop().create_task(_fetch_asx_listed_companies())
 
     # Auto-reconnect last active broker from saved credentials
     await _auto_reconnect_saved_broker()
@@ -768,6 +769,14 @@ async def market_scanner(market: str):
 
     _scanner_cache[market] = {"ts": time.time(), "rows": rows}
     return {"market": market, "rows": rows, "count": len(rows), "cached": False}
+
+
+@app.get("/api/asx/universe")
+async def asx_universe():
+    """Return the full ASX listed company universe for search/autocomplete."""
+    from api.scanners import get_asx_universe
+    universe = get_asx_universe()
+    return {"tickers": universe, "count": len(universe)}
 
 
 # ─────────────────────────────────────────────

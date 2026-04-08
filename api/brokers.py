@@ -189,6 +189,59 @@ class TigerBroker(GenericASXBroker):
     name = "tiger"
     _BASE = "https://openapi.tigerbrokers.com/gateway"
 
+class FinClearBroker(GenericASXBroker):
+    """FinClear — Australian wholesale execution via FIX/REST API.
+    Provides direct ASX market access for authorised participants."""
+    name = "finclear"
+    _BASE = "https://api.finclear.com.au/v1"
+
+class OpenMarketsBroker(GenericASXBroker):
+    """Open Markets — ASX licensed execution venue with REST/FIX API.
+    Specialises in ASX equities execution and clearing."""
+    name = "openmarkets"
+    _BASE = "https://api.openmarkets.com.au/v1"
+
+class PepperstoneBroker(GenericASXBroker):
+    """Pepperstone — cTrader Open API / MT4/MT5 for CFDs, FX, ASX."""
+    name = "pepperstone"
+    _BASE = "https://api.pepperstone.com/v1"
+
+class MarketechBroker(GenericASXBroker):
+    """Marketech — Australian broker with IRESS platform integration."""
+    name = "marketech"
+    _BASE = "https://api.marketech.com.au/v1"
+
+class OpenTraderBroker(GenericASXBroker):
+    """OpenTrader — Low-cost ASX broker powered by FinClear execution."""
+    name = "opentrader"
+    _BASE = "https://api.opentrader.com.au/v1"
+
+class IRESSBroker(GenericASXBroker):
+    """IRESS — Professional trading platform with FIX API for ASX."""
+    name = "iress"
+    _BASE = "https://api.iress.com/v1"
+
+class CQGBroker(GenericASXBroker):
+    """CQG — Professional futures & commodities platform with Web API."""
+    name = "cqg"
+    _BASE = "https://api.cqg.com/v2"
+
+class FlexTradeBroker(GenericASXBroker):
+    """FlexTrade — Institutional EMS/OMS with FIX connectivity."""
+    name = "flextrade"
+    _BASE = "https://api.flextrade.com/v1"
+
+class TradingViewBroker(GenericASXBroker):
+    """TradingView — Webhook-based order routing to connected brokers."""
+    name = "tradingview"
+    _BASE = "https://webhook.tradingview.com"
+
+class EODHDBroker(GenericASXBroker):
+    """EODHD — End-of-day & intraday market data API (data only, no trading)."""
+    name = "eodhd"
+    _BASE = "https://eodhd.com/api"
+
+
 # ── Active broker global ────────────────────────────────
 ACTIVE_BROKER: Optional[BrokerBase] = None
 
@@ -212,10 +265,15 @@ def _save_broker_creds(creds: dict):
     _BROKER_CREDS_FILE.write_text(json.dumps(encrypted, indent=2))
 
 
-# ── Broker map for connection routing ───────────────────
+# ── Broker map for connection routing (IBKR first — most complete) ──
 BROKER_MAP = {
     "ibkr": IBKRBroker,
     "ig": IGBroker, "cmc": CMCBroker,
-    "moomoo": MomooBroker, "saxo": SaxoBroker,
-    "tiger": TigerBroker,
+    "saxo": SaxoBroker, "tiger": TigerBroker,
+    "moomoo": MomooBroker, "pepperstone": PepperstoneBroker,
+    "finclear": FinClearBroker, "openmarkets": OpenMarketsBroker,
+    "marketech": MarketechBroker, "opentrader": OpenTraderBroker,
+    "iress": IRESSBroker, "cqg": CQGBroker,
+    "flextrade": FlexTradeBroker, "tradingview": TradingViewBroker,
+    "eodhd": EODHDBroker,
 }
