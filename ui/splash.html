@@ -3,11 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
 * { margin:0; padding:0; box-sizing:border-box; }
 body {
-  background: #0a0a0a;
-  color: #00ff41;
-  font-family: 'Courier New', monospace;
+  background: #1c1917;
+  color: #fafaf9;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
   overflow: hidden;
   height: 100vh;
   display: flex;
@@ -16,7 +18,7 @@ body {
   justify-content: center;
   position: relative;
 }
-/* CRT scanlines */
+/* Scanlines */
 body::before {
   content: '';
   position: fixed;
@@ -24,7 +26,7 @@ body::before {
   background: repeating-linear-gradient(
     0deg,
     transparent 0px,
-    rgba(0,255,65,0.015) 1px,
+    rgba(245,158,11,0.012) 1px,
     transparent 2px
   );
   pointer-events: none;
@@ -34,7 +36,7 @@ body::after {
   content: '';
   position: fixed;
   top:0;left:0;right:0;bottom:0;
-  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.6) 100%);
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%);
   pointer-events: none;
   z-index: 99;
 }
@@ -43,52 +45,6 @@ body::after {
   display: flex;
   align-items: flex-start;
   gap: 30px;
-}
-
-/* Rex mascot on boot screen */
-.boot-rex {
-  width: 180px;
-  flex-shrink: 0;
-  position: relative;
-}
-.boot-rex img {
-  width: 100%;
-  filter: drop-shadow(0 0 15px rgba(0,255,65,0.3)) drop-shadow(0 0 40px rgba(0,255,65,0.1));
-  animation: rexFloat 3s ease-in-out infinite, rexGlitch 8s ease-in-out infinite;
-}
-@keyframes rexFloat {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-8px); }
-}
-@keyframes rexGlitch {
-  0%, 100% { filter: drop-shadow(0 0 15px rgba(0,255,65,0.3)) drop-shadow(0 0 40px rgba(0,255,65,0.1)); }
-  89% { filter: drop-shadow(0 0 15px rgba(0,255,65,0.3)); }
-  90% { filter: drop-shadow(0 0 15px rgba(255,0,64,0.4)) drop-shadow(3px 0 0 rgba(0,255,65,0.3)); transform: translateY(-4px) translateX(2px); }
-  91% { filter: drop-shadow(0 0 15px rgba(0,255,65,0.5)) drop-shadow(-2px 0 0 rgba(0,200,255,0.3)); transform: translateY(-6px) translateX(-1px); }
-  92% { filter: drop-shadow(0 0 15px rgba(0,255,65,0.3)) drop-shadow(0 0 40px rgba(0,255,65,0.1)); }
-}
-.boot-rex .rex-label {
-  text-align: center;
-  font-size: 9px;
-  color: #005500;
-  margin-top: 8px;
-  letter-spacing: 3px;
-}
-.boot-rex .rex-holo-lines {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 20px;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent 0px,
-    rgba(0,255,65,0.04) 2px,
-    transparent 4px
-  );
-  pointer-events: none;
-  animation: holoSweep 2s linear infinite;
-}
-@keyframes holoSweep {
-  0%   { background-position: 0 0; }
-  100% { background-position: 0 20px; }
 }
 
 .boot-right {
@@ -101,6 +57,7 @@ body::after {
   text-align: center;
   margin-bottom: 30px;
 }
+
 /* ── 3D Cash Stack Logo ── */
 .cash3d { width:80px; height:80px; display:flex; align-items:center; justify-content:center; position:relative; margin:0 auto 10px; }
 .cash3d-scene { width:70px; height:66px; perspective:200px; position:relative; }
@@ -113,46 +70,38 @@ body::after {
 .cash3d-left { width:32px; height:34px; top:16px; left:9px; transform-origin:left center; transform:rotateY(-90deg) translateZ(16px); }
 .cash3d-top { width:52px; height:32px; top:0; left:9px; transform:rotateX(90deg) translateZ(16px); }
 .cash3d-bottom { width:52px; height:32px; top:32px; left:9px; transform:rotateX(-90deg) translateZ(16px); }
-.cash3d-top, .cash3d-bottom { background:linear-gradient(180deg,rgba(0,255,65,0.1) 0%,rgba(0,40,20,0.3) 100%); border:1px solid rgba(0,255,65,0.5); }
-.bill-face { width:100%; height:100%; background:linear-gradient(135deg,rgba(0,255,65,0.08) 0%,rgba(0,255,100,0.12) 50%,rgba(0,255,65,0.08) 100%); border:1.5px solid rgba(0,255,65,0.7); border-radius:2px; position:relative; overflow:hidden; box-shadow:inset 0 0 10px rgba(0,255,65,0.15); }
-.bill-border { position:absolute; top:2px; left:3px; right:3px; bottom:2px; border:1px solid rgba(0,255,65,0.3); border-radius:1px; }
-.bill-oval { position:absolute; width:16px; height:16px; top:50%; left:50%; transform:translate(-50%,-50%); border:1px solid rgba(0,255,100,0.35); border-radius:50%; }
-.bill-dollar { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-family:'Georgia',serif; font-size:16px; font-weight:bold; color:rgba(0,255,65,0.9); text-shadow:0 0 6px rgba(0,255,65,0.6),0 0 12px rgba(0,255,100,0.3); }
-.bill-100 { position:absolute; bottom:1px; right:2px; font-family:'Courier New',monospace; font-size:7px; font-weight:bold; color:rgba(0,255,65,0.5); }
-.stack-edge { width:100%; height:100%; background:repeating-linear-gradient(0deg,rgba(0,20,0,0.4) 0px,rgba(0,255,65,0.25) 0.8px,rgba(0,20,0,0.4) 1.6px); border:1px solid rgba(0,255,65,0.5); }
-.stack-edge-h { width:100%; height:100%; background:repeating-linear-gradient(90deg,rgba(0,20,0,0.4) 0px,rgba(0,255,65,0.25) 0.8px,rgba(0,20,0,0.4) 1.6px); border:1px solid rgba(0,255,65,0.5); }
-.band-face { position:absolute; backface-visibility:visible; background:linear-gradient(90deg,rgba(0,255,100,0.15) 0%,rgba(0,255,100,0.35) 40%,rgba(0,255,65,0.35) 60%,rgba(0,255,100,0.15) 100%); border:1px solid rgba(0,255,100,0.6); box-shadow:0 0 6px rgba(0,255,100,0.3),inset 0 0 4px rgba(0,255,100,0.15); }
+.cash3d-top, .cash3d-bottom { background:linear-gradient(180deg,rgba(245,158,11,0.1) 0%,rgba(40,30,10,0.3) 100%); border:1px solid rgba(245,158,11,0.5); }
+.bill-face { width:100%; height:100%; background:linear-gradient(135deg,rgba(245,158,11,0.08) 0%,rgba(245,180,50,0.12) 50%,rgba(245,158,11,0.08) 100%); border:1.5px solid rgba(245,158,11,0.7); border-radius:2px; position:relative; overflow:hidden; box-shadow:inset 0 0 10px rgba(245,158,11,0.15); }
+.bill-border { position:absolute; top:2px; left:3px; right:3px; bottom:2px; border:1px solid rgba(245,158,11,0.3); border-radius:1px; }
+.bill-oval { position:absolute; width:16px; height:16px; top:50%; left:50%; transform:translate(-50%,-50%); border:1px solid rgba(245,180,50,0.35); border-radius:50%; }
+.bill-dollar { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-family:'Georgia',serif; font-size:16px; font-weight:bold; color:rgba(245,158,11,0.9); text-shadow:0 0 6px rgba(245,158,11,0.6),0 0 12px rgba(245,180,50,0.3); }
+.bill-100 { position:absolute; bottom:1px; right:2px; font-family:'Courier New',monospace; font-size:7px; font-weight:bold; color:rgba(245,158,11,0.5); }
+.stack-edge { width:100%; height:100%; background:repeating-linear-gradient(0deg,rgba(20,15,10,0.4) 0px,rgba(245,158,11,0.25) 0.8px,rgba(20,15,10,0.4) 1.6px); border:1px solid rgba(245,158,11,0.5); }
+.stack-edge-h { width:100%; height:100%; background:repeating-linear-gradient(90deg,rgba(20,15,10,0.4) 0px,rgba(245,158,11,0.25) 0.8px,rgba(20,15,10,0.4) 1.6px); border:1px solid rgba(245,158,11,0.5); }
+.band-face { position:absolute; backface-visibility:visible; background:linear-gradient(90deg,rgba(245,180,50,0.15) 0%,rgba(245,180,50,0.35) 40%,rgba(245,158,11,0.35) 60%,rgba(245,180,50,0.15) 100%); border:1px solid rgba(245,180,50,0.6); box-shadow:0 0 6px rgba(245,180,50,0.3),inset 0 0 4px rgba(245,180,50,0.15); }
 .band-front { width:14px; height:34px; top:16px; left:28px; transform:translateZ(16.5px); }
 .band-back { width:14px; height:34px; top:16px; left:28px; transform:translateZ(-16.5px) rotateY(180deg); }
 .band-top { width:14px; height:33px; top:-0.5px; left:28px; transform:rotateX(90deg) translateZ(16.5px); }
 .band-bottom { width:14px; height:33px; top:32.5px; left:28px; transform:rotateX(-90deg) translateZ(16.5px); }
-.band-front::after, .band-back::after { content:'$'; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-family:'Georgia',serif; font-size:11px; font-weight:bold; color:rgba(0,255,100,0.7); text-shadow:0 0 4px rgba(0,255,100,0.5); }
-@keyframes cashGlitch { 0%,88%,92%,100%{filter:none} 89%{filter:drop-shadow(2px 0 0 rgba(255,0,64,0.5)) drop-shadow(-2px 0 0 rgba(0,255,136,0.5))} 90%{filter:drop-shadow(-1px 0 0 rgba(0,200,255,0.4)) drop-shadow(1px 0 0 rgba(255,0,64,0.4))} 91%{filter:none} 95%{filter:drop-shadow(1px 0 0 rgba(255,0,64,0.3))} 96%{filter:none} }
+.band-front::after, .band-back::after { content:'$'; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-family:'Georgia',serif; font-size:11px; font-weight:bold; color:rgba(245,180,50,0.7); text-shadow:0 0 4px rgba(245,180,50,0.5); }
+@keyframes cashGlitch { 0%,88%,92%,100%{filter:none} 89%{filter:drop-shadow(2px 0 0 rgba(255,0,64,0.5)) drop-shadow(-2px 0 0 rgba(245,158,11,0.5))} 90%{filter:drop-shadow(-1px 0 0 rgba(245,180,50,0.4)) drop-shadow(1px 0 0 rgba(255,0,64,0.4))} 91%{filter:none} 95%{filter:drop-shadow(1px 0 0 rgba(255,0,64,0.3))} 96%{filter:none} }
 
 .boot-logo {
+  font-family: 'Orbitron', monospace;
   font-size: 42px;
-  font-weight: bold;
-  color: #00ff41;
-  text-shadow: 0 0 10px #00ff41, 0 0 30px rgba(0,255,65,0.3);
+  font-weight: 900;
+  color: #f59e0b;
+  text-shadow: 0 0 10px rgba(245,158,11,0.5), 0 0 30px rgba(245,158,11,0.2);
   letter-spacing: 12px;
   animation: logoFlicker 4s ease-in-out infinite;
 }
 .boot-sub {
-  font-size: 11px;
-  color: #00aa2a;
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  color: #a8a29e;
   letter-spacing: 6px;
   margin-top: 8px;
   opacity: 0.8;
-}
-.boot-classification {
-  font-size: 10px;
-  color: #ff3333;
-  letter-spacing: 4px;
-  margin-top: 14px;
-  padding: 4px 16px;
-  border: 1px solid #ff3333;
-  display: inline-block;
-  animation: blink 1.2s step-end infinite;
 }
 
 @keyframes logoFlicker {
@@ -163,28 +112,26 @@ body::after {
   96% { opacity:0.6; }
   97% { opacity:1; }
 }
-@keyframes blink {
-  0%,100% { opacity:1; }
-  50% { opacity:0; }
-}
 
 .terminal {
   width: 620px;
-  background: rgba(0,20,0,0.4);
-  border: 1px solid #00ff41;
-  border-radius: 2px;
+  background: rgba(42,37,35,0.6);
+  border: 1px solid #3d3835;
+  border-radius: 8px;
   padding: 20px;
   position: relative;
-  box-shadow: 0 0 15px rgba(0,255,65,0.1), inset 0 0 30px rgba(0,0,0,0.5);
+  box-shadow: 0 0 15px rgba(245,158,11,0.05), inset 0 0 30px rgba(0,0,0,0.3);
 }
 .terminal-header {
   display: flex;
   justify-content: space-between;
-  border-bottom: 1px solid #004d00;
+  border-bottom: 1px solid #3d3835;
   padding-bottom: 8px;
   margin-bottom: 12px;
   font-size: 10px;
-  color: #007700;
+  color: #78716c;
+  font-family: 'Orbitron', monospace;
+  letter-spacing: 1px;
 }
 
 #log {
@@ -193,6 +140,7 @@ body::after {
   min-height: 240px;
   max-height: 240px;
   overflow: hidden;
+  color: #a8a29e;
 }
 #log .line {
   opacity: 0;
@@ -202,24 +150,26 @@ body::after {
 @keyframes lineIn {
   to { opacity: 1; }
 }
-.line .ok { color: #00ff41; }
-.line .warn { color: #ffaa00; }
-.line .info { color: #0088ff; }
-.line .dim { color: #005500; }
-.line .bright { color: #00ff41; text-shadow: 0 0 6px #00ff41; }
+.line .ok { color: #22c55e; }
+.line .warn { color: #f59e0b; }
+.line .info { color: #22d3ee; }
+.line .dim { color: #57534e; }
+.line .bright { color: #f59e0b; text-shadow: 0 0 6px rgba(245,158,11,0.4); }
 
 .progress-wrap {
   margin-top: 16px;
-  border: 1px solid #004d00;
+  border: 1px solid #3d3835;
   height: 18px;
   position: relative;
-  background: #000;
+  background: #1c1917;
+  border-radius: 4px;
+  overflow: hidden;
 }
 .progress-bar {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, #003300, #00ff41);
-  box-shadow: 0 0 10px #00ff41;
+  background: linear-gradient(90deg, #d97706, #f59e0b);
+  box-shadow: 0 0 10px rgba(245,158,11,0.3);
   transition: width 0.3s ease;
 }
 .progress-text {
@@ -229,9 +179,10 @@ body::after {
   align-items: center;
   justify-content: center;
   font-size: 10px;
-  color: #00ff41;
+  color: #fafaf9;
   letter-spacing: 2px;
   z-index: 2;
+  font-family: 'Orbitron', monospace;
 }
 
 .status-row {
@@ -239,7 +190,8 @@ body::after {
   justify-content: space-between;
   margin-top: 10px;
   font-size: 10px;
-  color: #005500;
+  color: #57534e;
+  font-family: 'JetBrains Mono', monospace;
 }
 </style>
 </head>
@@ -250,13 +202,12 @@ body::after {
     <div class="boot-header">
       <span class="cash3d"><div class="cash3d-scene"><div class="cash3d-rotator"><div class="cash3d-face cash3d-front"><div class="bill-face"><div class="bill-border"></div><div class="bill-oval"></div><span class="bill-dollar">$</span><span class="bill-100">100</span></div></div><div class="cash3d-face cash3d-back"><div class="bill-face"><div class="bill-border"></div><div class="bill-oval"></div><span class="bill-dollar">$</span><span class="bill-100">100</span></div></div><div class="cash3d-face cash3d-right"><div class="stack-edge"></div></div><div class="cash3d-face cash3d-left"><div class="stack-edge"></div></div><div class="cash3d-face cash3d-top"><div class="stack-edge-h"></div></div><div class="cash3d-face cash3d-bottom"><div class="stack-edge-h"></div></div><div class="band-face band-front"></div><div class="band-face band-back"></div><div class="band-face band-top"></div><div class="band-face band-bottom"></div></div></div></span>
       <div class="boot-logo">DALIOS</div>
-      <div class="boot-sub">AUTOMATED TRADING FRAMEWORK</div>
-      <div class="boot-classification">&#9650; TOP SECRET // TRADING SYSTEMS</div>
+      <div class="boot-sub">AUTONOMOUS TRADING FRAMEWORK</div>
     </div>
 
     <div class="terminal">
       <div class="terminal-header">
-        <span>DALIOS BOOT SEQUENCE v3.7.1</span>
+        <span>DALIOS BOOT SEQUENCE</span>
         <span id="clock">00:00:00</span>
       </div>
       <div id="log"></div>
@@ -300,7 +251,7 @@ const lines = [
   { t:3200, txt:'> SIGNAL PROCESSING PIPELINE ............... <span class="ok">[ONLINE]</span>' },
   { t:3500, txt:'> BROKER API HANDSHAKE ..................... <span class="warn">[STANDBY]</span>' },
   { t:3800, txt:'> AUTONOMOUS AGENT CORE ................... <span class="ok">[LOADED]</span>' },
-  { t:4100, txt:'> SCANNING ASX UNIVERSE (2,200+ TICKERS) .. <span class="info">[CACHED]</span>' },
+  { t:4100, txt:'> SCANNING ASX UNIVERSE (1,900+ TICKERS) .. <span class="info">[CACHED]</span>' },
   { t:4400, txt:'> SENTIMENT ANALYSIS ENGINE ................ <span class="ok">[READY]</span>' },
   { t:4700, txt:'> WEBSOCKET CHANNELS ...................... <span class="ok">[OPEN]</span>' },
   { t:5000, txt:'> COMMAND & CONTROL INTERFACE .............. <span class="ok">[ONLINE]</span>' },
@@ -329,7 +280,7 @@ lines.forEach((l, i) => {
 
 setTimeout(() => {
   ptxt.textContent = 'SYSTEM READY';
-  ptxt.style.textShadow = '0 0 8px #00ff41';
+  ptxt.style.textShadow = '0 0 8px rgba(245,158,11,0.5)';
   if (window.pywebview) {
     window.pywebview.api.boot_complete();
   }

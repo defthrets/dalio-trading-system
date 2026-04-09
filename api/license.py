@@ -6,6 +6,7 @@ Stores activation locally in data/license.json.
 
 import hashlib
 import json
+import os
 import platform
 import uuid
 from datetime import datetime, timedelta
@@ -16,10 +17,17 @@ import httpx
 from loguru import logger
 
 # ── Paths ──────────────────────────────────────────
-ROOT = Path(__file__).parent.parent
-DATA_DIR = ROOT / "data"
-DATA_DIR.mkdir(exist_ok=True)
-LICENSE_FILE = DATA_DIR / "license.json"
+# Store license in a persistent user directory so it survives app updates
+if platform.system() == "Windows":
+    _APP_DATA = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+elif platform.system() == "Darwin":
+    _APP_DATA = Path.home() / "Library" / "Application Support"
+else:
+    _APP_DATA = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+
+LICENSE_DIR = _APP_DATA / "DALIOS"
+LICENSE_DIR.mkdir(parents=True, exist_ok=True)
+LICENSE_FILE = LICENSE_DIR / "license.json"
 
 # ── LemonSqueezy API ──────────────────────────────
 LEMON_ACTIVATE_URL = "https://api.lemonsqueezy.com/v1/licenses/activate"
