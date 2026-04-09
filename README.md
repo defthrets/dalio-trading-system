@@ -4,6 +4,7 @@
 
 ![Status](https://img.shields.io/badge/status-operational-brightgreen)
 ![Price](https://img.shields.io/badge/price-FREE-22c55e)
+![Open Source](https://img.shields.io/badge/open%20source-yes-22c55e)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux%20%7C%20macOS-orange)
 ![Stack](https://img.shields.io/badge/stack-Python%20%2B%20FastAPI%20%2B%20Chart.js-cyan)
 
@@ -11,9 +12,13 @@
 
 ## What Is It?
 
-DALIOS scans 300+ ASX equities and Australian commodities in real time, generates trade signals, executes trades, and manages risk — all autonomously from a single terminal UI. Toggle "SCAN FULL ASX" to scan all ~1,900 listed companies.
+DALIOS is a free, open-source autonomous trading system built around Ray Dalio's core investment principles — the **All Weather** portfolio strategy and his **Economic Machine** framework for understanding how economies work.
 
-**Free to download. No subscriptions. No hidden fees.**
+The All Weather strategy is designed to perform in any economic environment by balancing assets across four regimes: rising growth, falling growth, rising inflation, and falling inflation. DALIOS implements this by classifying the current macro regime in real time and scoring every trade signal against it — so the system naturally shifts toward the right assets for the current conditions, just like Dalio's Bridgewater does at scale.
+
+It scans 300+ ASX equities and Australian commodities in real time, generates trade signals, executes trades, and manages risk — all autonomously from a single terminal UI. Toggle "SCAN FULL ASX" to scan all ~1,900 listed companies.
+
+**100% free and open source. No subscriptions. No hidden fees. No paywalls. The code is yours.**
 
 ---
 
@@ -55,11 +60,24 @@ Interactive Brokers, IG Markets, CMC Invest, Saxo Markets, Tiger Brokers, moomoo
 
 ---
 
+## Dalio's Principles In Action
+
+Ray Dalio's insight is that all economic shifts boil down to two forces — **growth** and **inflation** — each either rising or falling. That gives four quadrants, and each one favours different assets:
+
+| Quadrant | Condition | DALIOS Favours |
+|----------|-----------|---------------|
+| Q1 | Rising growth, falling inflation | Equities, corporate bonds |
+| Q2 | Rising growth, rising inflation | Commodities, inflation-linked assets |
+| Q3 | Falling growth, falling inflation | Bonds, defensive equities |
+| Q4 | Falling growth, rising inflation | Gold, cash, short positions |
+
+DALIOS detects the current quadrant from live macro data and scores every signal against it. A buy signal on a mining stock scores higher in Q2 (commodity-friendly) than in Q3 (risk-off). This is the same logic Bridgewater uses — DALIOS just makes it accessible to everyone, for free.
+
 ## How It Works
 
-1. **Quadrant Engine** detects the current economic regime (growth/inflation rising or falling)
+1. **Quadrant Engine** detects the current economic regime from live indicators
 2. **Signal Engine** generates RSI + trend signals scored against the regime
-3. **Risk Parity** calculates position weights based on risk contribution
+3. **Risk Parity** calculates position weights based on risk contribution, not dollar amount
 4. **Circuit Breaker** halts trading if daily loss or drawdown limits are hit
 5. **Autonomous Agent** runs the full cycle on a loop — scan, signal, size, execute, notify
 
