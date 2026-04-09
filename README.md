@@ -24,11 +24,32 @@ It scans 300+ ASX equities and Australian commodities in real time, generates tr
 
 ## Download
 
-Grab the latest build from [**Releases**](https://github.com/defthrets/dalio-trading-system/releases/latest) — Windows, Linux, and macOS. No Python needed.
+Grab the latest build from [**Releases**](https://github.com/defthrets/dalios/releases/latest) — Windows, Linux, and macOS. No Python needed.
 
 Or run from source:
 
+**Linux / WSL**
 ```bash
+git clone https://github.com/defthrets/dalios.git
+cd dalios
+pip install -r requirements.txt
+python -m uvicorn api.server:app --port 8000
+# Open http://localhost:8000
+```
+
+**macOS**
+```bash
+git clone https://github.com/defthrets/dalios.git
+cd dalios
+pip3 install -r requirements.txt
+python3 -m uvicorn api.server:app --port 8000
+# Open http://localhost:8000
+```
+
+**Windows (PowerShell)**
+```powershell
+git clone https://github.com/defthrets/dalios.git
+cd dalios
 pip install -r requirements.txt
 python -m uvicorn api.server:app --port 8000
 # Open http://localhost:8000
