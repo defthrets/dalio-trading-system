@@ -1082,6 +1082,7 @@
           <div class="scanner-title">🇦🇺 ASX MARKET SCANNER</div>
           <div class="panel-hint" style="flex-basis:100%;margin:-4px 0 4px">Live prices for ASX equities. Filter by ticker, name, or sector. Click column headers to sort. Green rows are up today, red are down. Click TRADE to open an order, or ★ to add to your watchlist.</div>
           <div class="scanner-toolbar-right">
+            <button id="fullAsxToggle" class="ctrl-btn" onclick="toggleFullAsx()" title="Scan all ~1,900 ASX-listed companies" style="font-size:10px;padding:4px 10px;white-space:nowrap;">⬇ FULL ASX (~1,900)</button>
             <input type="text" class="scanner-search" id="asxSearch" placeholder="Filter ticker or name..." oninput="filterScanner('asx',this.value)"/>
             <select class="ctrl-select" id="asxSectorFilter" onchange="filterScanner('asx',el('asxSearch').value)">
               <option value="">ALL SECTORS</option>

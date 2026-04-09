@@ -3372,15 +3372,23 @@ const _SCANNER_IDS = {
   commodities: { tbody: 'commoditiesTableBody',  stats: 'commStats',   cols: 7 },
 };
 
-async function loadScanner(market) {
+// Track full ASX mode
+let _asxFullMode = false;
+
+async function loadScanner(market, full) {
   const ids = _SCANNER_IDS[market];
   const tbody = el(ids.tbody);
   const statsEl = el(ids.stats);
   if (!tbody) return;
-  tbody.innerHTML = `<tr><td colspan="${ids.cols}" class="scanner-loading">⌛ Fetching live data… (may take 5–15s for first load)</td></tr>`;
+  const useFull = (market === 'asx' && (full !== undefined ? full : _asxFullMode));
+  const loadMsg = useFull
+    ? '⌛ Scanning full ASX universe (~1,900 tickers)… this may take 30–60s'
+    : '⌛ Fetching live data… (may take 5–15s for first load)';
+  tbody.innerHTML = `<tr><td colspan="${ids.cols}" class="scanner-loading">${loadMsg}</td></tr>`;
   if (statsEl) statsEl.innerHTML = '';
   try {
-    const d = await fetchJSON(`/api/markets/${market}`);
+    const url = useFull ? `/api/markets/${market}?full=true` : `/api/markets/${market}`;
+    const d = await fetchJSON(url);
     _scannerData[market] = d.rows || [];
     const cacheNote = d.cached ? ` <span style="opacity:.5">(cached ${d.cache_age}s ago)</span>` : '';
     if (statsEl) statsEl.dataset.cacheNote = cacheNote;
@@ -3388,6 +3396,16 @@ async function loadScanner(market) {
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="${ids.cols}" class="scanner-loading" style="color:var(--red)">⚠ Failed to load — ${escHtml(e.message)}</td></tr>`;
   }
+}
+
+function toggleFullAsx() {
+  _asxFullMode = !_asxFullMode;
+  const btn = document.getElementById('fullAsxToggle');
+  if (btn) {
+    btn.textContent = _asxFullMode ? '⬆ TOP 300' : '⬇ FULL ASX (~1,900)';
+    btn.title = _asxFullMode ? 'Switch to top 300 liquid tickers' : 'Scan all ~1,900 ASX-listed companies';
+  }
+  loadScanner('asx', _asxFullMode);
 }
 
 function renderScanner(market, filterText = '', filterSector = '') {

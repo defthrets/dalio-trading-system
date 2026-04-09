@@ -121,7 +121,7 @@ COMMODITY_TICKERS = [
     "QCB.AX", "COMB.AX",
     # -- ASX Copper & Base Metals --
     "OZL.AX", "29M.AX", "SFR.AX",
-    # -- ASX Iron Ore (commodity proxy) --
+    # -- ASX Iron Ore --
     "BHP.AX", "FMG.AX", "RIO.AX", "MIN.AX", "GRR.AX", "MGX.AX",
     # -- ASX Uranium --
     "BMN.AX", "LOT.AX", "DYL.AX",
@@ -132,27 +132,13 @@ COMMODITY_TICKERS = [
     "LYC.AX", "ARU.AX", "VML.AX", "HAS.AX", "NTU.AX",
     # -- ASX Nickel & Cobalt --
     "NIC.AX", "WSA.AX",
-    # -- ASX Agriculture & Soft Commodities --
+    # -- ASX Agriculture --
     "FOOD.AX", "QAG.AX", "GNC.AX", "NUF.AX", "ELD.AX",
     "AAC.AX", "TGR.AX", "CGC.AX",
     # -- ASX Coal --
     "WHC.AX", "NHC.AX", "CRN.AX",
     # -- ASX Aluminium --
     "AWC.AX", "S32.AX",
-    # -- Global Precious Metals Futures --
-    "GC=F", "SI=F", "PL=F", "PA=F",
-    # -- Global Energy Futures --
-    "CL=F", "BZ=F", "NG=F", "RB=F", "HO=F",
-    # -- Global Base & Industrial Metals --
-    "HG=F", "ALI=F",
-    # -- Global Agriculture & Soft Commodities --
-    "ZC=F", "ZW=F", "ZS=F", "ZM=F", "ZL=F",
-    "KC=F", "SB=F", "CC=F", "CT=F", "OJ=F",
-    "RS=F", "ZO=F",
-    # -- Global Livestock --
-    "LE=F", "GF=F", "HE=F",
-    # -- Global Lumber & Other --
-    "LBS=F",
 ]
 
 ALL_TICKERS = ASX_TICKERS + COMMODITY_TICKERS
@@ -278,40 +264,6 @@ _ASSET_META = {
     "ELD.AX":    {"name": "Elders (Farming)",       "cat": "Commodity", "sector": "Agriculture"},
     "TGR.AX":    {"name": "Tassal (Salmon)",        "cat": "Commodity", "sector": "Agriculture"},
     "CGC.AX":    {"name": "Costa Group (Produce)",   "cat": "Commodity", "sector": "Agriculture"},
-    # -- Global Precious Metals Futures --
-    "GC=F":      {"name": "Gold Futures",            "cat": "Commodity", "sector": "Precious Metals"},
-    "SI=F":      {"name": "Silver Futures",          "cat": "Commodity", "sector": "Precious Metals"},
-    "PL=F":      {"name": "Platinum Futures",        "cat": "Commodity", "sector": "Precious Metals"},
-    "PA=F":      {"name": "Palladium Futures",       "cat": "Commodity", "sector": "Precious Metals"},
-    # -- Global Energy Futures --
-    "CL=F":      {"name": "Crude Oil WTI",           "cat": "Commodity", "sector": "Energy"},
-    "BZ=F":      {"name": "Brent Crude Oil",         "cat": "Commodity", "sector": "Energy"},
-    "NG=F":      {"name": "Natural Gas",             "cat": "Commodity", "sector": "Energy"},
-    "RB=F":      {"name": "Gasoline (RBOB)",         "cat": "Commodity", "sector": "Energy"},
-    "HO=F":      {"name": "Heating Oil",             "cat": "Commodity", "sector": "Energy"},
-    # -- Global Base & Industrial Metals --
-    "HG=F":      {"name": "Copper Futures",          "cat": "Commodity", "sector": "Industrial Metals"},
-    "ALI=F":     {"name": "Aluminium Futures",       "cat": "Commodity", "sector": "Industrial Metals"},
-    # -- Global Agriculture & Grains --
-    "ZC=F":      {"name": "Corn Futures",            "cat": "Commodity", "sector": "Agriculture"},
-    "ZW=F":      {"name": "Wheat Futures",           "cat": "Commodity", "sector": "Agriculture"},
-    "ZS=F":      {"name": "Soybean Futures",         "cat": "Commodity", "sector": "Agriculture"},
-    "ZM=F":      {"name": "Soybean Meal",            "cat": "Commodity", "sector": "Agriculture"},
-    "ZL=F":      {"name": "Soybean Oil",             "cat": "Commodity", "sector": "Agriculture"},
-    "ZO=F":      {"name": "Oat Futures",             "cat": "Commodity", "sector": "Agriculture"},
-    "RS=F":      {"name": "Canola (Rapeseed)",       "cat": "Commodity", "sector": "Agriculture"},
-    # -- Global Soft Commodities --
-    "KC=F":      {"name": "Coffee Futures",          "cat": "Commodity", "sector": "Soft Commodities"},
-    "SB=F":      {"name": "Sugar Futures",           "cat": "Commodity", "sector": "Soft Commodities"},
-    "CC=F":      {"name": "Cocoa Futures",           "cat": "Commodity", "sector": "Soft Commodities"},
-    "CT=F":      {"name": "Cotton Futures",          "cat": "Commodity", "sector": "Soft Commodities"},
-    "OJ=F":      {"name": "Orange Juice Futures",    "cat": "Commodity", "sector": "Soft Commodities"},
-    # -- Global Livestock --
-    "LE=F":      {"name": "Live Cattle Futures",     "cat": "Commodity", "sector": "Livestock"},
-    "GF=F":      {"name": "Feeder Cattle Futures",   "cat": "Commodity", "sector": "Livestock"},
-    "HE=F":      {"name": "Lean Hogs Futures",       "cat": "Commodity", "sector": "Livestock"},
-    # -- Global Other --
-    "LBS=F":     {"name": "Lumber Futures",          "cat": "Commodity", "sector": "Materials"},
 }
 
 
@@ -416,23 +368,35 @@ async def _scan_yfinance_inner(tickers: list, market: str) -> list:
     loop = asyncio.get_running_loop()
     results: dict = {}
 
-    def _bulk():
-        try:
-            raw = yf.download(
-                tickers, period="5d", interval="1d",
-                group_by="ticker", auto_adjust=True,
-                progress=False, threads=True,
-            )
-            return raw
-        except Exception as exc:
-            logger.warning(f"yfinance bulk failed [{market}]: {exc}")
-            return None
+    # Batch large ticker lists to avoid timeouts
+    BATCH_SIZE = 200
+    batches = [tickers[i:i+BATCH_SIZE] for i in range(0, len(tickers), BATCH_SIZE)]
+    if len(batches) > 1:
+        logger.info(f"[{market}] Scanning {len(tickers)} tickers in {len(batches)} batches")
 
-    raw = await loop.run_in_executor(None, _bulk)
+    all_raw = []
+    for batch_idx, batch in enumerate(batches):
+        def _bulk(batch_tickers=batch):
+            try:
+                raw = yf.download(
+                    batch_tickers, period="5d", interval="1d",
+                    group_by="ticker", auto_adjust=True,
+                    progress=False, threads=True,
+                )
+                return raw
+            except Exception as exc:
+                logger.warning(f"yfinance bulk failed [{market}] batch {batch_idx}: {exc}")
+                return None
 
-    if raw is not None and not raw.empty:
-        multi = len(tickers) > 1
-        for ticker in tickers:
+        raw = await loop.run_in_executor(None, _bulk)
+        if raw is not None:
+            all_raw.append((batch, raw))
+
+    for batch, raw in all_raw:
+        if raw is None or raw.empty:
+            continue
+        multi = len(batch) > 1
+        for ticker in batch:
             try:
                 if multi:
                     if hasattr(raw.columns, "levels"):
@@ -528,16 +492,11 @@ _MARKET_DEMO = [
     ("^VIX",     "VIX Fear",      "index",         18.4,   -3.20),
     ("AUD=X",    "AUD/USD",       "fx",            0.6312,  0.18),
     ("EURUSD=X", "EUR/USD",       "fx",            1.0845,  0.12),
-    ("GC=F",     "Gold Futures",  "commodity",   2_380.0,   0.48),
-    ("SI=F",     "Silver Futures","commodity",      28.60,   0.92),
-    ("CL=F",     "Crude Oil WTI", "commodity",     78.50,  -0.65),
-    ("NG=F",     "Natural Gas",   "commodity",      2.15,  -2.30),
-    ("GLD",      "Gold ETF",      "commodity",    241.30,   0.65),
-    ("SLV",      "Silver ETF",    "commodity",     28.40,   0.88),
-    ("USO",      "Oil ETF",       "commodity",     74.85,  -0.55),
-    ("PPLT",     "Platinum ETF",  "commodity",     92.30,   0.40),
-    ("COPX",     "Copper Miners", "commodity",     38.70,   1.10),
-    ("URA",      "Uranium ETF",   "commodity",     28.90,   2.35),
-    ("WEAT",     "Wheat ETF",     "commodity",      5.80,  -0.70),
-    ("DBA",      "Agriculture ETF","commodity",    25.40,   0.15),
+    ("PMGOLD.AX","Perth Mint Gold","commodity",     24.50,   0.48),
+    ("PLS.AX",   "Pilbara Lithium","commodity",      3.80,  -1.20),
+    ("LYC.AX",   "Lynas Rare Earth","commodity",     7.40,   0.92),
+    ("PDN.AX",   "Paladin Uranium","commodity",     12.30,   2.35),
+    ("WHC.AX",   "Whitehaven Coal","commodity",      7.90,  -0.65),
+    ("OOO.AX",   "Oil ETF (ASX)", "commodity",      5.60,  -0.55),
+    ("S32.AX",   "South32",       "commodity",       3.20,   0.40),
 ]

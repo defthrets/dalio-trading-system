@@ -831,23 +831,25 @@ async def chart_data(ticker: str, period: str = "6mo", interval: str = "1d"):
 
 
 @app.get("/api/markets/{market}")
-async def market_scanner(market: str):
+async def market_scanner(market: str, full: bool = False):
     """Scan a market: asx | commodities. Uses cache (90s TTL).
-    Scanner uses curated ASX_TICKERS (~300 most liquid).
-    Full ~1,900 ASX universe available via /api/asx/universe for search."""
+    Pass ?full=true to scan the entire ASX universe (~1,900 tickers)."""
     market = market.lower()
+    from api.scanners import get_asx_universe
+    cache_key = f"{market}_full" if (market == "asx" and full) else market
     ticker_map = {
-        "asx":         ASX_TICKERS,
+        "asx":         get_asx_universe() if full else ASX_TICKERS,
         "commodities": COMMODITY_TICKERS,
     }
     if market not in ticker_map:
         raise HTTPException(400, f"Unknown market '{market}'. Use: asx, commodities")
 
-    cached = _scanner_cache.get(market)
+    cached = _scanner_cache.get(cache_key)
     if cached and (time.time() - cached["ts"]) < _CACHE_TTL:
         return {"market": market, "rows": cached["rows"],
                 "count": len(cached["rows"]), "cached": True,
-                "cache_age": int(time.time() - cached["ts"])}
+                "cache_age": int(time.time() - cached["ts"]),
+                "full": full}
 
     tickers = ticker_map[market]
     rows = await _scan_yfinance(tickers, market)
@@ -859,8 +861,8 @@ async def market_scanner(market: str):
     # Uniform sorting: biggest movers first (consistent across all markets)
     rows = sorted(rows, key=lambda r: abs(r.get("change_pct", 0)), reverse=True)
 
-    _scanner_cache[market] = {"ts": time.time(), "rows": rows}
-    return {"market": market, "rows": rows, "count": len(rows), "cached": False}
+    _scanner_cache[cache_key] = {"ts": time.time(), "rows": rows}
+    return {"market": market, "rows": rows, "count": len(rows), "cached": False, "full": full}
 
 
 @app.get("/api/asx/universe")
