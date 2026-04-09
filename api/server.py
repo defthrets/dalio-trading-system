@@ -81,12 +81,6 @@ from api.auth import (
     AUTH_ENABLED, auth_middleware,
     register_user, login_user, get_current_user,
 )
-from api.license import (
-    is_licensed, needs_revalidation,
-    activate_license, validate_license, deactivate_license,
-    get_license_status,
-)
-
 import api.state as _state_ref  # module ref for mutable TRADING_MODE
 
 def _current_mode() -> str:
@@ -123,22 +117,6 @@ app.add_middleware(
 _rate_limiter = RateLimiter()
 
 
-# ── License gate middleware ──
-@app.middleware("http")
-async def _license_mw(request: Request, call_next):
-    path = request.url.path
-    # Allow license endpoints, static files, health check, and the license page itself
-    if (path.startswith("/api/license") or path.startswith("/static") or
-            path in ("/", "/health", "/license", "/license.html") or
-            path.startswith("/ws")):
-        return await call_next(request)
-    # Block API calls if not licensed
-    if path.startswith("/api/") and not is_licensed():
-        return JSONResponse(
-            status_code=403,
-            content={"detail": "License not activated", "license_required": True},
-        )
-    return await call_next(request)
 
 
 # ── JWT Auth middleware (disabled by default, enable via DALIOS_AUTH_ENABLED=true) ──
@@ -254,23 +232,10 @@ async def _auto_reconnect_saved_broker():
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    # Redirect to license page if not activated
-    if not is_licensed():
-        license_path = UI_DIR / "license.html"
-        if license_path.exists():
-            return HTMLResponse(content=license_path.read_text(encoding="utf-8"))
     html_path = UI_DIR / "index.html"
     if html_path.exists():
         return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
     return HTMLResponse("<h1>UI not found. Run from project root.</h1>", status_code=404)
-
-
-@app.get("/license", response_class=HTMLResponse)
-async def license_page():
-    license_path = UI_DIR / "license.html"
-    if license_path.exists():
-        return HTMLResponse(content=license_path.read_text(encoding="utf-8"))
-    return HTMLResponse("<h1>License page not found.</h1>", status_code=404)
 
 
 # ─────────────────────────────────────────────
@@ -281,45 +246,6 @@ async def license_page():
 async def health_check():
     """Lightweight health check for Docker/load balancers."""
     return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
-
-
-# ─────────────────────────────────────────────
-# Routes -- License
-# ─────────────────────────────────────────────
-
-@app.get("/api/license/status")
-async def license_status():
-    """Check current license activation status."""
-    return get_license_status()
-
-
-@app.post("/api/license/activate")
-async def license_activate(request: Request):
-    """Activate a license key."""
-    body = await request.json()
-    key = body.get("license_key", "").strip()
-    if not key:
-        raise HTTPException(400, "License key is required")
-    result = await activate_license(key)
-    if not result["success"]:
-        raise HTTPException(400, result["message"])
-    return result
-
-
-@app.post("/api/license/deactivate")
-async def license_deactivate():
-    """Deactivate the current license."""
-    result = await deactivate_license()
-    if not result["success"]:
-        raise HTTPException(400, result["message"])
-    return result
-
-
-@app.post("/api/license/validate")
-async def license_revalidate():
-    """Force online revalidation of the stored license."""
-    result = await validate_license()
-    return result
 
 
 # ─────────────────────────────────────────────

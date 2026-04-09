@@ -67,7 +67,6 @@ jobs:
             --hidden-import "api.auth" `
             --hidden-import "api.utils" `
             --hidden-import "api.agent" `
-            --hidden-import "api.license" `
             --hidden-import "agents" `
             --hidden-import "agents.dalio_agent" `
             --hidden-import "data" `
@@ -155,7 +154,6 @@ jobs:
             --hidden-import "api.auth" \
             --hidden-import "api.utils" \
             --hidden-import "api.agent" \
-            --hidden-import "api.license" \
             --hidden-import "agents" \
             --hidden-import "agents.dalio_agent" \
             --hidden-import "data" \
@@ -238,7 +236,6 @@ jobs:
             --hidden-import "api.auth" \
             --hidden-import "api.utils" \
             --hidden-import "api.agent" \
-            --hidden-import "api.license" \
             --hidden-import "agents" \
             --hidden-import "agents.dalio_agent" \
             --hidden-import "data" \
