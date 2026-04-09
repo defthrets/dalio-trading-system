@@ -18,7 +18,7 @@ The All Weather strategy is designed to perform in any economic environment by b
 
 It scans 300+ ASX equities and Australian commodities in real time, generates trade signals, executes trades, and manages risk — all autonomously from a single terminal UI. Toggle "SCAN FULL ASX" to scan all ~1,900 listed companies.
 
-**100% free and open source. No subscriptions. No hidden fees. No paywalls. The code is yours.**
+**100% free and open source. No subscriptions. No hidden fees. No paywalls.**
 
 ---
 
