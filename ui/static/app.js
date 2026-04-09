@@ -3382,8 +3382,8 @@ async function loadScanner(market, full) {
   if (!tbody) return;
   const useFull = (market === 'asx' && (full !== undefined ? full : _asxFullMode));
   const loadMsg = useFull
-    ? '⌛ Scanning full ASX universe (~1,900 tickers)… this may take 30–60s'
-    : '⌛ Fetching live data… (may take 5–15s for first load)';
+    ? '⌛ Scanning full ASX universe (~1,900 tickers)… this may take a minute'
+    : '⌛ Scanning ASX 300…';
   tbody.innerHTML = `<tr><td colspan="${ids.cols}" class="scanner-loading">${loadMsg}</td></tr>`;
   if (statsEl) statsEl.innerHTML = '';
   try {
@@ -3402,8 +3402,10 @@ function toggleFullAsx() {
   _asxFullMode = !_asxFullMode;
   const btn = document.getElementById('fullAsxToggle');
   if (btn) {
-    btn.textContent = _asxFullMode ? '⬆ TOP 300' : '⬇ FULL ASX (~1,900)';
-    btn.title = _asxFullMode ? 'Switch to top 300 liquid tickers' : 'Scan all ~1,900 ASX-listed companies';
+    btn.textContent = _asxFullMode ? 'ASX 300' : 'SCAN FULL ASX';
+    btn.title = _asxFullMode ? 'Switch back to ASX 300' : 'Scan all ~1,900 ASX-listed companies';
+    btn.classList.toggle('badge--amber', !_asxFullMode);
+    btn.classList.toggle('badge--cyan', _asxFullMode);
   }
   loadScanner('asx', _asxFullMode);
 }
@@ -3538,6 +3540,14 @@ function filterScanner(market, text) {
 function sortScanner(market, key) {
   const cur = _scannerSort[market];
   _scannerSort[market] = (cur?.key === key) ? { key, asc: !cur.asc } : { key, asc: false };
+  renderScanner(market);
+}
+
+function applySortSelect(market, val) {
+  if (!val) { _scannerSort[market] = null; renderScanner(market); return; }
+  const asc = val.endsWith('_asc');
+  const key = val.replace(/_(?:asc|desc)$/, '');
+  _scannerSort[market] = { key, asc };
   renderScanner(market);
 }
 

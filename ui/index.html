@@ -1079,10 +1079,10 @@
     ───────────────────────────────────── -->
     <section id="tab-asx-scanner" class="tab-panel">      <div class="scanner-wrap">
         <div class="scanner-toolbar">
-          <div class="scanner-title">🇦🇺 ASX MARKET SCANNER</div>
-          <div class="panel-hint" style="flex-basis:100%;margin:-4px 0 4px">Live prices for ASX equities. Filter by ticker, name, or sector. Click column headers to sort. Green rows are up today, red are down. Click TRADE to open an order, or ★ to add to your watchlist.</div>
+          <div class="scanner-title">🇦🇺 ASX 300 SCANNER</div>
+          <div class="panel-hint" style="flex-basis:100%;margin:-4px 0 4px">ASX 300 by default. Hit SCAN FULL ASX to scan all ~1,900 listed companies. Filter, sort, trade, or ★ watchlist.</div>
           <div class="scanner-toolbar-right">
-            <button id="fullAsxToggle" class="ctrl-btn" onclick="toggleFullAsx()" title="Scan all ~1,900 ASX-listed companies" style="font-size:10px;padding:4px 10px;white-space:nowrap;">⬇ FULL ASX (~1,900)</button>
+            <button id="fullAsxToggle" class="badge badge--amber" onclick="toggleFullAsx()" title="Scan all ~1,900 ASX-listed companies" style="cursor:pointer;min-width:auto;white-space:nowrap;">SCAN FULL ASX</button>
             <input type="text" class="scanner-search" id="asxSearch" placeholder="Filter ticker or name..." oninput="filterScanner('asx',this.value)"/>
             <select class="ctrl-select" id="asxSectorFilter" onchange="filterScanner('asx',el('asxSearch').value)">
               <option value="">ALL SECTORS</option>
@@ -1095,6 +1095,17 @@
               <option value="Finance">Finance</option>
               <option value="REIT">REIT</option>
               <option value="Gold">Gold</option>
+            </select>
+            <select class="ctrl-select" id="asxSortBy" onchange="applySortSelect('asx',this.value)">
+              <option value="">SORT BY</option>
+              <option value="change_pct_desc">% Change ↓</option>
+              <option value="change_pct_asc">% Change ↑</option>
+              <option value="price_desc">Price ↓</option>
+              <option value="price_asc">Price ↑</option>
+              <option value="volume_desc">Volume ↓</option>
+              <option value="volume_asc">Volume ↑</option>
+              <option value="ticker_asc">Ticker A-Z</option>
+              <option value="ticker_desc">Ticker Z-A</option>
             </select>
             <button class="btn-primary btn--sm" onclick="loadScanner('asx')">↻ REFRESH</button>
           </div>
@@ -1132,6 +1143,17 @@
           <div class="panel-hint" style="flex-basis:100%;margin:-4px 0 4px">Track gold, silver, oil, natural gas, and other commodity prices. Key to the All-Weather strategy as hedges against inflation and geopolitical risk. Click TRADE to place an order on any commodity.</div>
           <div class="scanner-toolbar-right">
             <input type="text" class="scanner-search" id="commSearch" placeholder="Filter ticker or name..." oninput="filterScanner('commodities',this.value)"/>
+            <select class="ctrl-select" id="commSortBy" onchange="applySortSelect('commodities',this.value)">
+              <option value="">SORT BY</option>
+              <option value="change_pct_desc">% Change ↓</option>
+              <option value="change_pct_asc">% Change ↑</option>
+              <option value="price_desc">Price ↓</option>
+              <option value="price_asc">Price ↑</option>
+              <option value="volume_desc">Volume ↓</option>
+              <option value="volume_asc">Volume ↑</option>
+              <option value="ticker_asc">Ticker A-Z</option>
+              <option value="ticker_desc">Ticker Z-A</option>
+            </select>
             <button class="btn-primary btn--sm" onclick="loadScanner('commodities')">↻ REFRESH</button>
           </div>
         </div>
