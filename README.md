@@ -107,7 +107,7 @@ CI builds all platforms automatically when you push a version tag (`git tag v2.4
 
 ## Disclaimer
 
-Educational and research purposes only. Not financial advice. Algorithmic signals are not guarantees. You can lose money trading. Always do your own research. Past performance means nothing. Rex takes zero responsibility — he's a lizard.
+Educational and research purposes only. Not financial advice. Algorithmic signals are not guarantees. You can lose money trading. Always do your own research. Past performance means nothing.
 
 ---
 
