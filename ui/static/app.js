@@ -66,6 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
   _restoreFilters();
   loadAll();
   loadMarketSummary();
+  setTimeout(preloadAllTabs, 3000);       // Preload all tab data 3s after boot
   setTimeout(initWelcomeTutorial, 1500);  // Show welcome popup after initial load
 
   // Use saved intervals or defaults
@@ -141,6 +142,23 @@ async function loadAll() {
     loadAlerts(),
     loadBrokerStatus(),
   ]);
+}
+
+// ─── Preload all tabs (background, fires once after boot) ──
+async function preloadAllTabs() {
+  await Promise.allSettled([
+    initCommandCentre(),
+    initSignalOps(),
+    loadSentiment(),
+    loadCorrelation(),
+    loadBacktest(),
+    loadScanner('asx'),
+    loadScanner('commodities'),
+    initPaperTrading(),
+    initLiveTrading(),
+    initSettingsTab(),
+  ]);
+  console.log('[DALIOS] All tabs preloaded');
 }
 
 // ═══════════════════════════════════════════════════════════
