@@ -3381,7 +3381,7 @@ async function loadScanner(market, full) {
   const statsEl = el(ids.stats);
   if (!tbody) return;
   const useFull = (market === 'asx' && (full !== undefined ? full : _asxFullMode));
-  const mktLabel = market === 'asx' ? (useFull ? 'FULL ASX ~1,900' : 'ASX 300') : 'COMMODITIES';
+  const mktLabel = market === 'asx' ? (useFull ? 'FULL ASX ~1,900' : 'ASX 200') : 'COMMODITIES';
 
   // Show compact inline loading bar
   const tableWrap = tbody.closest('.scanner-table-wrap');
@@ -3432,8 +3432,8 @@ function toggleFullAsx() {
   _asxFullMode = !_asxFullMode;
   const btn = document.getElementById('fullAsxToggle');
   if (btn) {
-    btn.textContent = _asxFullMode ? 'ASX 300' : 'SCAN FULL ASX';
-    btn.title = _asxFullMode ? 'Switch back to ASX 300' : 'Scan all ~1,900 ASX-listed companies';
+    btn.textContent = _asxFullMode ? 'ASX 200' : 'SCAN FULL ASX';
+    btn.title = _asxFullMode ? 'Switch back to ASX 200' : 'Scan all ~1,900 ASX-listed companies';
     btn.classList.toggle('badge--amber', !_asxFullMode);
     btn.classList.toggle('badge--cyan', _asxFullMode);
   }

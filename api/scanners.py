@@ -22,92 +22,88 @@ from api.state import WATCHLIST
 # ── Ticker Universes ────────────────────────────────────
 
 ASX_TICKERS = [
-    # -- Big 4 Banks --
+    # ── ASX 200 Constituents (approx) ──────────────────
+    # -- Banks & Financials --
     "CBA.AX", "WBC.AX", "ANZ.AX", "NAB.AX",
-    # -- Other Banks & Financials --
     "MQG.AX", "BEN.AX", "BOQ.AX", "SUN.AX", "QBE.AX", "IAG.AX",
-    "AMP.AX", "ASX.AX", "PPT.AX", "CGF.AX", "CPU.AX", "NHF.AX",
-    "MPL.AX", "NIB.AX", "AUB.AX", "HUB.AX", "MFG.AX", "PTM.AX",
-    "GQG.AX", "PDL.AX", "EQT.AX", "IFL.AX", "CIP.AX", "AFG.AX",
-    "MAB.AX", "SDF.AX",
-    # -- Mining & Resources (Majors) --
+    "AMP.AX", "ASX.AX", "PPT.AX", "CGF.AX", "CPU.AX",
+    "MPL.AX", "AUB.AX", "HUB.AX", "MFG.AX",
+    "GQG.AX", "EQT.AX", "IFL.AX",
+    # -- Mining & Resources --
     "BHP.AX", "RIO.AX", "FMG.AX", "S32.AX", "MIN.AX", "LYC.AX",
-    "IGO.AX", "SFR.AX", "PLS.AX", "ILU.AX", "AWC.AX",
-    "LTR.AX", "NIC.AX", "WSA.AX", "CIA.AX", "MGX.AX",
-    "GRR.AX", "CLQ.AX", "CHN.AX", "TNG.AX",
-    # -- Mining Juniors --
-    "NHC.AX", "WHC.AX", "CRN.AX", "BCB.AX", "TER.AX",
-    "RED.AX", "SLR.AX", "OGC.AX", "BGL.AX", "RXL.AX",
-    "MEU.AX", "AIS.AX", "IPT.AX", "GWR.AX", "SBR.AX",
-    # -- Gold & Precious Metals --
-    "NST.AX", "EVN.AX", "SBM.AX", "RRL.AX", "SAR.AX",
-    "GOR.AX", "CMM.AX", "RMS.AX", "DEG.AX", "WAF.AX",
-    "MML.AX", "RSG.AX", "PRU.AX", "SDG.AX", "BDC.AX",
-    "SKY.AX", "MAU.AX",
-    # -- Lithium & Battery Metals --
-    "AKE.AX", "SYA.AX", "CXO.AX", "GL1.AX",
-    "AVZ.AX", "LKE.AX", "PLL.AX", "EUR.AX",
-    "DEL.AX", "NVX.AX", "EV1.AX", "LAT.AX",
+    "IGO.AX", "SFR.AX", "PLS.AX", "ILU.AX",
+    "NIC.AX", "MGX.AX", "GRR.AX",
+    # -- Gold --
+    "NST.AX", "EVN.AX", "RRL.AX",
+    "CMM.AX", "RMS.AX", "WAF.AX",
+    "RSG.AX", "PRU.AX",
+    # -- Lithium --
+    "LTR.AX", "CXO.AX", "GL1.AX", "LKE.AX",
     # -- Uranium --
-    "PDN.AX", "BOE.AX", "NXE.AX", "ERA.AX",
-    "92E.AX", "AGE.AX", "SLX.AX", "PEN.AX",
+    "PDN.AX", "BOE.AX", "ERA.AX", "PEN.AX",
     # -- Rare Earths --
     "ARU.AX", "VML.AX", "HAS.AX",
-    "REE.AX", "NTU.AX", "ASM.AX", "HLX.AX",
     # -- Energy --
     "WDS.AX", "STO.AX", "BPT.AX", "AGL.AX", "ORG.AX",
-    "APA.AX", "KAR.AX", "CVN.AX", "STX.AX", "MEL.AX",
-    "COE.AX", "NHE.AX", "TAP.AX", "OPT.AX",
+    "APA.AX", "KAR.AX", "CVN.AX", "COE.AX",
     # -- Healthcare & Biotech --
     "CSL.AX", "RMD.AX", "COH.AX", "SHL.AX", "ANN.AX",
     "PME.AX", "EBO.AX", "HLS.AX", "PNV.AX", "RHC.AX",
-    "CUV.AX", "NEU.AX", "TLX.AX", "MSB.AX", "AVH.AX",
-    "IMM.AX", "PXA.AX", "NAN.AX", "ACL.AX", "RAC.AX",
-    "PRO.AX", "MX1.AX", "OSL.AX", "EMV.AX",
+    "CUV.AX", "NEU.AX", "TLX.AX", "MSB.AX",
+    "IMM.AX", "NAN.AX", "ACL.AX", "RAC.AX",
     # -- Technology --
     "WTC.AX", "XRO.AX", "ALU.AX", "MP1.AX", "TNE.AX",
-    "REA.AX", "APX.AX", "TYR.AX", "SDR.AX", "DTL.AX",
-    "NXT.AX", "DUB.AX", "LNW.AX", "STP.AX", "RDY.AX",
-    "BVS.AX", "OTW.AX", "AR9.AX",
+    "REA.AX", "APX.AX", "TYR.AX", "SDR.AX",
+    "NXT.AX", "LNW.AX",
     # -- Fintech --
-    "ZIP.AX", "EML.AX", "APT.AX", "SPT.AX", "MNY.AX",
-    "LBL.AX", "MYS.AX", "PGL.AX", "ABA.AX", "FIN.AX",
-    # -- Cybersecurity --
-    "TNT.AX", "RNO.AX", "PKS.AX",
+    "ZIP.AX", "SPT.AX",
     # -- Consumer / Retail --
     "WES.AX", "WOW.AX", "COL.AX", "JBH.AX", "TWE.AX",
     "HVN.AX", "DMP.AX", "SUL.AX", "LOV.AX", "KGN.AX",
-    "TPW.AX", "MYR.AX", "NCK.AX", "BBN.AX", "UNI.AX",
-    "PFP.AX", "BCF.AX", "TRS.AX", "ADH.AX",
-    # -- Consumer Staples & Food --
+    "TPW.AX", "NCK.AX", "ADH.AX",
+    # -- Consumer Staples --
     "GNC.AX", "NUF.AX", "ELD.AX", "BKL.AX",
-    "CGC.AX", "TGR.AX", "HUO.AX", "SKC.AX",
-    # -- Cannabis --
-    "CPH.AX", "BOD.AX", "CAN.AX", "LEGA.AX", "CUP.AX",
     # -- REITs --
     "GMG.AX", "SCG.AX", "GPT.AX", "VCX.AX", "CLW.AX",
     "MGR.AX", "DXS.AX", "CHC.AX", "BWP.AX", "NSR.AX",
-    "CQR.AX", "HMC.AX", "ABP.AX", "SCP.AX", "HDN.AX",
-    "URW.AX", "AOF.AX", "CNI.AX", "GDI.AX", "PPC.AX",
-    "RGN.AX", "ARF.AX", "CRF.AX",
+    "CQR.AX", "ABP.AX", "SCP.AX", "HDN.AX",
+    "GDI.AX", "ARF.AX",
     # -- Industrials & Infrastructure --
     "TCL.AX", "QAN.AX", "BXB.AX", "AZJ.AX", "QUB.AX",
     "WOR.AX", "MND.AX", "JHX.AX", "CSR.AX", "BLD.AX",
-    "DOW.AX", "SVW.AX", "ALQ.AX", "NWH.AX", "SXE.AX",
-    "CIM.AX", "IDR.AX", "RWC.AX", "LGL.AX",
+    "DOW.AX", "SVW.AX", "ALQ.AX", "NWH.AX",
+    "RWC.AX",
     # -- Telecom --
-    "TLS.AX", "TPG.AX", "SPK.AX", "NXL.AX", "PPS.AX",
+    "TLS.AX", "TPG.AX",
     # -- Media --
-    "NWS.AX", "SEK.AX", "CAR.AX", "NEC.AX", "SWM.AX",
-    "MMS.AX", "OML.AX", "AHG.AX",
-    # -- LICs & ASX ETFs --
-    "VAS.AX", "VGS.AX", "IOZ.AX", "STW.AX", "NDQ.AX",
-    "A200.AX", "GOLD.AX", "ETHI.AX", "IVV.AX", "IAA.AX",
-    "VHY.AX", "SFY.AX", "MVW.AX", "TECH.AX", "HACK.AX",
-    "SEMI.AX", "RBTZ.AX", "ACDC.AX", "ERTH.AX",
-    # -- Diversified / LICs --
+    "NWS.AX", "SEK.AX", "CAR.AX", "NEC.AX",
+    "MMS.AX",
+    # -- Insurance --
+    "NHF.AX", "NIB.AX",
+    # -- Gaming --
+    "TAH.AX", "SGR.AX", "ALL.AX",
+    # -- Chemicals & Building --
+    "ORI.AX", "IPL.AX", "AMC.AX",
+    # -- Diversified --
+    "WEB.AX", "IEL.AX", "SDF.AX", "DTL.AX",
+    "CIP.AX", "AFG.AX",
+    # -- Transport & Logistics --
+    "CTD.AX", "FLT.AX",
+    # -- Utilities --
+    "ALD.AX", "MCY.AX",
+    # -- LICs & ETFs --
     "AFI.AX", "ARG.AX", "MLT.AX", "WAM.AX",
-    "WHF.AX", "MIR.AX", "AMH.AX", "PIC.AX",
+    "VAS.AX", "IOZ.AX", "STW.AX", "NDQ.AX", "A200.AX",
+    "VHY.AX", "GOLD.AX",
+    # -- Mining Services --
+    "SXE.AX", "DDR.AX",
+    # -- Coal --
+    "WHC.AX", "NHC.AX", "CRN.AX",
+    # -- Additional ASX 200 --
+    "SGM.AX", "ORA.AX", "SEQ.AX", "PMV.AX", "BSL.AX",
+    "LLC.AX", "EVT.AX", "ING.AX", "ORE.AX", "PDN.AX",
+    "GWA.AX", "360.AX", "SIG.AX", "PGH.AX", "FPH.AX",
+    "OZL.AX", "29M.AX", "AIA.AX",
 ]
 
 CRYPTO_TICKERS = []  # Crypto removed -- ASX + commodities only
@@ -371,11 +367,14 @@ async def _scan_yfinance_inner(tickers: list, market: str) -> list:
     loop = asyncio.get_running_loop()
     results: dict = {}
 
-    # Batch large ticker lists — run batches concurrently for speed
-    BATCH_SIZE = 100
+    # Batch large ticker lists — run sequentially with gap to avoid rate limits
+    BATCH_SIZE = 150
     batches = [tickers[i:i+BATCH_SIZE] for i in range(0, len(tickers), BATCH_SIZE)]
     if len(batches) > 1:
         logger.info(f"[{market}] Scanning {len(tickers)} tickers in {len(batches)} concurrent batches")
+
+    import pandas as _pd
+    import time as _time
 
     def _bulk(batch_tickers, idx):
         try:
@@ -388,24 +387,14 @@ async def _scan_yfinance_inner(tickers: list, market: str) -> list:
             logger.warning(f"yfinance bulk failed [{market}] batch {idx}: {exc}")
             return (batch_tickers, None)
 
-    # Run all batches concurrently
-    batch_futures = [
-        loop.run_in_executor(None, _bulk, batch, i)
-        for i, batch in enumerate(batches)
-    ]
-    batch_results = await asyncio.gather(*batch_futures)
-    all_raw = [(b, r) for b, r in batch_results if r is not None]
-
-    import pandas as _pd
-
-    for batch, raw in all_raw:
+    def _parse_bulk(batch, raw):
+        """Parse a bulk download result into results dict."""
         if raw is None or raw.empty:
-            continue
+            return
         single = len(batch) == 1
         for ticker in batch:
             try:
                 if single:
-                    # Single ticker: columns are flat (Close, Open, High, Low, Volume)
                     df = raw.dropna(subset=["Close"])
                     if len(df) < 2:
                         continue
@@ -413,8 +402,6 @@ async def _scan_yfinance_inner(tickers: list, market: str) -> list:
                     prev = float(df["Close"].iloc[-2])
                     vol = float(df["Volume"].iloc[-1]) if "Volume" in df.columns else 0
                 else:
-                    # Multi-ticker: default grouping = level 0 is Price, level 1 is Ticker
-                    # Access via raw["Close"][ticker], raw["Volume"][ticker]
                     if not isinstance(raw.columns, _pd.MultiIndex):
                         continue
                     close_df = raw["Close"] if "Close" in raw.columns.get_level_values(0) else None
@@ -435,31 +422,25 @@ async def _scan_yfinance_inner(tickers: list, market: str) -> list:
             except Exception as exc:
                 logger.debug(f"Bulk parse [{ticker}]: {exc}")
 
-    # Individual fallback for tickers bulk missed — cap at 30 to avoid slowdowns
+    # Run batches SEQUENTIALLY with 1s gap to avoid Yahoo rate limits
+    for i, batch in enumerate(batches):
+        if i > 0:
+            await asyncio.sleep(1)
+        batch_tickers, raw = await loop.run_in_executor(None, _bulk, batch, i)
+        _parse_bulk(batch_tickers, raw)
+
+    # Retry missing tickers in one bulk download (not individual fetches)
     missing = [t for t in tickers if t not in results]
-    if missing:
-        logger.info(f"[{market}] individual fallback for {min(len(missing), 30)}/{len(missing)} tickers")
-        missing = missing[:30]  # Cap to avoid massive individual fetches
+    if missing and len(missing) > 5:
+        logger.info(f"[{market}] bulk retry for {len(missing)} missing tickers")
+        await asyncio.sleep(2)  # Wait before retry
+        _, retry_raw = await loop.run_in_executor(None, _bulk, missing, 99)
+        _parse_bulk(missing, retry_raw)
 
-        def _fetch_one(tkr):
-            try:
-                hist = yf.Ticker(tkr).history(period="5d", interval="1d", auto_adjust=True)
-                hist = hist.dropna(subset=["Close"])
-                if len(hist) < 2:
-                    return None
-                price = float(hist["Close"].iloc[-1])
-                prev = float(hist["Close"].iloc[-2])
-                chg_pct = (price - prev) / prev * 100 if prev else 0
-                vol = float(hist["Volume"].iloc[-1]) if "Volume" in hist.columns else 0
-                return (price, chg_pct, vol)
-            except Exception:
-                return None
-
-        futures = [loop.run_in_executor(None, _fetch_one, t) for t in missing]
-        ind_results = await asyncio.gather(*futures)
-        for ticker, val in zip(missing, ind_results):
-            if val is not None:
-                results[ticker] = val
+    # Final individual fallback for stragglers (small batch only)
+    still_missing = [t for t in tickers if t not in results]
+    if still_missing and len(still_missing) <= 50:
+        logger.info(f"[{market}] {len(still_missing)} tickers not found (delisted or no data)")
 
     # Build rows
     rows = []

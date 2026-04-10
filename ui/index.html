@@ -153,8 +153,7 @@
     <button class="tab-btn" data-tab="comms-config" role="tab" aria-selected="false" aria-controls="tab-comms-config">
       <span class="tab-icon" aria-hidden="true">⚙</span> SETTINGS
     </button>
-    <button class="tab-help-btn" id="helpBtn" title="Show tutorial for this page" aria-label="Show tutorial" onclick="openCurrentTutorial()">?</button>
-    <button class="search-nav-btn" onclick="openSearch()" title="Search all assets (Ctrl+K)">◎ SEARCH 71 ASSETS <span style="opacity:0.5;font-size:11px;margin-left:4px">Ctrl+K</span></button>
+    <!-- help btn and search assets btn removed -->
   </nav>
 
   <!-- ═══════════════════════════════════════════════
@@ -1079,8 +1078,8 @@
     ───────────────────────────────────── -->
     <section id="tab-asx-scanner" class="tab-panel">      <div class="scanner-wrap">
         <div class="scanner-toolbar">
-          <div class="scanner-title">🇦🇺 ASX 300 SCANNER</div>
-          <div class="panel-hint" style="flex-basis:100%;margin:-4px 0 4px">ASX 300 by default. Hit SCAN FULL ASX to scan all ~1,900 listed companies. Filter, sort, trade, or ★ watchlist.</div>
+          <div class="scanner-title">🇦🇺 ASX 200 SCANNER</div>
+          <div class="panel-hint" style="flex-basis:100%;margin:-4px 0 4px">ASX 200 by default. Hit SCAN FULL ASX to scan all ~1,900 listed companies. Filter, sort, trade, or ★ watchlist.</div>
           <div class="scanner-toolbar-right">
             <button id="fullAsxToggle" class="badge badge--amber" onclick="toggleFullAsx()" title="Scan all ~1,900 ASX-listed companies" style="cursor:pointer;min-width:auto;white-space:nowrap;">SCAN FULL ASX</button>
             <input type="text" class="scanner-search" id="asxSearch" placeholder="Filter ticker or name..." oninput="filterScanner('asx',this.value)"/>
