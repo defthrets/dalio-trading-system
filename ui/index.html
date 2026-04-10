@@ -144,6 +144,9 @@
     <button class="tab-btn" data-tab="asx-scanner" role="tab" aria-selected="false" aria-controls="tab-asx-scanner">
       <span class="tab-icon" aria-hidden="true">▣</span> ASX
     </button>
+    <button class="tab-btn" data-tab="penny-scanner" role="tab" aria-selected="false" aria-controls="tab-penny-scanner">
+      <span class="tab-icon" aria-hidden="true">¢</span> PENNY STOCKS
+    </button>
     <button class="tab-btn" data-tab="commodities-scanner" role="tab" aria-selected="false" aria-controls="tab-commodities-scanner">
       <span class="tab-icon" aria-hidden="true">▤</span> COMMODITIES
     </button>
@@ -1126,6 +1129,53 @@
             </thead>
             <tbody id="asxTableBody">
               <tr><td colspan="8" class="scanner-loading">⌛ Loading ASX data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ─────────────────────────────────────
+         TAB: ASX PENNY STOCKS SCANNER
+    ───────────────────────────────────── -->
+    <section id="tab-penny-scanner" class="tab-panel">      <div class="scanner-wrap">
+        <div class="scanner-toolbar">
+          <div class="scanner-title">¢ ASX PENNY STOCKS</div>
+          <div class="panel-hint" style="flex-basis:100%;margin:-4px 0 4px">High-risk, high-reward ASX stocks under $1. Small-cap miners, explorers, biotechs, and speculative plays. Filter, sort, trade, or ★ watchlist.</div>
+          <div class="scanner-toolbar-right">
+            <input type="text" class="scanner-search" id="pennySearch" placeholder="Filter ticker or name..." oninput="filterScanner('penny',this.value)"/>
+            <select class="ctrl-select" id="pennySortBy" onchange="applySortSelect('penny',this.value)">
+              <option value="">SORT BY</option>
+              <option value="change_pct_desc">% Change ↓</option>
+              <option value="change_pct_asc">% Change ↑</option>
+              <option value="price_desc">Price ↓</option>
+              <option value="price_asc">Price ↑</option>
+              <option value="volume_desc">Volume ↓</option>
+              <option value="volume_asc">Volume ↑</option>
+              <option value="ticker_asc">Ticker A-Z</option>
+              <option value="ticker_desc">Ticker Z-A</option>
+            </select>
+            <button class="btn-primary btn--sm" onclick="loadScanner('penny')">↻ REFRESH</button>
+          </div>
+        </div>
+        <div class="scanner-stats" id="pennyStats"></div>
+        <div class="scanner-table-wrap">
+          <table class="data-table scanner-table" id="pennyTable">
+            <thead>
+              <tr>
+                <th onclick="sortScanner('penny','ticker')">TICKER ⇅</th>
+                <th>NAME</th>
+                <th>SECTOR</th>
+                <th onclick="sortScanner('penny','price')">PRICE ⇅</th>
+                <th onclick="sortScanner('penny','change_pct')">CHANGE% ⇅</th>
+                <th>VOLUME</th>
+                <th>WATCHLIST</th>
+                <th>TRADE</th>
+              </tr>
+            </thead>
+            <tbody id="pennyTableBody">
+              <tr><td colspan="8" class="scanner-loading">⌛ Loading penny stocks...</td></tr>
             </tbody>
           </table>
         </div>

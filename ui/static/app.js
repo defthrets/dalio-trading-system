@@ -117,6 +117,7 @@ function _switchTab(id, btn) {
   if (id === 'paper-trading')        initPaperTrading();
   if (id === 'live-trading')         initLiveTrading();
   if (id === 'asx-scanner')         loadScanner('asx');
+  if (id === 'penny-scanner')      loadScanner('penny');
   if (id === 'commodities-scanner') loadScanner('commodities');
   if (id === 'command-center')      initCommandCentre();
   if (id === 'comms-config')        initSettingsTab();
@@ -3364,11 +3365,12 @@ function miniSparkSVG(ticker, changePct, w = 40, h = 14) {
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="vertical-align:middle;flex-shrink:0"><path d="${path}" fill="none" stroke="${col}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 
-const _scannerData = { asx: [], commodities: [] };
-const _scannerSort = { asx: null, commodities: null };
+const _scannerData = { asx: [], penny: [], commodities: [] };
+const _scannerSort = { asx: null, penny: null, commodities: null };
 
 const _SCANNER_IDS = {
   asx:         { tbody: 'asxTableBody',         stats: 'asxStats',    cols: 8 },
+  penny:       { tbody: 'pennyTableBody',       stats: 'pennyStats',  cols: 8 },
   commodities: { tbody: 'commoditiesTableBody',  stats: 'commStats',   cols: 7 },
 };
 
@@ -3381,7 +3383,7 @@ async function loadScanner(market, full) {
   const statsEl = el(ids.stats);
   if (!tbody) return;
   const useFull = (market === 'asx' && (full !== undefined ? full : _asxFullMode));
-  const mktLabel = market === 'asx' ? (useFull ? 'FULL ASX ~1,900' : 'ASX 200') : 'COMMODITIES';
+  const mktLabel = market === 'asx' ? (useFull ? 'FULL ASX ~1,900' : 'ASX 200') : market === 'penny' ? 'PENNY STOCKS' : 'COMMODITIES';
 
   // Show compact inline loading bar
   const tableWrap = tbody.closest('.scanner-table-wrap');

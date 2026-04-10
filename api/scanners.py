@@ -51,6 +51,46 @@ ASX_TICKERS = [
     "WOR.AX", "WOW.AX", "WPR.AX", "WTC.AX", "XRO.AX", "YAL.AX", "ZIP.AX",
 ]
 
+# ── ASX Penny Stocks (under $1, speculative) ──────────
+PENNY_TICKERS = [
+    # -- Mining Juniors & Explorers --
+    "NHE.AX", "CAN.AX", "ERA.AX", "GWR.AX", "SBR.AX",
+    "BCB.AX", "TER.AX", "RXL.AX", "MEU.AX", "AIS.AX",
+    "IPT.AX", "BGL.AX", "CLQ.AX", "TNG.AX", "CHN.AX",
+    "SKY.AX", "MAU.AX", "BDC.AX", "SDG.AX",
+    # -- Gold Juniors --
+    "SBM.AX", "DEG.AX", "GOR.AX", "SAR.AX", "MML.AX",
+    "WAF.AX", "SLR.AX", "OGC.AX", "RED.AX",
+    # -- Lithium & Battery --
+    "SYA.AX", "CXO.AX", "GL1.AX", "LKE.AX",
+    "AVZ.AX", "PLL.AX", "EUR.AX", "DEL.AX",
+    "NVX.AX", "EV1.AX", "LAT.AX",
+    # -- Uranium Juniors --
+    "92E.AX", "AGE.AX", "SLX.AX", "PEN.AX",
+    "BOE.AX", "NXE.AX", "GTR.AX", "TOE.AX",
+    "BKY.AX", "LOT.AX", "DYL.AX", "BMN.AX",
+    # -- Rare Earths --
+    "ARU.AX", "VML.AX", "HAS.AX", "NTU.AX",
+    "REE.AX", "ASM.AX", "HLX.AX",
+    # -- Biotech & Cannabis --
+    "RAC.AX", "IMM.AX", "PXA.AX", "ACL.AX",
+    "PRO.AX", "MX1.AX", "OSL.AX", "EMV.AX",
+    "CPH.AX", "BOD.AX", "CUP.AX",
+    # -- Tech Microcaps --
+    "AR9.AX", "RDY.AX", "BVS.AX", "OTW.AX",
+    "RNO.AX", "PKS.AX", "TNT.AX",
+    # -- Fintech --
+    "EML.AX", "MNY.AX", "LBL.AX", "MYS.AX",
+    "PGL.AX", "ABA.AX", "FIN.AX",
+    # -- Energy Juniors --
+    "STX.AX", "MEL.AX", "TAP.AX", "OPT.AX", "CVN.AX",
+    # -- Misc Speculative --
+    "NIC.AX", "WSA.AX", "CIA.AX", "MGX.AX",
+    "GRR.AX", "NHC.AX", "CRN.AX",
+    "MYR.AX", "BBN.AX", "KGN.AX", "TPW.AX",
+    "STP.AX", "DUB.AX", "DTL.AX",
+]
+
 CRYPTO_TICKERS = []  # Crypto removed -- ASX + commodities only
 
 COMMODITY_TICKERS = [
@@ -82,7 +122,7 @@ COMMODITY_TICKERS = [
     "AWC.AX", "S32.AX",
 ]
 
-ALL_TICKERS = ASX_TICKERS + COMMODITY_TICKERS
+ALL_TICKERS = ASX_TICKERS + PENNY_TICKERS + COMMODITY_TICKERS
 CORR_TICKERS = ASX_TICKERS  # Use ASX for correlation heatmap
 
 # ── Dynamic ASX full universe (~1,900 companies) ──────────

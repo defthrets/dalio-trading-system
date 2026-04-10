@@ -823,17 +823,18 @@ async def chart_data(ticker: str, period: str = "6mo", interval: str = "1d"):
 
 @app.get("/api/markets/{market}")
 async def market_scanner(market: str, full: bool = False):
-    """Scan a market: asx | commodities. Uses cache (90s TTL).
+    """Scan a market: asx | penny | commodities. Uses cache.
     Pass ?full=true to scan the entire ASX universe (~1,900 tickers)."""
     market = market.lower()
-    from api.scanners import get_asx_universe
+    from api.scanners import get_asx_universe, PENNY_TICKERS
     cache_key = f"{market}_full" if (market == "asx" and full) else market
     ticker_map = {
         "asx":         get_asx_universe() if full else ASX_TICKERS,
+        "penny":       PENNY_TICKERS,
         "commodities": COMMODITY_TICKERS,
     }
     if market not in ticker_map:
-        raise HTTPException(400, f"Unknown market '{market}'. Use: asx, commodities")
+        raise HTTPException(400, f"Unknown market '{market}'. Use: asx, penny, commodities")
 
     cached = _scanner_cache.get(cache_key)
     if cached and (time.time() - cached["ts"]) < _CACHE_TTL:
