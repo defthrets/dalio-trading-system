@@ -735,10 +735,21 @@ async def chart_data(ticker: str, period: str = "6mo", interval: str = "1d"):
             info = {}
             try:
                 ti = t.info
-                info = {"name": ti.get("shortName", ticker), "sector": ti.get("sector", ""),
-                        "marketCap": ti.get("marketCap"), "currency": ti.get("currency", "USD")}
+                info = {
+                    "name": ti.get("shortName", ticker),
+                    "sector": ti.get("sector", ""),
+                    "industry": ti.get("industry", ""),
+                    "marketCap": ti.get("marketCap"),
+                    "currency": ti.get("currency", "AUD"),
+                    "longBusinessSummary": ti.get("longBusinessSummary", ""),
+                    "previousClose": ti.get("previousClose"),
+                    "fiftyTwoWeekHigh": ti.get("fiftyTwoWeekHigh"),
+                    "fiftyTwoWeekLow": ti.get("fiftyTwoWeekLow"),
+                    "dividendYield": ti.get("dividendYield"),
+                    "trailingPE": ti.get("trailingPE"),
+                }
             except Exception:
-                info = {"name": ticker, "sector": "", "marketCap": None, "currency": "USD"}
+                info = {"name": ticker, "sector": "", "marketCap": None, "currency": "AUD"}
 
             return {
                 "ticker": ticker, "period": period, "interval": interval,

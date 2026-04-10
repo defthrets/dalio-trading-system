@@ -597,19 +597,19 @@ a:hover { color: var(--primary); text-decoration: underline; }
   color: var(--primary);
 }
 
-/* ── 3D Cash Stack Logo (GTA-style) ── */
-/* Block dimensions: W=44 x H=28 x D=28 — chunky cube-ish bundle */
+/* ── 3D Cash Stack Logo ── */
+/* Box: W=48  H=30  D=12 — proper joined rectangular prism */
 .cash3d {
   width: 68px;
-  height: 68px;
+  height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
 }
 .cash3d-scene {
-  width: 60px;
-  height: 56px;
+  width: 48px;
+  height: 30px;
   perspective: 200px;
   position: relative;
 }
@@ -630,50 +630,40 @@ a:hover { color: var(--primary); text-decoration: underline; }
   backface-visibility: visible;
 }
 
-/* Front & back bill faces — 44w x 28h */
-.cash3d-front {
-  width: 44px; height: 28px;
-  top: 14px; left: 8px;
-  transform: translateZ(14px);
-}
+/* Front & back bill faces — 48w x 30h */
+.cash3d-front,
 .cash3d-back {
-  width: 44px; height: 28px;
-  top: 14px; left: 8px;
-  transform: translateZ(-14px) rotateY(180deg);
+  width: 48px; height: 30px;
+  top: 0; left: 0;
 }
+.cash3d-front { transform: translateZ(6px); }
+.cash3d-back  { transform: rotateY(180deg) translateZ(6px); }
 
-/* Left & right edges — 28 deep x 28 tall (nearly square!) */
+/* Left & right edges — 12 deep x 30 tall */
 .cash3d-right {
-  width: 28px; height: 28px;
-  top: 14px; left: 38px;
-  transform-origin: left center;
-  transform: rotateY(90deg) translateZ(-14px);
+  width: 12px; height: 30px;
+  top: 0; left: 18px;
+  transform: rotateY(90deg) translateZ(24px);
 }
 .cash3d-left {
-  width: 28px; height: 28px;
-  top: 14px; left: 8px;
-  transform-origin: left center;
-  transform: rotateY(-90deg) translateZ(14px);
+  width: 12px; height: 30px;
+  top: 0; left: 18px;
+  transform: rotateY(-90deg) translateZ(24px);
 }
 
-/* Top & bottom edges — 44 wide x 28 deep */
+/* Top & bottom edges — 48 wide x 12 deep */
 .cash3d-top {
-  width: 44px; height: 28px;
-  top: 0px; left: 8px;
-  transform: rotateX(90deg) translateZ(14px);
+  width: 48px; height: 12px;
+  top: 9px; left: 0;
+  transform: rotateX(90deg) translateZ(15px);
 }
 .cash3d-bottom {
-  width: 44px; height: 28px;
-  top: 28px; left: 8px;
-  transform: rotateX(-90deg) translateZ(14px);
-}
-.cash3d-top,
-.cash3d-bottom {
-  background: linear-gradient(180deg, rgba(0,212,255,0.1) 0%, rgba(0,40,50,0.3) 100%);
-  border: 1px solid rgba(0,212,255,0.5);
+  width: 48px; height: 12px;
+  top: 9px; left: 0;
+  transform: rotateX(-90deg) translateZ(15px);
 }
 
-/* Bill face design — holographic translucent */
+/* Bill face design — blue holographic */
 .bill-face {
   width: 100%; height: 100%;
   background: linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(0,255,170,0.12) 50%, rgba(0,212,255,0.08) 100%);
@@ -691,7 +681,7 @@ a:hover { color: var(--primary); text-decoration: underline; }
 }
 .bill-oval {
   position: absolute;
-  width: 15px; height: 15px;
+  width: 14px; height: 14px;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   border: 1px solid rgba(0,255,170,0.35);
@@ -702,7 +692,7 @@ a:hover { color: var(--primary); text-decoration: underline; }
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   font-family: 'Georgia', serif;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: bold;
   color: rgba(0,212,255,0.9);
   text-shadow: 0 0 6px rgba(0,212,255,0.6), 0 0 12px rgba(0,255,170,0.3);
@@ -711,16 +701,16 @@ a:hover { color: var(--primary); text-decoration: underline; }
   position: absolute;
   bottom: 1px; right: 3px;
   font-family: 'Courier New', monospace;
-  font-size: 6px;
+  font-size: 5px;
   font-weight: bold;
   color: rgba(0,212,255,0.5);
 }
 
-/* Stack edge — vertical bill lines (left/right) — holographic */
+/* Stack edge — vertical bill lines (left/right) */
 .stack-edge {
   width: 100%; height: 100%;
   background: repeating-linear-gradient(
-    0deg,
+    90deg,
     rgba(0,30,40,0.4) 0px,
     rgba(0,212,255,0.25) 0.8px,
     rgba(0,30,40,0.4) 1.6px
@@ -732,7 +722,7 @@ a:hover { color: var(--primary); text-decoration: underline; }
 .stack-edge-h {
   width: 100%; height: 100%;
   background: repeating-linear-gradient(
-    90deg,
+    0deg,
     rgba(0,30,40,0.4) 0px,
     rgba(0,212,255,0.25) 0.8px,
     rgba(0,30,40,0.4) 1.6px
@@ -740,8 +730,8 @@ a:hover { color: var(--primary); text-decoration: underline; }
   border: 1px solid rgba(0,212,255,0.5);
 }
 
-/* ── Money Band — wraps vertically (short way around) ── */
-/* Band is 12px wide strip, centered horizontally on the stack */
+/* ── Money Band — wraps vertically around the stack ── */
+/* Band is 10px wide strip, centered horizontally */
 .band-face {
   position: absolute;
   backface-visibility: visible;
@@ -749,45 +739,30 @@ a:hover { color: var(--primary); text-decoration: underline; }
   border: 1px solid rgba(0,255,170,0.6);
   box-shadow: 0 0 6px rgba(0,255,170,0.3), inset 0 0 4px rgba(0,255,170,0.15);
 }
-/* Front band strip */
 .band-front {
-  width: 12px; height: 28px;
-  top: 14px; left: 24px;
-  transform: translateZ(14.5px);
+  width: 10px; height: 30px;
+  top: 0; left: 19px;
+  transform: translateZ(6.2px);
 }
-/* Back band strip */
 .band-back {
-  width: 12px; height: 28px;
-  top: 14px; left: 24px;
-  transform: translateZ(-14.5px) rotateY(180deg);
+  width: 10px; height: 30px;
+  top: 0; left: 19px;
+  transform: rotateY(180deg) translateZ(6.2px);
 }
-/* Top band strip — connects front to back over the top */
 .band-top {
-  width: 12px; height: 29px;
-  top: -0.5px; left: 24px;
-  transform: rotateX(90deg) translateZ(14.5px);
+  width: 10px; height: 12px;
+  top: 9px; left: 19px;
+  transform: rotateX(90deg) translateZ(15px);
 }
-/* Bottom band strip — connects front to back under the bottom */
 .band-bottom {
-  width: 12px; height: 29px;
-  top: 27.5px; left: 24px;
-  transform: rotateX(-90deg) translateZ(14.5px);
+  width: 10px; height: 12px;
+  top: 9px; left: 19px;
+  transform: rotateX(-90deg) translateZ(15px);
 }
 .band-front::after,
 .band-back::after {
-  content: '$';
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  font-family: 'Georgia', serif;
-  font-size: 10px;
-  font-weight: bold;
-  color: rgba(0,255,170,0.7);
-  text-shadow: 0 0 4px rgba(0,255,170,0.5);
+  display: none;
 }
-
-/* Subtle holographic glow — no hard edges */
-/* No scanline overlay — keep it clean */
 
 /* Glitch effect */
 @keyframes cashGlitch {
@@ -4462,6 +4437,243 @@ body.cli-expanded { padding-bottom: 272px; }
   color: var(--text-muted);
   padding: 32px;
   font-size: 13px;
+}
+
+/* ── Scanner Loading Overlay ── */
+.scanner-load-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+}
+.scanner-load-overlay .load-icon {
+  font-size: 32px;
+  animation: scanPulse 1.2s ease-in-out infinite;
+}
+@keyframes scanPulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.95); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+.scanner-load-overlay .load-title {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  color: var(--primary);
+  letter-spacing: 2px;
+}
+.scanner-load-overlay .load-status {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+}
+.scanner-load-bar {
+  width: 260px;
+  height: 6px;
+  background: var(--bg-2);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+.scanner-load-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--cyan));
+  border-radius: 3px;
+  width: 0%;
+  transition: width 0.4s ease;
+}
+.scanner-load-bar-pulse {
+  position: absolute;
+  top: 0; left: -40%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0,212,255,0.4), transparent);
+  animation: barSweep 1.5s ease-in-out infinite;
+}
+@keyframes barSweep {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
+
+/* ── Stock Detail Panel ── */
+.stock-detail-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 9000;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(4px);
+}
+.stock-detail-overlay.open {
+  display: flex;
+}
+.stock-detail-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-hi);
+  border-radius: 8px;
+  width: 90vw;
+  max-width: 900px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+}
+.sd-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.sd-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sd-ticker {
+  font-family: var(--font-hud);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 2px;
+}
+.sd-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.sd-price-block {
+  text-align: right;
+}
+.sd-price {
+  font-family: var(--font-hud);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+.sd-change {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+}
+.sd-change.pos { color: var(--green); }
+.sd-change.neg { color: var(--red); }
+.sd-close-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 18px;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sd-close-btn:hover { color: var(--red); border-color: var(--red); }
+.sd-chart-wrap {
+  padding: 16px 20px;
+  height: 300px;
+  position: relative;
+}
+.sd-chart-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+.sd-period-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 20px 12px;
+}
+.sd-period-btn {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-family: var(--font-hud);
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  letter-spacing: 1px;
+}
+.sd-period-btn.active,
+.sd-period-btn:hover {
+  background: var(--primary-glow);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.sd-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 12px 20px 16px;
+}
+.sd-info-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+}
+.sd-info-card h4 {
+  font-family: var(--font-hud);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.sd-info-card p {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+.sd-info-stat {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+.sd-info-stat:last-child { border-bottom: none; }
+.sd-info-stat .label { color: var(--text-muted); }
+.sd-info-stat .value { color: var(--text-1); font-weight: 600; }
+.sd-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 20px 16px;
+}
+.sd-actions button {
+  flex: 1;
+  padding: 10px;
+  font-family: var(--font-hud);
+  font-size: 12px;
+  letter-spacing: 1px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sd-buy-btn { background: var(--green-glow); color: var(--green); border-color: var(--green-dim); }
+.sd-buy-btn:hover { background: var(--green); color: var(--bg-1); }
+.sd-sell-btn { background: var(--red-glow); color: var(--red); border-color: rgba(239,68,68,0.3); }
+.sd-sell-btn:hover { background: var(--red); color: var(--bg-1); }
+.sd-watch-btn { background: var(--bg-2); color: var(--amber); border-color: rgba(245,158,11,0.3); }
+.sd-watch-btn:hover { background: rgba(245,158,11,0.15); }
+.sd-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .sd-info-grid { grid-template-columns: 1fr; }
+  .stock-detail-panel { width: 98vw; max-height: 95vh; }
 }
 
 /* row color coding by change */

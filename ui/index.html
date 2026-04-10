@@ -2167,6 +2167,52 @@
   </main>
 
   <!-- ═══════════════════════════════════════════════
+       STOCK DETAIL PANEL
+  ═══════════════════════════════════════════════ -->
+  <div class="stock-detail-overlay" id="stockDetailOverlay" onclick="if(event.target===this)closeStockDetail()">
+    <div class="stock-detail-panel">
+      <div class="sd-header">
+        <div class="sd-header-left">
+          <span class="sd-ticker" id="sdTicker">---</span>
+          <span class="sd-name" id="sdName"></span>
+        </div>
+        <div class="sd-price-block">
+          <div class="sd-price" id="sdPrice">--</div>
+          <div class="sd-change" id="sdChange"></div>
+        </div>
+        <button class="sd-close-btn" onclick="closeStockDetail()">✕</button>
+      </div>
+      <div class="sd-period-tabs" id="sdPeriodTabs">
+        <button class="sd-period-btn" onclick="sdLoadPeriod('1mo')">1M</button>
+        <button class="sd-period-btn active" onclick="sdLoadPeriod('3mo')">3M</button>
+        <button class="sd-period-btn" onclick="sdLoadPeriod('6mo')">6M</button>
+        <button class="sd-period-btn" onclick="sdLoadPeriod('1y')">1Y</button>
+        <button class="sd-period-btn" onclick="sdLoadPeriod('2y')">2Y</button>
+        <button class="sd-period-btn" onclick="sdLoadPeriod('5y')">5Y</button>
+      </div>
+      <div class="sd-chart-wrap" id="sdChartWrap">
+        <div class="sd-loading">Loading chart...</div>
+        <canvas id="sdChartCanvas" style="display:none"></canvas>
+      </div>
+      <div class="sd-info-grid" id="sdInfoGrid">
+        <div class="sd-info-card" id="sdAbout">
+          <h4>ABOUT</h4>
+          <p id="sdDescription">Loading...</p>
+        </div>
+        <div class="sd-info-card" id="sdStats">
+          <h4>KEY STATS</h4>
+          <div id="sdStatsBody"></div>
+        </div>
+      </div>
+      <div class="sd-actions">
+        <button class="sd-buy-btn" id="sdBuyBtn" onclick="sdTrade('BUY')">▲ BUY</button>
+        <button class="sd-sell-btn" id="sdSellBtn" onclick="sdTrade('SELL')">▼ SELL</button>
+        <button class="sd-watch-btn" id="sdWatchBtn" onclick="sdToggleWatch()">☆ WATCH</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
        ORDER POPUP MODAL
   ═══════════════════════════════════════════════ -->
   <div class="order-modal-overlay" id="orderModalOverlay" style="display:none" onclick="if(event.target===this)closeOrderModal()">

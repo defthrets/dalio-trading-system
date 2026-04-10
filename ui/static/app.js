@@ -3381,20 +3381,57 @@ async function loadScanner(market, full) {
   const statsEl = el(ids.stats);
   if (!tbody) return;
   const useFull = (market === 'asx' && (full !== undefined ? full : _asxFullMode));
-  const loadMsg = useFull
-    ? '⌛ Scanning full ASX universe (~1,900 tickers)… this may take a minute'
-    : '⌛ Scanning ASX 300…';
-  tbody.innerHTML = `<tr><td colspan="${ids.cols}" class="scanner-loading">${loadMsg}</td></tr>`;
+  const mktLabel = market === 'asx' ? (useFull ? 'FULL ASX (~1,900)' : 'ASX 300') : 'COMMODITIES';
+
+  // Show loading overlay with progress bar
+  const tableWrap = tbody.closest('.scanner-table-wrap');
+  let cardGrid = tableWrap?.querySelector('.scanner-card-grid');
+  const loadHtml = `<div class="scanner-load-overlay" id="${market}LoadOverlay">
+    <div class="load-icon">◎</div>
+    <div class="load-title">SCANNING ${mktLabel}</div>
+    <div class="scanner-load-bar"><div class="scanner-load-bar-fill" id="${market}LoadBar"></div><div class="scanner-load-bar-pulse"></div></div>
+    <div class="load-status" id="${market}LoadStatus">Connecting to market feed...</div>
+  </div>`;
+  if (cardGrid) cardGrid.innerHTML = loadHtml;
+  else tbody.innerHTML = `<tr><td colspan="${ids.cols}">${loadHtml}</td></tr>`;
   if (statsEl) statsEl.innerHTML = '';
+
+  // Animate progress bar
+  const barEl = el(`${market}LoadBar`);
+  const statusEl = el(`${market}LoadStatus`);
+  let pct = 0;
+  const progressInterval = setInterval(() => {
+    pct = Math.min(pct + Math.random() * 12 + 3, 90);
+    if (barEl) barEl.style.width = pct + '%';
+    if (statusEl) {
+      if (pct < 25) statusEl.textContent = 'Connecting to market feed...';
+      else if (pct < 50) statusEl.textContent = 'Downloading price data...';
+      else if (pct < 75) statusEl.textContent = 'Processing ' + mktLabel + ' tickers...';
+      else statusEl.textContent = 'Calculating changes...';
+    }
+  }, 400);
+
   try {
     const url = useFull ? `/api/markets/${market}?full=true` : `/api/markets/${market}`;
     const d = await fetchJSON(url);
+    clearInterval(progressInterval);
+    if (barEl) barEl.style.width = '100%';
+    if (statusEl) statusEl.textContent = `Loaded ${(d.rows||[]).length} tickers`;
     _scannerData[market] = d.rows || [];
     const cacheNote = d.cached ? ` <span style="opacity:.5">(cached ${d.cache_age}s ago)</span>` : '';
     if (statsEl) statsEl.dataset.cacheNote = cacheNote;
+    // Brief pause to show 100% before rendering
+    await new Promise(r => setTimeout(r, 300));
     renderScanner(market);
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="${ids.cols}" class="scanner-loading" style="color:var(--red)">⚠ Failed to load — ${escHtml(e.message)}</td></tr>`;
+    clearInterval(progressInterval);
+    const errHtml = `<div class="scanner-load-overlay">
+      <div class="load-icon" style="animation:none;color:var(--red)">⚠</div>
+      <div class="load-title" style="color:var(--red)">SCAN FAILED</div>
+      <div class="load-status">${escHtml(e.message)}</div>
+    </div>`;
+    if (cardGrid) cardGrid.innerHTML = errHtml;
+    else tbody.innerHTML = `<tr><td colspan="${ids.cols}">${errHtml}</td></tr>`;
   }
 }
 
@@ -3488,7 +3525,7 @@ function renderScanner(market, filterText = '', filterSector = '') {
       const nameShort = r.name.length > 20 ? r.name.slice(0,20) + '…' : r.name;
       const wlIcon   = r.in_watchlist ? '★' : '☆';
       const wlCls    = r.in_watchlist ? ' in' : '';
-      return `<div class="scanner-card" onclick="scannerOpenTrade('${escHtml(ticker)}',${r.price})">
+      return `<div class="scanner-card" onclick="openStockDetail('${escHtml(ticker)}',${r.price},${r.change_pct})">
         <span class="sc-ticker">${dispName}</span>
         <span class="sc-name" title="${escHtml(r.name)}">${nameShort}</span>
         <span class="sc-price">${priceStr}</span>
@@ -3553,6 +3590,259 @@ function applySortSelect(market, val) {
 
 function scannerOpenTrade(ticker, price) {
   openOrderModal(ticker, 'BUY', price);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Stock Detail Panel
+// ═══════════════════════════════════════════════════════════
+
+let _sdChart = null;
+let _sdTicker = '';
+let _sdPrice = 0;
+
+function openStockDetail(ticker, price, changePct) {
+  _sdTicker = ticker;
+  _sdPrice = price;
+  const overlay = el('stockDetailOverlay');
+  if (!overlay) return;
+  overlay.classList.add('open');
+
+  el('sdTicker').textContent = ticker;
+  el('sdName').textContent = '';
+  el('sdPrice').textContent = price > 0 ? '$' + price.toFixed(price >= 1 ? 2 : 4) : '--';
+  const chgEl = el('sdChange');
+  if (changePct !== undefined) {
+    chgEl.textContent = (changePct >= 0 ? '+' : '') + changePct.toFixed(2) + '%';
+    chgEl.className = 'sd-change ' + (changePct > 0 ? 'pos' : changePct < 0 ? 'neg' : '');
+  } else {
+    chgEl.textContent = '';
+  }
+
+  // Update watchlist button
+  const wBtn = el('sdWatchBtn');
+  if (wBtn) {
+    const inWl = _watchlist.includes(ticker);
+    wBtn.textContent = inWl ? '★ WATCHING' : '☆ WATCH';
+  }
+
+  // Reset chart area
+  el('sdChartWrap').querySelector('.sd-loading').style.display = 'flex';
+  el('sdChartCanvas').style.display = 'none';
+  el('sdDescription').textContent = 'Loading...';
+  el('sdStatsBody').innerHTML = '';
+
+  // Set active period button
+  document.querySelectorAll('.sd-period-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.sd-period-btn')[1]?.classList.add('active'); // 3M default
+
+  // Load chart data
+  sdLoadPeriod('3mo');
+
+  // Escape key
+  document.addEventListener('keydown', _sdEscHandler);
+}
+
+function closeStockDetail() {
+  const overlay = el('stockDetailOverlay');
+  if (overlay) overlay.classList.remove('open');
+  if (_sdChart) { _sdChart.destroy(); _sdChart = null; }
+  document.removeEventListener('keydown', _sdEscHandler);
+}
+
+function _sdEscHandler(e) { if (e.key === 'Escape') closeStockDetail(); }
+
+async function sdLoadPeriod(period) {
+  // Update active button
+  document.querySelectorAll('.sd-period-btn').forEach(b => {
+    const map = {'1mo':'1M','3mo':'3M','6mo':'6M','1y':'1Y','2y':'2Y','5y':'5Y'};
+    b.classList.toggle('active', b.textContent === map[period]);
+  });
+
+  const loadEl = el('sdChartWrap').querySelector('.sd-loading');
+  const canvas = el('sdChartCanvas');
+  loadEl.style.display = 'flex';
+  loadEl.textContent = 'Loading chart...';
+  canvas.style.display = 'none';
+
+  try {
+    const d = await fetchJSON(`/api/chart/${encodeURIComponent(_sdTicker)}?period=${period}&interval=1d`);
+
+    // Update header with real price from chart data
+    if (d.candles && d.candles.length > 0) {
+      const lastCandle = d.candles[d.candles.length - 1];
+      const realPrice = lastCandle.c;
+      _sdPrice = realPrice;
+      el('sdPrice').textContent = '$' + realPrice.toFixed(realPrice >= 1 ? 2 : 4);
+
+      if (d.candles.length >= 2) {
+        const prevClose = d.candles[d.candles.length - 2].c;
+        const chg = ((realPrice - prevClose) / prevClose * 100);
+        const chgEl = el('sdChange');
+        chgEl.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
+        chgEl.className = 'sd-change ' + (chg > 0 ? 'pos' : chg < 0 ? 'neg' : '');
+      }
+    }
+
+    // Update company info
+    if (d.info) {
+      el('sdName').textContent = d.info.name || _sdTicker;
+      const desc = d.info.longBusinessSummary || '';
+      const sector = d.info.sector || '';
+      const industry = d.info.industry || '';
+      const currency = d.info.currency || 'AUD';
+      if (desc) {
+        el('sdDescription').textContent = desc.length > 400 ? desc.slice(0, 400) + '...' : desc;
+      } else {
+        const parts = [d.info.name || _sdTicker];
+        if (sector) parts.push(sector);
+        if (industry) parts.push(industry);
+        parts.push(`Currency: ${currency}`);
+        el('sdDescription').textContent = parts.join(' — ') + '.';
+      }
+    }
+
+    // Key stats
+    if (d.candles && d.candles.length > 0) {
+      const closes = d.candles.map(c => c.c);
+      const highs = d.candles.map(c => c.h);
+      const lows = d.candles.map(c => c.l);
+      const vols = d.candles.map(c => c.v);
+      const high52 = Math.max(...highs);
+      const low52 = Math.min(...lows);
+      const avgVol = vols.length ? Math.round(vols.reduce((a,b) => a+b, 0) / vols.length) : 0;
+      const latestRsi = d.rsi ? d.rsi.filter(v => v !== null).pop() : null;
+      const mktCap = d.info?.marketCap;
+
+      let statsHtml = '';
+      statsHtml += `<div class="sd-info-stat"><span class="label">PERIOD HIGH</span><span class="value">$${high52.toFixed(2)}</span></div>`;
+      statsHtml += `<div class="sd-info-stat"><span class="label">PERIOD LOW</span><span class="value">$${low52.toFixed(2)}</span></div>`;
+      if (mktCap) statsHtml += `<div class="sd-info-stat"><span class="label">MKT CAP</span><span class="value">$${mktCap >= 1e9 ? (mktCap/1e9).toFixed(2)+'B' : (mktCap/1e6).toFixed(1)+'M'}</span></div>`;
+      statsHtml += `<div class="sd-info-stat"><span class="label">AVG VOLUME</span><span class="value">${avgVol.toLocaleString()}</span></div>`;
+      if (latestRsi) statsHtml += `<div class="sd-info-stat"><span class="label">RSI (14)</span><span class="value" style="color:${latestRsi > 70 ? 'var(--red)' : latestRsi < 30 ? 'var(--green)' : ''}">${latestRsi}</span></div>`;
+      if (d.info?.trailingPE) statsHtml += `<div class="sd-info-stat"><span class="label">P/E RATIO</span><span class="value">${d.info.trailingPE.toFixed(1)}</span></div>`;
+      if (d.info?.dividendYield) statsHtml += `<div class="sd-info-stat"><span class="label">DIV YIELD</span><span class="value">${(d.info.dividendYield*100).toFixed(2)}%</span></div>`;
+      if (d.info?.fiftyTwoWeekHigh) statsHtml += `<div class="sd-info-stat"><span class="label">52W HIGH</span><span class="value">$${d.info.fiftyTwoWeekHigh.toFixed(2)}</span></div>`;
+      if (d.info?.fiftyTwoWeekLow) statsHtml += `<div class="sd-info-stat"><span class="label">52W LOW</span><span class="value">$${d.info.fiftyTwoWeekLow.toFixed(2)}</span></div>`;
+      if (d.sma20) {
+        const sma = d.sma20.filter(v => v !== null).pop();
+        if (sma) statsHtml += `<div class="sd-info-stat"><span class="label">SMA 20</span><span class="value">$${sma.toFixed(2)}</span></div>`;
+      }
+      if (d.sma50) {
+        const sma = d.sma50.filter(v => v !== null).pop();
+        if (sma) statsHtml += `<div class="sd-info-stat"><span class="label">SMA 50</span><span class="value">$${sma.toFixed(2)}</span></div>`;
+      }
+      el('sdStatsBody').innerHTML = statsHtml;
+    }
+
+    // Render chart
+    loadEl.style.display = 'none';
+    canvas.style.display = 'block';
+    _renderStockChart(canvas, d);
+
+  } catch (e) {
+    loadEl.textContent = 'Failed to load chart: ' + (e.message || 'unknown error');
+    loadEl.style.color = 'var(--red)';
+  }
+}
+
+function _renderStockChart(canvas, data) {
+  if (_sdChart) { _sdChart.destroy(); _sdChart = null; }
+  if (!data.candles || !data.candles.length) return;
+
+  const labels = data.candles.map(c => {
+    const d = new Date(c.t);
+    return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  });
+  const closes = data.candles.map(c => c.c);
+
+  const datasets = [{
+    label: 'Price',
+    data: closes,
+    borderColor: 'rgba(0,212,255,0.9)',
+    backgroundColor: 'rgba(0,212,255,0.08)',
+    fill: true,
+    borderWidth: 2,
+    pointRadius: 0,
+    pointHoverRadius: 4,
+    tension: 0.3,
+  }];
+
+  // SMA20
+  if (data.sma20) {
+    datasets.push({
+      label: 'SMA 20',
+      data: data.sma20,
+      borderColor: 'rgba(245,158,11,0.6)',
+      borderWidth: 1,
+      borderDash: [4, 2],
+      pointRadius: 0,
+      fill: false,
+    });
+  }
+  // SMA50
+  if (data.sma50) {
+    datasets.push({
+      label: 'SMA 50',
+      data: data.sma50,
+      borderColor: 'rgba(168,102,246,0.6)',
+      borderWidth: 1,
+      borderDash: [4, 2],
+      pointRadius: 0,
+      fill: false,
+    });
+  }
+
+  const ctx = canvas.getContext('2d');
+  _sdChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { color: '#a8a29e', font: { size: 10, family: "'JetBrains Mono', monospace" }, boxWidth: 12, padding: 8 },
+        },
+        tooltip: {
+          backgroundColor: 'rgba(28,25,23,0.95)',
+          titleColor: '#fafaf9',
+          bodyColor: '#a8a29e',
+          borderColor: 'rgba(0,212,255,0.3)',
+          borderWidth: 1,
+          callbacks: {
+            label: (ctx) => `${ctx.dataset.label}: $${ctx.parsed.y?.toFixed(ctx.parsed.y >= 1 ? 2 : 4)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#78716c', font: { size: 9 }, maxTicksLimit: 12, maxRotation: 0 },
+          grid: { color: 'rgba(61,56,53,0.3)' },
+        },
+        y: {
+          ticks: { color: '#78716c', font: { size: 9 }, callback: v => '$' + v.toFixed(2) },
+          grid: { color: 'rgba(61,56,53,0.3)' },
+        }
+      }
+    }
+  });
+}
+
+function sdTrade(side) {
+  closeStockDetail();
+  openOrderModal(_sdTicker, side, _sdPrice);
+}
+
+function sdToggleWatch() {
+  const btn = el('sdWatchBtn');
+  // Re-use existing watchlist toggle — find the ticker button in scanner
+  toggleWatchlist(_sdTicker, btn).then(() => {
+    const inWl = _watchlist.includes(_sdTicker);
+    if (btn) btn.textContent = inWl ? '★ WATCHING' : '☆ WATCH';
+  });
 }
 
 // ─── Watchlist ─────────────────────────────────────────────
