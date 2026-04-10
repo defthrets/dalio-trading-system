@@ -3381,16 +3381,15 @@ async function loadScanner(market, full) {
   const statsEl = el(ids.stats);
   if (!tbody) return;
   const useFull = (market === 'asx' && (full !== undefined ? full : _asxFullMode));
-  const mktLabel = market === 'asx' ? (useFull ? 'FULL ASX (~1,900)' : 'ASX 300') : 'COMMODITIES';
+  const mktLabel = market === 'asx' ? (useFull ? 'FULL ASX ~1,900' : 'ASX 300') : 'COMMODITIES';
 
-  // Show loading overlay with progress bar
+  // Show compact inline loading bar
   const tableWrap = tbody.closest('.scanner-table-wrap');
   let cardGrid = tableWrap?.querySelector('.scanner-card-grid');
-  const loadHtml = `<div class="scanner-load-overlay" id="${market}LoadOverlay">
-    <div class="load-icon">◎</div>
-    <div class="load-title">SCANNING ${mktLabel}</div>
-    <div class="scanner-load-bar"><div class="scanner-load-bar-fill" id="${market}LoadBar"></div><div class="scanner-load-bar-pulse"></div></div>
-    <div class="load-status" id="${market}LoadStatus">Connecting to market feed...</div>
+  const loadHtml = `<div class="scanner-load-inline">
+    <div class="scanner-load-top"><div class="load-spinner"></div><span class="load-label">SCANNING ${mktLabel}...</span></div>
+    <div class="scanner-load-bar"><div class="scanner-load-bar-fill" id="${market}LoadBar"></div></div>
+    <div class="scanner-load-status" id="${market}LoadStatus">Connecting to market feed...</div>
   </div>`;
   if (cardGrid) cardGrid.innerHTML = loadHtml;
   else tbody.innerHTML = `<tr><td colspan="${ids.cols}">${loadHtml}</td></tr>`;
@@ -3401,37 +3400,31 @@ async function loadScanner(market, full) {
   const statusEl = el(`${market}LoadStatus`);
   let pct = 0;
   const progressInterval = setInterval(() => {
-    pct = Math.min(pct + Math.random() * 12 + 3, 90);
+    pct = Math.min(pct + Math.random() * 8 + 2, 92);
     if (barEl) barEl.style.width = pct + '%';
     if (statusEl) {
-      if (pct < 25) statusEl.textContent = 'Connecting to market feed...';
-      else if (pct < 50) statusEl.textContent = 'Downloading price data...';
-      else if (pct < 75) statusEl.textContent = 'Processing ' + mktLabel + ' tickers...';
+      if (pct < 30) statusEl.textContent = 'Downloading price data...';
+      else if (pct < 60) statusEl.textContent = `Processing ${mktLabel} tickers...`;
       else statusEl.textContent = 'Calculating changes...';
     }
-  }, 400);
+  }, 500);
 
   try {
     const url = useFull ? `/api/markets/${market}?full=true` : `/api/markets/${market}`;
     const d = await fetchJSON(url);
     clearInterval(progressInterval);
     if (barEl) barEl.style.width = '100%';
-    if (statusEl) statusEl.textContent = `Loaded ${(d.rows||[]).length} tickers`;
+    if (statusEl) statusEl.textContent = `${(d.rows||[]).length} tickers loaded`;
     _scannerData[market] = d.rows || [];
     const cacheNote = d.cached ? ` <span style="opacity:.5">(cached ${d.cache_age}s ago)</span>` : '';
     if (statsEl) statsEl.dataset.cacheNote = cacheNote;
-    // Brief pause to show 100% before rendering
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 200));
     renderScanner(market);
   } catch (e) {
     clearInterval(progressInterval);
-    const errHtml = `<div class="scanner-load-overlay">
-      <div class="load-icon" style="animation:none;color:var(--red)">⚠</div>
-      <div class="load-title" style="color:var(--red)">SCAN FAILED</div>
-      <div class="load-status">${escHtml(e.message)}</div>
-    </div>`;
-    if (cardGrid) cardGrid.innerHTML = errHtml;
-    else tbody.innerHTML = `<tr><td colspan="${ids.cols}">${errHtml}</td></tr>`;
+    if (barEl) barEl.style.background = 'var(--red)';
+    if (barEl) barEl.style.width = '100%';
+    if (statusEl) { statusEl.textContent = 'Failed: ' + (e.message||'unknown error'); statusEl.style.color = 'var(--red)'; }
   }
 }
 
@@ -3661,8 +3654,10 @@ async function sdLoadPeriod(period) {
   const loadEl = el('sdChartWrap').querySelector('.sd-loading');
   const canvas = el('sdChartCanvas');
   loadEl.style.display = 'flex';
+  loadEl.style.color = '';  // reset error colour
   loadEl.textContent = 'Loading chart...';
   canvas.style.display = 'none';
+  if (_sdChart) { _sdChart.destroy(); _sdChart = null; }
 
   try {
     const d = await fetchJSON(`/api/chart/${encodeURIComponent(_sdTicker)}?period=${period}&interval=1d`);
@@ -3734,10 +3729,10 @@ async function sdLoadPeriod(period) {
       el('sdStatsBody').innerHTML = statsHtml;
     }
 
-    // Render chart
+    // Render chart — requestAnimationFrame ensures canvas has layout dimensions
     loadEl.style.display = 'none';
     canvas.style.display = 'block';
-    _renderStockChart(canvas, d);
+    requestAnimationFrame(() => _renderStockChart(canvas, d));
 
   } catch (e) {
     loadEl.textContent = 'Failed to load chart: ' + (e.message || 'unknown error');

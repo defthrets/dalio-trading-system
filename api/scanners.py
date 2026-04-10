@@ -269,7 +269,7 @@ _ASSET_META = {
 
 # ── Scanner cache ──────────────────────────────────────
 _scanner_cache: dict = {}   # market -> {"ts": float, "rows": list}
-_CACHE_TTL = 90             # seconds
+_CACHE_TTL = 300            # 5 minutes — prices don't change that fast
 
 
 async def _live_price(ticker: str) -> Optional[float]:
@@ -368,29 +368,31 @@ async def _scan_yfinance_inner(tickers: list, market: str) -> list:
     loop = asyncio.get_running_loop()
     results: dict = {}
 
-    # Batch large ticker lists to avoid timeouts
-    BATCH_SIZE = 200
+    # Batch large ticker lists — run batches concurrently for speed
+    BATCH_SIZE = 100
     batches = [tickers[i:i+BATCH_SIZE] for i in range(0, len(tickers), BATCH_SIZE)]
     if len(batches) > 1:
-        logger.info(f"[{market}] Scanning {len(tickers)} tickers in {len(batches)} batches")
+        logger.info(f"[{market}] Scanning {len(tickers)} tickers in {len(batches)} concurrent batches")
 
-    all_raw = []
-    for batch_idx, batch in enumerate(batches):
-        def _bulk(batch_tickers=batch):
-            try:
-                raw = yf.download(
-                    batch_tickers, period="5d", interval="1d",
-                    group_by="ticker", auto_adjust=True,
-                    progress=False, threads=True,
-                )
-                return raw
-            except Exception as exc:
-                logger.warning(f"yfinance bulk failed [{market}] batch {batch_idx}: {exc}")
-                return None
+    def _bulk(batch_tickers, idx):
+        try:
+            raw = yf.download(
+                batch_tickers, period="5d", interval="1d",
+                group_by="ticker", auto_adjust=True,
+                progress=False, threads=True,
+            )
+            return (batch_tickers, raw)
+        except Exception as exc:
+            logger.warning(f"yfinance bulk failed [{market}] batch {idx}: {exc}")
+            return (batch_tickers, None)
 
-        raw = await loop.run_in_executor(None, _bulk)
-        if raw is not None:
-            all_raw.append((batch, raw))
+    # Run all batches concurrently
+    batch_futures = [
+        loop.run_in_executor(None, _bulk, batch, i)
+        for i, batch in enumerate(batches)
+    ]
+    batch_results = await asyncio.gather(*batch_futures)
+    all_raw = [(b, r) for b, r in batch_results if r is not None]
 
     for batch, raw in all_raw:
         if raw is None or raw.empty:
@@ -421,10 +423,11 @@ async def _scan_yfinance_inner(tickers: list, market: str) -> list:
             except Exception as exc:
                 logger.debug(f"Bulk parse [{ticker}]: {exc}")
 
-    # Individual fallback for tickers bulk missed
+    # Individual fallback for tickers bulk missed — cap at 30 to avoid slowdowns
     missing = [t for t in tickers if t not in results]
     if missing:
-        logger.info(f"[{market}] individual fallback for {len(missing)} tickers")
+        logger.info(f"[{market}] individual fallback for {min(len(missing), 30)}/{len(missing)} tickers")
+        missing = missing[:30]  # Cap to avoid massive individual fetches
 
         def _fetch_one(tkr):
             try:

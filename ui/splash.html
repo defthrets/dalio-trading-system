@@ -59,32 +59,33 @@ body::after {
 }
 
 /* ── 3D Cash Stack Logo ── */
-.cash3d { width:80px; height:80px; display:flex; align-items:center; justify-content:center; position:relative; margin:0 auto 10px; }
-.cash3d-scene { width:70px; height:66px; perspective:200px; position:relative; }
+/* Box: W=48  H=30  D=12 — proper joined rectangular prism */
+.cash3d { width:80px; height:50px; display:flex; align-items:center; justify-content:center; position:relative; margin:0 auto 10px; }
+.cash3d-scene { width:48px; height:30px; perspective:200px; position:relative; }
 .cash3d-rotator { width:100%; height:100%; position:relative; transform-style:preserve-3d; animation:cash3dSpin 5s linear infinite, cashGlitch 7s ease-in-out infinite; }
 @keyframes cash3dSpin { 0%{transform:rotateY(0deg) rotateX(-15deg)} 100%{transform:rotateY(360deg) rotateX(-15deg)} }
 .cash3d-face { position:absolute; backface-visibility:visible; }
-.cash3d-front { width:52px; height:34px; top:16px; left:9px; transform:translateZ(16px); }
-.cash3d-back { width:52px; height:34px; top:16px; left:9px; transform:translateZ(-16px) rotateY(180deg); }
-.cash3d-right { width:32px; height:34px; top:16px; left:44px; transform-origin:left center; transform:rotateY(90deg) translateZ(-16px); }
-.cash3d-left { width:32px; height:34px; top:16px; left:9px; transform-origin:left center; transform:rotateY(-90deg) translateZ(16px); }
-.cash3d-top { width:52px; height:32px; top:0; left:9px; transform:rotateX(90deg) translateZ(16px); }
-.cash3d-bottom { width:52px; height:32px; top:32px; left:9px; transform:rotateX(-90deg) translateZ(16px); }
-.cash3d-top, .cash3d-bottom { background:linear-gradient(180deg,rgba(245,158,11,0.1) 0%,rgba(40,30,10,0.3) 100%); border:1px solid rgba(245,158,11,0.5); }
-.bill-face { width:100%; height:100%; background:linear-gradient(135deg,rgba(245,158,11,0.08) 0%,rgba(245,180,50,0.12) 50%,rgba(245,158,11,0.08) 100%); border:1.5px solid rgba(245,158,11,0.7); border-radius:2px; position:relative; overflow:hidden; box-shadow:inset 0 0 10px rgba(245,158,11,0.15); }
-.bill-border { position:absolute; top:2px; left:3px; right:3px; bottom:2px; border:1px solid rgba(245,158,11,0.3); border-radius:1px; }
-.bill-oval { position:absolute; width:16px; height:16px; top:50%; left:50%; transform:translate(-50%,-50%); border:1px solid rgba(245,180,50,0.35); border-radius:50%; }
-.bill-dollar { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-family:'Georgia',serif; font-size:16px; font-weight:bold; color:rgba(245,158,11,0.9); text-shadow:0 0 6px rgba(245,158,11,0.6),0 0 12px rgba(245,180,50,0.3); }
-.bill-100 { position:absolute; bottom:1px; right:2px; font-family:'Courier New',monospace; font-size:7px; font-weight:bold; color:rgba(245,158,11,0.5); }
-.stack-edge { width:100%; height:100%; background:repeating-linear-gradient(0deg,rgba(20,15,10,0.4) 0px,rgba(245,158,11,0.25) 0.8px,rgba(20,15,10,0.4) 1.6px); border:1px solid rgba(245,158,11,0.5); }
-.stack-edge-h { width:100%; height:100%; background:repeating-linear-gradient(90deg,rgba(20,15,10,0.4) 0px,rgba(245,158,11,0.25) 0.8px,rgba(20,15,10,0.4) 1.6px); border:1px solid rgba(245,158,11,0.5); }
-.band-face { position:absolute; backface-visibility:visible; background:linear-gradient(90deg,rgba(245,180,50,0.15) 0%,rgba(245,180,50,0.35) 40%,rgba(245,158,11,0.35) 60%,rgba(245,180,50,0.15) 100%); border:1px solid rgba(245,180,50,0.6); box-shadow:0 0 6px rgba(245,180,50,0.3),inset 0 0 4px rgba(245,180,50,0.15); }
-.band-front { width:14px; height:34px; top:16px; left:28px; transform:translateZ(16.5px); }
-.band-back { width:14px; height:34px; top:16px; left:28px; transform:translateZ(-16.5px) rotateY(180deg); }
-.band-top { width:14px; height:33px; top:-0.5px; left:28px; transform:rotateX(90deg) translateZ(16.5px); }
-.band-bottom { width:14px; height:33px; top:32.5px; left:28px; transform:rotateX(-90deg) translateZ(16.5px); }
-.band-front::after, .band-back::after { content:'$'; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-family:'Georgia',serif; font-size:11px; font-weight:bold; color:rgba(245,180,50,0.7); text-shadow:0 0 4px rgba(245,180,50,0.5); }
-@keyframes cashGlitch { 0%,88%,92%,100%{filter:none} 89%{filter:drop-shadow(2px 0 0 rgba(255,0,64,0.5)) drop-shadow(-2px 0 0 rgba(245,158,11,0.5))} 90%{filter:drop-shadow(-1px 0 0 rgba(245,180,50,0.4)) drop-shadow(1px 0 0 rgba(255,0,64,0.4))} 91%{filter:none} 95%{filter:drop-shadow(1px 0 0 rgba(255,0,64,0.3))} 96%{filter:none} }
+.cash3d-front, .cash3d-back { width:48px; height:30px; top:0; left:0; }
+.cash3d-front { transform:translateZ(6px); }
+.cash3d-back { transform:rotateY(180deg) translateZ(6px); }
+.cash3d-right { width:12px; height:30px; top:0; left:18px; transform:rotateY(90deg) translateZ(24px); }
+.cash3d-left { width:12px; height:30px; top:0; left:18px; transform:rotateY(-90deg) translateZ(24px); }
+.cash3d-top { width:48px; height:12px; top:9px; left:0; transform:rotateX(90deg) translateZ(15px); }
+.cash3d-bottom { width:48px; height:12px; top:9px; left:0; transform:rotateX(-90deg) translateZ(15px); }
+.bill-face { width:100%; height:100%; background:linear-gradient(135deg,rgba(0,212,255,0.08) 0%,rgba(0,255,170,0.12) 50%,rgba(0,212,255,0.08) 100%); border:1.5px solid rgba(0,212,255,0.7); border-radius:2px; position:relative; overflow:hidden; box-shadow:inset 0 0 10px rgba(0,212,255,0.15); }
+.bill-border { position:absolute; top:2px; left:3px; right:3px; bottom:2px; border:1px solid rgba(0,212,255,0.3); border-radius:1px; }
+.bill-oval { position:absolute; width:14px; height:14px; top:50%; left:50%; transform:translate(-50%,-50%); border:1px solid rgba(0,255,170,0.35); border-radius:50%; }
+.bill-dollar { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-family:'Georgia',serif; font-size:12px; font-weight:bold; color:rgba(0,212,255,0.9); text-shadow:0 0 6px rgba(0,212,255,0.6),0 0 12px rgba(0,255,170,0.3); }
+.bill-100 { position:absolute; bottom:1px; right:3px; font-family:'Courier New',monospace; font-size:5px; font-weight:bold; color:rgba(0,212,255,0.5); }
+.stack-edge { width:100%; height:100%; background:repeating-linear-gradient(90deg,rgba(0,30,40,0.4) 0px,rgba(0,212,255,0.25) 0.8px,rgba(0,30,40,0.4) 1.6px); border:1px solid rgba(0,212,255,0.5); }
+.stack-edge-h { width:100%; height:100%; background:repeating-linear-gradient(0deg,rgba(0,30,40,0.4) 0px,rgba(0,212,255,0.25) 0.8px,rgba(0,30,40,0.4) 1.6px); border:1px solid rgba(0,212,255,0.5); }
+.band-face { position:absolute; backface-visibility:visible; background:linear-gradient(90deg,rgba(0,255,170,0.15) 0%,rgba(0,255,170,0.35) 40%,rgba(0,212,255,0.35) 60%,rgba(0,255,170,0.15) 100%); border:1px solid rgba(0,255,170,0.6); box-shadow:0 0 6px rgba(0,255,170,0.3),inset 0 0 4px rgba(0,255,170,0.15); }
+.band-front { width:10px; height:30px; top:0; left:19px; transform:translateZ(6.2px); }
+.band-back { width:10px; height:30px; top:0; left:19px; transform:rotateY(180deg) translateZ(6.2px); }
+.band-top { width:10px; height:12px; top:9px; left:19px; transform:rotateX(90deg) translateZ(15px); }
+.band-bottom { width:10px; height:12px; top:9px; left:19px; transform:rotateX(-90deg) translateZ(15px); }
+.band-front::after, .band-back::after { display:none; }
+@keyframes cashGlitch { 0%,88%,92%,100%{filter:none} 89%{filter:drop-shadow(2px 0 0 rgba(255,0,64,0.5)) drop-shadow(-2px 0 0 rgba(0,255,136,0.5))} 90%{filter:drop-shadow(-1px 0 0 rgba(0,200,255,0.4)) drop-shadow(1px 0 0 rgba(255,0,64,0.4))} 91%{filter:none} 95%{filter:drop-shadow(1px 0 0 rgba(255,0,64,0.3))} 96%{filter:none} }
 
 .boot-logo {
   font-family: 'Orbitron', monospace;
