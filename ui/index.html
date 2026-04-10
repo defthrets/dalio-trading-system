@@ -76,7 +76,7 @@
       </div>
       <div class="header-divider"></div>
       <div class="system-badges">
-        <button class="badge badge--green" id="statusBadge" onclick="toggleSystemStatus()" title="Click to pause/resume trading" aria-label="Toggle system status">● OPERATIONAL</button>
+        <button class="badge badge--red" id="statusBadge" onclick="toggleAutoTrading()" title="Click to enable/disable autonomous auto-trading (signals still generate either way)" aria-label="Toggle auto-trading">⏸ AUTO TRADING OFF</button>
         <div class="mode-dropdown" id="modeDropdown">
           <button class="badge badge--cyan mode-paper" id="modeBadge" onclick="toggleModeDropdown()" title="Click to switch LIVE / PAPER trading mode" aria-label="Toggle trading mode" aria-haspopup="true">MODE: PAPER ▾</button>
           <div class="mode-dropdown-menu hidden" id="modeDropdownMenu">

@@ -270,12 +270,12 @@ async function loadStatus() {
     STATE.status = d;
     document.getElementById('modeBadge').textContent   = `MODE: ${d.mode} ▾`;
     document.getElementById('modeBadge').className     = d.mode === 'LIVE' ? 'badge badge--red mode-live' : 'badge badge--cyan mode-paper';
-    // Status badge respects paused state from server
+    // Sync auto-trading badge with server agent state
     const sb = document.getElementById('statusBadge');
-    if (sb) {
-      _systemPaused = !!d.paused;
-      sb.textContent = d.paused ? '⏸ PAUSED' : `● ${d.status}`;
-      sb.className   = d.paused ? 'badge badge--paused' : 'badge badge--green';
+    if (sb && d.agent_enabled !== undefined) {
+      _autoTradingEnabled = !!d.agent_enabled;
+      sb.textContent = _autoTradingEnabled ? '● AUTO TRADING ON' : '⏸ AUTO TRADING OFF';
+      sb.className   = _autoTradingEnabled ? 'badge badge--green' : 'badge badge--red';
     }
     document.getElementById('cycleCount').textContent  = d.cycle_count;
     document.getElementById('uptimeBadge').textContent = `UPTIME: ${formatUptime(d.uptime_seconds)}`;
@@ -6141,7 +6141,7 @@ const _RADAR_STATUS_MSGS = [
   // System health
   () => `UPTIME: ${((performance.now()/1000/60)).toFixed(0)} MIN | MEM: ${(performance.memory?.usedJSHeapSize/1024/1024)?.toFixed(0) ?? '?'}MB`,
   () => `WEBSOCKET: ${STATE._wsConnected ? 'CONNECTED' : 'DISCONNECTED'} | MODE: ${_tradingMode?.toUpperCase() ?? 'PAPER'}`,
-  () => _systemPaused ? '⏸ SYSTEM PAUSED — NO NEW TRADES' : '● ALL SYSTEMS OPERATIONAL — TRADING ACTIVE',
+  () => _autoTradingEnabled ? '● AUTO-TRADING ACTIVE — AGENT EXECUTING TRADES' : '⏸ MANUAL MODE — SIGNALS ACTIVE, NO AUTO TRADES',
   () => { const w = _watchlist?.length ?? 0; return `WATCHLIST: ${w} ASSETS TRACKED | ALERTS: ${_priceAlerts?.filter(a=>!a.triggered)?.length ?? 0} ACTIVE`; },
   // Quadrant & sentiment
   () => { const q = STATE.health?.active_quadrant; return q ? `REGIME: ${q.replace(/_/g,' ').toUpperCase()} | STRATEGY ALIGNED` : 'ECONOMIC QUADRANT: DETECTING'; },
@@ -6182,7 +6182,7 @@ const _TELEMETRY_LINES = [
   () => { return { txt: `WS.LINK ${STATE._wsConnected ? 'CONNECTED' : 'DOWN'}`, cls: STATE._wsConnected ? 'fast' : 'slow' }; },
   () => { const mem = (performance.memory?.usedJSHeapSize/1024/1024)?.toFixed(0); return { txt: `SYS.MEM ${mem ?? '?'}MB / ${(performance.memory?.jsHeapSizeLimit/1024/1024)?.toFixed(0) ?? '?'}MB`, cls: 'fast' }; },
   () => { const up = (performance.now()/1000/60).toFixed(0); return { txt: `UPTIME ${up} MIN`, cls: 'fast' }; },
-  () => { return { txt: `MODE ${_tradingMode?.toUpperCase() ?? 'PAPER'} | ${_systemPaused ? 'PAUSED' : 'ACTIVE'}`, cls: _systemPaused ? 'slow' : 'fast' }; },
+  () => { return { txt: `MODE ${_tradingMode?.toUpperCase() ?? 'PAPER'} | ${_autoTradingEnabled ? 'AUTO' : 'MANUAL'}`, cls: _autoTradingEnabled ? 'fast' : 'slow' }; },
   // Correlation & quadrant
   () => { const c = STATE.corr; return c ? { txt: `CORR.ENG MEAN ${(c.mean_correlation??0).toFixed(3)}`, cls: 'fast' } : { txt: 'CORR.ENG PENDING', cls: '' }; },
   () => { const q = STATE.health?.active_quadrant; return { txt: `QUAD.DET ${q ? q.replace(/_/g,' ').toUpperCase() : 'SCANNING'}`, cls: 'fast' }; },
@@ -6291,27 +6291,36 @@ function pushOpsLine(cmd, msg, type) {
 
 // ═══════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════
-// SYSTEM STATUS TOGGLE (OPERATIONAL / PAUSED)
+// AUTO-TRADING TOGGLE (AUTONOMOUS / MANUAL)
 // ═══════════════════════════════════════════════════════════
-let _systemPaused = false;
+let _autoTradingEnabled = false;
 
-function toggleSystemStatus() {
-  _systemPaused = !_systemPaused;
+function toggleAutoTrading() {
+  _autoTradingEnabled = !_autoTradingEnabled;
+  _updateAutoTradingBadge();
+  // Toggle the autonomous agent on the server
+  postJSON('/api/agent/toggle', { enabled: _autoTradingEnabled })
+    .then(d => {
+      if (d && d.enabled !== undefined) _autoTradingEnabled = d.enabled;
+      _updateAutoTradingBadge();
+    })
+    .catch(() => pushAlert('SYSTEM', 'Failed to toggle auto-trading', 'error'));
+}
+
+function _updateAutoTradingBadge() {
   const badge = el('statusBadge');
   if (!badge) return;
-  if (_systemPaused) {
-    badge.textContent = '⏸ PAUSED';
-    badge.className = 'badge badge--paused';
-    pushAlert('SYSTEM', 'Trading PAUSED — no new trades will be executed', 'warning');
-    playBeep(220, 0.15);
-  } else {
-    badge.textContent = '● OPERATIONAL';
+  if (_autoTradingEnabled) {
+    badge.textContent = '● AUTO TRADING ON';
     badge.className = 'badge badge--green';
-    pushAlert('SYSTEM', 'Trading RESUMED — system is operational', 'info');
+    pushAlert('AGENT', 'Autonomous auto-trading ENABLED — agent will execute trades automatically', 'warning');
     playBeep(660, 0.1);
+  } else {
+    badge.textContent = '⏸ AUTO TRADING OFF';
+    badge.className = 'badge badge--red';
+    pushAlert('AGENT', 'Auto-trading DISABLED — manual mode (signals & recommendations still active)', 'info');
+    playBeep(220, 0.15);
   }
-  // Notify server
-  postJSON('/api/system/pause', { paused: _systemPaused }).catch(() => pushAlert('SYSTEM', 'Failed to toggle pause', 'error'));
 }
 
 

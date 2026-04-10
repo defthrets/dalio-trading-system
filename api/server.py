@@ -301,6 +301,7 @@ async def get_status():
         "version": "1.0.0",
         "timestamp": datetime.utcnow().isoformat(),
         "paused": getattr(STATE, 'paused', False),
+        "agent_enabled": AGENT_CONFIG.get("enabled", False),
     }
 
 
