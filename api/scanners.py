@@ -22,88 +22,33 @@ from api.state import WATCHLIST
 # ── Ticker Universes ────────────────────────────────────
 
 ASX_TICKERS = [
-    # ── ASX 200 Constituents (approx) ──────────────────
-    # -- Banks & Financials --
-    "CBA.AX", "WBC.AX", "ANZ.AX", "NAB.AX",
-    "MQG.AX", "BEN.AX", "BOQ.AX", "SUN.AX", "QBE.AX", "IAG.AX",
-    "AMP.AX", "ASX.AX", "PPT.AX", "CGF.AX", "CPU.AX",
-    "MPL.AX", "AUB.AX", "HUB.AX", "MFG.AX",
-    "GQG.AX", "EQT.AX", "IFL.AX",
-    # -- Mining & Resources --
-    "BHP.AX", "RIO.AX", "FMG.AX", "S32.AX", "MIN.AX", "LYC.AX",
-    "IGO.AX", "SFR.AX", "PLS.AX", "ILU.AX",
-    "NIC.AX", "MGX.AX", "GRR.AX",
-    # -- Gold --
-    "NST.AX", "EVN.AX", "RRL.AX",
-    "CMM.AX", "RMS.AX", "WAF.AX",
-    "RSG.AX", "PRU.AX",
-    # -- Lithium --
-    "LTR.AX", "CXO.AX", "GL1.AX", "LKE.AX",
-    # -- Uranium --
-    "PDN.AX", "BOE.AX", "ERA.AX", "PEN.AX",
-    # -- Rare Earths --
-    "ARU.AX", "VML.AX", "HAS.AX",
-    # -- Energy --
-    "WDS.AX", "STO.AX", "BPT.AX", "AGL.AX", "ORG.AX",
-    "APA.AX", "KAR.AX", "CVN.AX", "COE.AX",
-    # -- Healthcare & Biotech --
-    "CSL.AX", "RMD.AX", "COH.AX", "SHL.AX", "ANN.AX",
-    "PME.AX", "EBO.AX", "HLS.AX", "PNV.AX", "RHC.AX",
-    "CUV.AX", "NEU.AX", "TLX.AX", "MSB.AX",
-    "IMM.AX", "NAN.AX", "ACL.AX", "RAC.AX",
-    # -- Technology --
-    "WTC.AX", "XRO.AX", "ALU.AX", "MP1.AX", "TNE.AX",
-    "REA.AX", "APX.AX", "TYR.AX", "SDR.AX",
-    "NXT.AX", "LNW.AX",
-    # -- Fintech --
-    "ZIP.AX", "SPT.AX",
-    # -- Consumer / Retail --
-    "WES.AX", "WOW.AX", "COL.AX", "JBH.AX", "TWE.AX",
-    "HVN.AX", "DMP.AX", "SUL.AX", "LOV.AX", "KGN.AX",
-    "TPW.AX", "NCK.AX", "ADH.AX",
-    # -- Consumer Staples --
-    "GNC.AX", "NUF.AX", "ELD.AX", "BKL.AX",
-    # -- REITs --
-    "GMG.AX", "SCG.AX", "GPT.AX", "VCX.AX", "CLW.AX",
-    "MGR.AX", "DXS.AX", "CHC.AX", "BWP.AX", "NSR.AX",
-    "CQR.AX", "ABP.AX", "SCP.AX", "HDN.AX",
-    "GDI.AX", "ARF.AX",
-    # -- Industrials & Infrastructure --
-    "TCL.AX", "QAN.AX", "BXB.AX", "AZJ.AX", "QUB.AX",
-    "WOR.AX", "MND.AX", "JHX.AX", "CSR.AX", "BLD.AX",
-    "DOW.AX", "SVW.AX", "ALQ.AX", "NWH.AX",
-    "RWC.AX",
-    # -- Telecom --
-    "TLS.AX", "TPG.AX",
-    # -- Media --
-    "NWS.AX", "SEK.AX", "CAR.AX", "NEC.AX",
-    "MMS.AX",
-    # -- Insurance --
-    "NHF.AX", "NIB.AX",
-    # -- Gaming --
-    "TAH.AX", "SGR.AX", "ALL.AX",
-    # -- Chemicals & Building --
-    "ORI.AX", "IPL.AX", "AMC.AX",
-    # -- Diversified --
-    "WEB.AX", "IEL.AX", "SDF.AX", "DTL.AX",
-    "CIP.AX", "AFG.AX",
-    # -- Transport & Logistics --
-    "CTD.AX", "FLT.AX",
-    # -- Utilities --
-    "ALD.AX", "MCY.AX",
-    # -- LICs & ETFs --
-    "AFI.AX", "ARG.AX", "MLT.AX", "WAM.AX",
-    "VAS.AX", "IOZ.AX", "STW.AX", "NDQ.AX", "A200.AX",
-    "VHY.AX", "GOLD.AX",
-    # -- Mining Services --
-    "SXE.AX", "DDR.AX",
-    # -- Coal --
-    "WHC.AX", "NHC.AX", "CRN.AX",
-    # -- Additional ASX 200 --
-    "SGM.AX", "ORA.AX", "SEQ.AX", "PMV.AX", "BSL.AX",
-    "LLC.AX", "EVT.AX", "ING.AX", "ORE.AX", "PDN.AX",
-    "GWA.AX", "360.AX", "SIG.AX", "PGH.AX", "FPH.AX",
-    "OZL.AX", "29M.AX", "AIA.AX",
+    # ── S&P/ASX 200 Index Constituents ─────────────────
+    "29M.AX", "360.AX", "A2M.AX", "ABC.AX", "ABP.AX", "ADA.AX", "AGL.AX", "AIA.AX",
+    "ALD.AX", "ALL.AX", "ALQ.AX", "ALU.AX", "ALX.AX", "AMC.AX", "AMP.AX", "ANZ.AX",
+    "APA.AX", "APE.AX", "APX.AX", "ARB.AX", "ARX.AX", "ASX.AX", "AUB.AX", "AWC.AX",
+    "AZJ.AX", "BEN.AX", "BGA.AX", "BHP.AX", "BKW.AX", "BLD.AX", "BOQ.AX", "BPT.AX",
+    "BRG.AX", "BSL.AX", "BWP.AX", "CAR.AX", "CBA.AX", "CCP.AX", "CDA.AX", "CGF.AX",
+    "CHC.AX", "CHN.AX", "CIA.AX", "CIM.AX", "CIP.AX", "CLW.AX", "CMM.AX", "CNU.AX",
+    "COE.AX", "COH.AX", "COL.AX", "CPU.AX", "CQR.AX", "CSL.AX", "CSR.AX", "CTD.AX",
+    "CWY.AX", "DEG.AX", "DHG.AX", "DMP.AX", "DOW.AX", "DRR.AX", "DTL.AX", "DXS.AX",
+    "DYL.AX", "EBO.AX", "EDV.AX", "ELD.AX", "EML.AX", "EVN.AX", "EVT.AX", "FBU.AX",
+    "FLT.AX", "FMG.AX", "FPH.AX", "GMG.AX", "GNE.AX", "GOZ.AX", "GPT.AX", "GQG.AX",
+    "HCW.AX", "HDN.AX", "HLS.AX", "HMC.AX", "HUB.AX", "HVN.AX", "IAG.AX", "IEL.AX",
+    "IGO.AX", "ILU.AX", "IMD.AX", "INA.AX", "IPG.AX", "IPL.AX", "IRE.AX", "JBH.AX",
+    "JHX.AX", "JIN.AX", "KAR.AX", "KED.AX", "KGN.AX", "KMD.AX", "LFG.AX", "LIC.AX",
+    "LLL.AX", "LNW.AX", "LOV.AX", "LTR.AX", "LYC.AX", "MAQ.AX", "MCY.AX", "MEI.AX",
+    "MGR.AX", "MIN.AX", "MND.AX", "MPL.AX", "MQG.AX", "MRM.AX", "MSB.AX", "MTS.AX",
+    "MVF.AX", "NAB.AX", "NAN.AX", "NCM.AX", "NEC.AX", "NHC.AX", "NHF.AX", "NIC.AX",
+    "NST.AX", "NWL.AX", "NXT.AX", "ORA.AX", "ORG.AX", "ORI.AX", "OZL.AX", "PBH.AX",
+    "PDN.AX", "PLS.AX", "PME.AX", "PMV.AX", "PNI.AX", "PNV.AX", "PPT.AX", "PRU.AX",
+    "PSQ.AX", "PTM.AX", "QAN.AX", "QBE.AX", "QUB.AX", "REA.AX", "REH.AX", "RHC.AX",
+    "RIO.AX", "RMD.AX", "RRL.AX", "RWC.AX", "S32.AX", "SBM.AX", "SCG.AX", "SDF.AX",
+    "SEK.AX", "SFR.AX", "SGM.AX", "SGP.AX", "SHL.AX", "SIG.AX", "SKC.AX", "SLC.AX",
+    "SMP.AX", "SNZ.AX", "SOL.AX", "SPK.AX", "SQ2.AX", "SRL.AX", "SSM.AX", "STA.AX",
+    "STX.AX", "SUL.AX", "SUN.AX", "SVW.AX", "SWM.AX", "TAH.AX", "TCL.AX", "TLC.AX",
+    "TLS.AX", "TNE.AX", "TPG.AX", "TWE.AX", "TYR.AX", "UNI.AX", "VCX.AX", "VEA.AX",
+    "VNT.AX", "VUK.AX", "WBC.AX", "WDS.AX", "WEB.AX", "WES.AX", "WGX.AX", "WHC.AX",
+    "WOR.AX", "WOW.AX", "WPR.AX", "WTC.AX", "XRO.AX", "YAL.AX", "ZIP.AX",
 ]
 
 CRYPTO_TICKERS = []  # Crypto removed -- ASX + commodities only
