@@ -656,6 +656,11 @@ async def get_recommendations(n: int = 6):
     }
 
 
+# ── Chart rate limiter (avoid Yahoo bans) ─────────────────
+_chart_semaphore = asyncio.Semaphore(1)  # serialize chart requests
+_chart_last_fetch = 0.0
+
+
 @app.get("/api/chart/{ticker}")
 async def chart_data(ticker: str, period: str = "6mo", interval: str = "1d"):
     """OHLCV candlestick data for a single ticker via yfinance."""
@@ -670,31 +675,60 @@ async def chart_data(ticker: str, period: str = "6mo", interval: str = "1d"):
         interval = "1d"
 
     cache_key = f"chart_{ticker}_{period}_{interval}"
-    cached = _cache_get(cache_key)
+    cached = _cache_get(cache_key, ttl=1800)  # 30 min chart cache
     if cached is not None:
         return cached
+
+    # Serialize chart fetches and enforce minimum gap to avoid Yahoo rate limit
+    global _chart_last_fetch
+    async with _chart_semaphore:
+        # Re-check cache (another request may have populated it while waiting)
+        cached = _cache_get(cache_key, ttl=1800)
+        if cached is not None:
+            return cached
+        # Enforce 2s gap between Yahoo requests
+        now = time.time()
+        wait = max(0, 2.0 - (now - _chart_last_fetch))
+        if wait > 0:
+            await asyncio.sleep(wait)
 
     loop = asyncio.get_running_loop()
 
     def _fetch():
         try:
             import time as _time
-            for attempt in range(3):
+
+            # Use yf.download() for history — shares rate-limit pool with scanner
+            # Retry with exponential backoff for Yahoo rate limits
+            import pandas as _pd_chart
+            hist = None
+            for attempt in range(4):
                 try:
-                    from api.utils import _yf_session
-                    t = yf.Ticker(ticker, session=_yf_session) if _yf_session else yf.Ticker(ticker)
-                    hist = t.history(period=period, interval=interval, auto_adjust=True)
-                    break
+                    raw = yf.download(
+                        ticker, period=period, interval=interval,
+                        auto_adjust=True, progress=False, threads=False,
+                    )
+                    # Flatten MultiIndex columns (single ticker download returns MultiIndex)
+                    if raw is not None and not raw.empty:
+                        if isinstance(raw.columns, _pd_chart.MultiIndex):
+                            raw.columns = raw.columns.get_level_values(0)
+                        hist = raw
+                        break
+                    # yf.download silently returns empty on rate limit — retry
+                    logger.info(f"Chart empty for {ticker} attempt {attempt+1}/4, retrying...")
+                    _time.sleep(3 * (attempt + 1))
                 except Exception as retry_exc:
-                    if attempt < 2 and "Rate" in str(retry_exc):
-                        logger.info(f"Chart rate-limited for {ticker}, retry {attempt+1}/3...")
-                        _time.sleep(2 * (attempt + 1))
+                    logger.info(f"Chart error for {ticker} attempt {attempt+1}/4: {retry_exc}")
+                    if attempt < 3:
+                        _time.sleep(3 * (attempt + 1))
                     else:
                         raise
+
             if hist is None or hist.empty:
-                logger.warning(f"Chart: empty history for {ticker} (period={period})")
+                logger.warning(f"Chart: no data for {ticker} after 4 attempts (period={period})")
                 return None
             hist = hist.dropna(subset=["Close"])
+
             candles = []
             for idx, row in hist.iterrows():
                 ts = idx.isoformat() if hasattr(idx, 'isoformat') else str(idx)
@@ -746,6 +780,7 @@ async def chart_data(ticker: str, period: str = "6mo", interval: str = "1d"):
 
             info = {}
             try:
+                t = yf.Ticker(ticker)
                 ti = t.info
                 info = {
                     "name": ti.get("shortName", ticker),
@@ -774,10 +809,11 @@ async def chart_data(ticker: str, period: str = "6mo", interval: str = "1d"):
             return None
 
     try:
-        result = await asyncio.wait_for(loop.run_in_executor(None, _fetch), timeout=30)
+        result = await asyncio.wait_for(loop.run_in_executor(None, _fetch), timeout=45)
     except asyncio.TimeoutError:
-        logger.warning(f"Chart data timeout for {ticker} (30s)")
+        logger.warning(f"Chart data timeout for {ticker} (45s)")
         raise HTTPException(504, f"Chart data timeout for {ticker}")
+    _chart_last_fetch = time.time()
     if result is None:
         raise HTTPException(404, f"No chart data for {ticker}")
     _cache_set(cache_key, result)

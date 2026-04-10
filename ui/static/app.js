@@ -3735,8 +3735,17 @@ async function sdLoadPeriod(period) {
     requestAnimationFrame(() => _renderStockChart(canvas, d));
 
   } catch (e) {
-    loadEl.textContent = 'Failed to load chart: ' + (e.message || 'unknown error');
-    loadEl.style.color = 'var(--red)';
+    // If 504 timeout, show retry message; otherwise show error
+    const isTimeout = e.message && e.message.includes('504');
+    const isRateLimit = e.message && (e.message.includes('429') || e.message.includes('504'));
+    if (isRateLimit) {
+      loadEl.textContent = 'Rate limited by Yahoo — retrying in 5s...';
+      loadEl.style.color = 'var(--amber)';
+      setTimeout(() => sdLoadPeriod(period), 5000);
+    } else {
+      loadEl.textContent = 'Failed to load chart: ' + (e.message || 'unknown error');
+      loadEl.style.color = 'var(--red)';
+    }
   }
 }
 

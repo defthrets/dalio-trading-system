@@ -22,10 +22,11 @@ CACHE_TTL = 300   # seconds
 _EXECUTOR = ThreadPoolExecutor(max_workers=4)
 
 
-def _cache_get(key: str):
+def _cache_get(key: str, ttl: int = None):
     with _CACHE_LOCK:
         e = _DATA_CACHE.get(key)
-    return e["v"] if e and (time.time() - e["t"]) < CACHE_TTL else None
+    max_age = ttl if ttl is not None else CACHE_TTL
+    return e["v"] if e and (time.time() - e["t"]) < max_age else None
 
 
 def _cache_set(key: str, val):
