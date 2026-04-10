@@ -2504,7 +2504,7 @@ function toggleSoundSetting(btn) {
   btn.textContent = _soundOn ? 'ON' : 'OFF';
   btn.classList.toggle('on', _soundOn);
   const mainBtn = el('soundToggleBtn');
-  if (mainBtn) { mainBtn.textContent = _soundOn ? '🔊 SOUND' : '🔇 SOUND'; mainBtn.classList.toggle('on', _soundOn); }
+  if (mainBtn) { const ic = document.getElementById('soundIcon'); if (ic) ic.textContent = _soundOn ? '🔊' : '🔇'; mainBtn.classList.toggle('on', _soundOn); }
 }
 
 function requestNotificationPermission() {
@@ -3895,7 +3895,7 @@ function _restoreSound() {
   if (s.sound_on === true) {
     _soundOn = true;
     const btn = el('soundToggleBtn');
-    if (btn) { btn.textContent = '🔊 SOUND'; btn.classList.add('on'); }
+    if (btn) { const ic = document.getElementById('soundIcon'); if (ic) ic.textContent = '🔊'; btn.classList.add('on'); }
     _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
 }
@@ -3904,7 +3904,8 @@ function toggleSound() {
   _soundOn = !_soundOn;
   const btn = el('soundToggleBtn');
   if (btn) {
-    btn.textContent = _soundOn ? '🔊 SOUND' : '🔇 SOUND';
+    const ic = document.getElementById('soundIcon');
+    if (ic) ic.textContent = _soundOn ? '🔊' : '🔇';
     btn.classList.toggle('on', _soundOn);
   }
   if (_soundOn && !_audioCtx) {
@@ -6755,15 +6756,8 @@ function toggleLightDark() {
 
 function _updateThemeToggleBtn(themeName) {
   const icon = document.getElementById('themeIcon');
-  const label = document.getElementById('themeLabel');
-  if (!icon || !label) return;
-  if (themeName === 'light') {
-    icon.textContent = '☀';
-    label.textContent = 'LIGHT';
-  } else {
-    icon.textContent = '◐';
-    label.textContent = 'DARK';
-  }
+  if (!icon) return;
+  icon.textContent = themeName === 'light' ? '☀' : '🌙';
 }
 
 // ═══════════════════════════════════════════════════════════

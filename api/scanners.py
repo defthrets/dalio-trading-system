@@ -53,42 +53,57 @@ ASX_TICKERS = [
 
 # ── ASX Penny Stocks (under $1, speculative) ──────────
 PENNY_TICKERS = [
-    # -- Mining Juniors & Explorers --
+    # -- Mining Juniors & Explorers (30) --
     "NHE.AX", "CAN.AX", "ERA.AX", "GWR.AX", "SBR.AX",
     "BCB.AX", "TER.AX", "RXL.AX", "MEU.AX", "AIS.AX",
     "IPT.AX", "BGL.AX", "CLQ.AX", "TNG.AX", "CHN.AX",
-    "SKY.AX", "MAU.AX", "BDC.AX", "SDG.AX",
-    # -- Gold Juniors --
+    "SKY.AX", "MAU.AX", "BDC.AX", "SDG.AX", "PNR.AX",
+    "ADT.AX", "MRR.AX", "AZL.AX", "CAD.AX", "CYL.AX",
+    "KAI.AX", "TIE.AX", "ABR.AX", "JMS.AX", "VMS.AX",
+    # -- Gold Juniors (20) --
     "SBM.AX", "DEG.AX", "GOR.AX", "SAR.AX", "MML.AX",
-    "WAF.AX", "SLR.AX", "OGC.AX", "RED.AX",
-    # -- Lithium & Battery --
-    "SYA.AX", "CXO.AX", "GL1.AX", "LKE.AX",
-    "AVZ.AX", "PLL.AX", "EUR.AX", "DEL.AX",
-    "NVX.AX", "EV1.AX", "LAT.AX",
-    # -- Uranium Juniors --
-    "92E.AX", "AGE.AX", "SLX.AX", "PEN.AX",
-    "BOE.AX", "NXE.AX", "GTR.AX", "TOE.AX",
-    "BKY.AX", "LOT.AX", "DYL.AX", "BMN.AX",
-    # -- Rare Earths --
-    "ARU.AX", "VML.AX", "HAS.AX", "NTU.AX",
-    "REE.AX", "ASM.AX", "HLX.AX",
-    # -- Biotech & Cannabis --
-    "RAC.AX", "IMM.AX", "PXA.AX", "ACL.AX",
-    "PRO.AX", "MX1.AX", "OSL.AX", "EMV.AX",
-    "CPH.AX", "BOD.AX", "CUP.AX",
-    # -- Tech Microcaps --
-    "AR9.AX", "RDY.AX", "BVS.AX", "OTW.AX",
-    "RNO.AX", "PKS.AX", "TNT.AX",
-    # -- Fintech --
-    "EML.AX", "MNY.AX", "LBL.AX", "MYS.AX",
-    "PGL.AX", "ABA.AX", "FIN.AX",
-    # -- Energy Juniors --
+    "WAF.AX", "SLR.AX", "OGC.AX", "RED.AX", "RMS.AX",
+    "RRL.AX", "PRU.AX", "CMM.AX", "RSG.AX", "MVR.AX",
+    "MZZ.AX", "POZ.AX", "AQX.AX", "GCY.AX", "KCN.AX",
+    # -- Lithium & Battery (20) --
+    "SYA.AX", "CXO.AX", "GL1.AX", "LKE.AX", "AVZ.AX",
+    "PLL.AX", "EUR.AX", "DEL.AX", "NVX.AX", "EV1.AX",
+    "LAT.AX", "ESS.AX", "LRS.AX", "ASN.AX", "AML.AX",
+    "CDT.AX", "LIT.AX", "FFX.AX", "PSC.AX", "VUL.AX",
+    # -- Uranium Juniors (15) --
+    "92E.AX", "AGE.AX", "SLX.AX", "PEN.AX", "BOE.AX",
+    "NXE.AX", "GTR.AX", "TOE.AX", "BKY.AX", "LOT.AX",
+    "DYL.AX", "BMN.AX", "EL8.AX", "VAL.AX", "MEY.AX",
+    # -- Rare Earths (10) --
+    "ARU.AX", "VML.AX", "HAS.AX", "NTU.AX", "REE.AX",
+    "ASM.AX", "HLX.AX", "IXR.AX", "OD6.AX", "GGG.AX",
+    # -- Biotech & Cannabis (20) --
+    "RAC.AX", "IMM.AX", "PXA.AX", "ACL.AX", "PRO.AX",
+    "MX1.AX", "OSL.AX", "EMV.AX", "CPH.AX", "BOD.AX",
+    "CUP.AX", "IDT.AX", "ADO.AX", "PAB.AX", "PNV.AX",
+    "AVH.AX", "TLX.AX", "NAN.AX", "ANP.AX", "SPL.AX",
+    # -- Tech Microcaps (15) --
+    "AR9.AX", "RDY.AX", "BVS.AX", "OTW.AX", "RNO.AX",
+    "PKS.AX", "TNT.AX", "DUB.AX", "DTL.AX", "ALC.AX",
+    "PPS.AX", "OCL.AX", "KNM.AX", "VMT.AX", "CI1.AX",
+    # -- Fintech & Services (15) --
+    "EML.AX", "MNY.AX", "LBL.AX", "MYS.AX", "PGL.AX",
+    "ABA.AX", "FIN.AX", "NVA.AX", "HUM.AX", "PPH.AX",
+    "SZL.AX", "SPT.AX", "FLX.AX", "IGL.AX", "JIN.AX",
+    # -- Energy Juniors (15) --
     "STX.AX", "MEL.AX", "TAP.AX", "OPT.AX", "CVN.AX",
-    # -- Misc Speculative --
-    "NIC.AX", "WSA.AX", "CIA.AX", "MGX.AX",
-    "GRR.AX", "NHC.AX", "CRN.AX",
-    "MYR.AX", "BBN.AX", "KGN.AX", "TPW.AX",
-    "STP.AX", "DUB.AX", "DTL.AX",
+    "BRU.AX", "COE.AX", "KAR.AX", "NZO.AX", "NRG.AX",
+    "GAL.AX", "MAD.AX", "BUR.AX", "RLE.AX", "XST.AX",
+    # -- Copper & Base Metal Juniors (15) --
+    "C6C.AX", "CUF.AX", "BHP.AX", "HCH.AX", "AOU.AX",
+    "TG1.AX", "HAV.AX", "MLS.AX", "AX8.AX", "CSE.AX",
+    "PAN.AX", "LCY.AX", "CUX.AX", "SVD.AX", "NML.AX",
+    # -- Misc Speculative (25) --
+    "NIC.AX", "WSA.AX", "CIA.AX", "MGX.AX", "GRR.AX",
+    "NHC.AX", "CRN.AX", "MYR.AX", "BBN.AX", "KGN.AX",
+    "TPW.AX", "STP.AX", "ZIP.AX", "IOU.AX", "DW8.AX",
+    "RBL.AX", "BRN.AX", "FYI.AX", "NMT.AX", "EMN.AX",
+    "APC.AX", "MNS.AX", "CPN.AX", "ALT.AX", "DRO.AX",
 ]
 
 CRYPTO_TICKERS = []  # Crypto removed -- ASX + commodities only
