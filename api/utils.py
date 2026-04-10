@@ -306,9 +306,19 @@ try:
     import yfinance as yf
     import pandas as pd
     YF_AVAILABLE = True
+    # Use a shared requests session to avoid repeated cookie/crumb fetches
+    # that trigger Yahoo rate limits
+    try:
+        import requests as _req
+        _yf_session = _req.Session()
+        _yf_session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+        yf.utils.get_json = None  # force fresh session
+    except Exception:
+        _yf_session = None
     logger.info("yfinance available -- real market data enabled")
 except ImportError:
     YF_AVAILABLE = False
+    _yf_session = None
     logger.warning("yfinance not installed -- using demo data (run: pip install yfinance pandas)")
 
 _VALID_PERIODS = {'1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max'}

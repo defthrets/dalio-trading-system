@@ -678,9 +678,21 @@ async def chart_data(ticker: str, period: str = "6mo", interval: str = "1d"):
 
     def _fetch():
         try:
-            t = yf.Ticker(ticker)
-            hist = t.history(period=period, interval=interval, auto_adjust=True)
+            import time as _time
+            for attempt in range(3):
+                try:
+                    from api.utils import _yf_session
+                    t = yf.Ticker(ticker, session=_yf_session) if _yf_session else yf.Ticker(ticker)
+                    hist = t.history(period=period, interval=interval, auto_adjust=True)
+                    break
+                except Exception as retry_exc:
+                    if attempt < 2 and "Rate" in str(retry_exc):
+                        logger.info(f"Chart rate-limited for {ticker}, retry {attempt+1}/3...")
+                        _time.sleep(2 * (attempt + 1))
+                    else:
+                        raise
             if hist is None or hist.empty:
+                logger.warning(f"Chart: empty history for {ticker} (period={period})")
                 return None
             hist = hist.dropna(subset=["Close"])
             candles = []
@@ -757,10 +769,15 @@ async def chart_data(ticker: str, period: str = "6mo", interval: str = "1d"):
                 "prediction": prediction, "info": info, "count": len(candles),
             }
         except Exception as exc:
-            logger.warning(f"Chart data error for {ticker}: {exc}")
+            import traceback
+            logger.warning(f"Chart data error for {ticker}: {exc}\n{traceback.format_exc()}")
             return None
 
-    result = await asyncio.wait_for(loop.run_in_executor(None, _fetch), timeout=15)
+    try:
+        result = await asyncio.wait_for(loop.run_in_executor(None, _fetch), timeout=30)
+    except asyncio.TimeoutError:
+        logger.warning(f"Chart data timeout for {ticker} (30s)")
+        raise HTTPException(504, f"Chart data timeout for {ticker}")
     if result is None:
         raise HTTPException(404, f"No chart data for {ticker}")
     _cache_set(cache_key, result)

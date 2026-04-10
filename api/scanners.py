@@ -308,29 +308,32 @@ async def _prices_for_positions(tickers: list) -> dict:
 
             def _batch_yf():
                 import yfinance as _yf_batch
+                import pandas as _pd_batch
                 try:
+                    single = len(remaining) == 1
                     raw = _yf_batch.download(
-                        remaining if len(remaining) > 1 else remaining[0],
+                        remaining if not single else remaining[0],
                         period="5d", auto_adjust=True, progress=False,
                         threads=True, timeout=10,
                     )
                     if raw is None or raw.empty:
                         return {}
-                    import pandas as _pd_batch
-                    if isinstance(raw.columns, _pd_batch.MultiIndex):
-                        close = raw["Close"] if "Close" in raw.columns.get_level_values(0) else None
-                    elif "Close" in raw.columns:
-                        close = _pd_batch.DataFrame({remaining[0]: raw["Close"]})
-                    else:
-                        return {}
-                    if close is None or close.empty:
-                        return {}
                     prices = {}
-                    for t in remaining:
-                        if t in close.columns:
-                            col = close[t].dropna()
+                    if single:
+                        # Single ticker: flat columns
+                        if "Close" in raw.columns:
+                            col = raw["Close"].dropna()
                             if not col.empty:
-                                prices[t] = float(col.iloc[-1])
+                                prices[remaining[0]] = float(col.iloc[-1])
+                    elif isinstance(raw.columns, _pd_batch.MultiIndex):
+                        # Multi-ticker: level 0 = Price, level 1 = Ticker
+                        if "Close" in raw.columns.get_level_values(0):
+                            close = raw["Close"]
+                            for t in remaining:
+                                if t in close.columns:
+                                    col = close[t].dropna()
+                                    if not col.empty:
+                                        prices[t] = float(col.iloc[-1])
                     return prices
                 except Exception:
                     return {}
@@ -378,8 +381,7 @@ async def _scan_yfinance_inner(tickers: list, market: str) -> list:
         try:
             raw = yf.download(
                 batch_tickers, period="5d", interval="1d",
-                group_by="ticker", auto_adjust=True,
-                progress=False, threads=True,
+                auto_adjust=True, progress=False, threads=True,
             )
             return (batch_tickers, raw)
         except Exception as exc:
@@ -394,31 +396,41 @@ async def _scan_yfinance_inner(tickers: list, market: str) -> list:
     batch_results = await asyncio.gather(*batch_futures)
     all_raw = [(b, r) for b, r in batch_results if r is not None]
 
+    import pandas as _pd
+
     for batch, raw in all_raw:
         if raw is None or raw.empty:
             continue
-        multi = len(batch) > 1
+        single = len(batch) == 1
         for ticker in batch:
             try:
-                if multi:
-                    if hasattr(raw.columns, "levels"):
-                        if ticker in raw.columns.get_level_values(1):
-                            df = raw.xs(ticker, axis=1, level=1).dropna(subset=["Close"])
-                        elif ticker in raw.columns.get_level_values(0):
-                            df = raw[ticker].dropna(subset=["Close"])
-                        else:
-                            continue
-                    else:
-                        df = raw[ticker].dropna(subset=["Close"])
-                else:
+                if single:
+                    # Single ticker: columns are flat (Close, Open, High, Low, Volume)
                     df = raw.dropna(subset=["Close"])
+                    if len(df) < 2:
+                        continue
+                    price = float(df["Close"].iloc[-1])
+                    prev = float(df["Close"].iloc[-2])
+                    vol = float(df["Volume"].iloc[-1]) if "Volume" in df.columns else 0
+                else:
+                    # Multi-ticker: default grouping = level 0 is Price, level 1 is Ticker
+                    # Access via raw["Close"][ticker], raw["Volume"][ticker]
+                    if not isinstance(raw.columns, _pd.MultiIndex):
+                        continue
+                    close_df = raw["Close"] if "Close" in raw.columns.get_level_values(0) else None
+                    if close_df is None:
+                        continue
+                    if ticker not in close_df.columns:
+                        continue
+                    col = close_df[ticker].dropna()
+                    if len(col) < 2:
+                        continue
+                    price = float(col.iloc[-1])
+                    prev = float(col.iloc[-2])
+                    vol_df = raw["Volume"] if "Volume" in raw.columns.get_level_values(0) else None
+                    vol = float(vol_df[ticker].dropna().iloc[-1]) if vol_df is not None and ticker in vol_df.columns else 0
 
-                if len(df) < 2:
-                    continue
-                price = float(df["Close"].iloc[-1])
-                prev = float(df["Close"].iloc[-2])
                 chg_pct = (price - prev) / prev * 100 if prev else 0
-                vol = float(df["Volume"].iloc[-1]) if "Volume" in df.columns else 0
                 results[ticker] = (price, chg_pct, vol)
             except Exception as exc:
                 logger.debug(f"Bulk parse [{ticker}]: {exc}")
