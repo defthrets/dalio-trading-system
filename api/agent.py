@@ -218,8 +218,8 @@ async def _run_autonomous_cycle():
 
     # 3. Filter signals by minimum confidence
     strong_signals = [s for s in signals if s.get("confidence", 0) >= min_confidence]
-    buy_signals = [s for s in strong_signals if s.get("action") == "BUY"]
-    sell_signals = [s for s in strong_signals if s.get("action") == "SELL"]
+    buy_signals = [s for s in strong_signals if s.get("action") in ("BUY", "LONG")]
+    sell_signals = [s for s in strong_signals if s.get("action") in ("SELL", "SHORT")]
 
     trades_executed = 0
     trade_details = []
