@@ -135,4 +135,3 @@ Educational and research purposes only. Not financial advice. Algorithmic signal
 **Website:** [defthrets.github.io/dalios-website](https://defthrets.github.io/dalios-website)
 
 ---
-*Co-authored by Clawd <clawd@qloak.me>
