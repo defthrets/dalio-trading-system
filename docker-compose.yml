@@ -24,7 +24,7 @@ services:
     environment:
       POSTGRES_DB: dalios
       POSTGRES_USER: dalios
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?err}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
