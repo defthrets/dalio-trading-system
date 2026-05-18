@@ -3,7 +3,6 @@ Dalios -- Shared Utilities
 Ticker normalisation, credential encryption, rate limiting, technical indicators, caching.
 """
 
-import base64
 import os
 import threading
 import time
@@ -34,24 +33,37 @@ def _cache_set(key: str, val):
         _DATA_CACHE[key] = {"v": val, "t": time.time()}
 
 
-# ── Basic credential obfuscation ────────────────────────
-_CRED_APP_KEY = os.environ.get("DALIO_CRED_KEY", "DaLiOs_AlLwEaThEr_2024!").encode("utf-8")
+# ── Credential encryption (Fernet / AES-128-GCM) ────────
+
+from cryptography.fernet import Fernet
+
+_KEY_PATH = os.path.join(os.path.dirname(__file__), "..", "data", ".cred_key")
 
 
-def _xor_bytes(data: bytes, key: bytes) -> bytes:
-    return bytes(b ^ key[i % len(key)] for i, b in enumerate(data))
+def _load_or_create_fernet_key() -> bytes:
+    """Load the Fernet key from disk, or generate and persist a new one."""
+    key_file = os.path.abspath(_KEY_PATH)
+    if os.path.exists(key_file):
+        with open(key_file, "rb") as f:
+            return f.read()
+    key = Fernet.generate_key()
+    os.makedirs(os.path.dirname(key_file), exist_ok=True)
+    with open(key_file, "wb") as f:
+        f.write(key)
+    return key
+
+
+_fernet = Fernet(_load_or_create_fernet_key())
 
 
 def _encrypt_value(plaintext: str) -> str:
-    """XOR + base64 obfuscation for stored credentials."""
-    xored = _xor_bytes(plaintext.encode("utf-8"), _CRED_APP_KEY)
-    return base64.b64encode(xored).decode("ascii")
+    """Fernet AES-128-GCM encryption for stored credentials."""
+    return _fernet.encrypt(plaintext.encode("utf-8")).decode("ascii")
 
 
 def _decrypt_value(encoded: str) -> str:
-    """Reverse XOR + base64 obfuscation."""
-    xored = base64.b64decode(encoded.encode("ascii"))
-    return _xor_bytes(xored, _CRED_APP_KEY).decode("utf-8")
+    """Fernet AES-128-GCM decryption for stored credentials."""
+    return _fernet.decrypt(encoded.encode("ascii")).decode("utf-8")
 
 
 def _encrypt_creds(creds: dict) -> dict:
