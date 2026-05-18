@@ -23,7 +23,8 @@ pydantic-settings>=2.0.0,<3.0.0
 sqlalchemy>=2.0.0,<3.0.0
 psycopg2-binary>=2.9.0,<3.0.0      # PostgreSQL driver (optional, for production)
 
-# ─── Scheduling & Utilities ─────────────────────────────────────────
+# ─── Utilities ──────────────────────────────────────────────────────
+cryptography>=41.0.0
 apscheduler>=3.10.0,<4.0.0
 python-dateutil>=2.8.0,<3.0.0
 loguru>=0.7.2,<1.0.0

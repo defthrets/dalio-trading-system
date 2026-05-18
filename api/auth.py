@@ -47,7 +47,24 @@ class User(Base):
 # ── Config ────────────────────────────────────────────────────
 
 AUTH_ENABLED = os.environ.get("DALIOS_AUTH_ENABLED", "false").lower() == "true"
-JWT_SECRET = os.environ.get("DALIOS_JWT_SECRET", secrets.token_hex(32))
+
+_JWT_SECRET_FILE = os.path.join(os.path.dirname(__file__), "..", "data", ".jwt_secret")
+
+
+def _load_or_create_jwt_secret() -> str:
+    """Load JWT secret from disk, or generate + persist a new one."""
+    secret_file = os.path.abspath(_JWT_SECRET_FILE)
+    if os.path.exists(secret_file):
+        with open(secret_file) as f:
+            return f.read().strip()
+    secret = secrets.token_hex(32)
+    os.makedirs(os.path.dirname(secret_file), exist_ok=True)
+    with open(secret_file, "w") as f:
+        f.write(secret)
+    return secret
+
+
+JWT_SECRET = os.environ.get("DALIOS_JWT_SECRET") or _load_or_create_jwt_secret()
 JWT_EXPIRY_HOURS = int(os.environ.get("DALIOS_JWT_EXPIRY_HOURS", "24"))
 
 
